@@ -5,6 +5,7 @@ import { Sidebar } from './components/Layout/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
 import { BrowseHalls } from './pages/BrowseHalls';
+import { UsersManagement } from './pages/UsersManagement';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Menu } from 'lucide-react';
@@ -180,6 +181,9 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'my_halls' && userProfile.role === 'vendor' && <VendorHalls user={userProfile} />}
           {activeTab === 'browse' && <BrowseHalls user={userProfile} />}
+          
+          {/* Super Admin Routes */}
+          {activeTab === 'users' && userProfile.role === 'super_admin' && <UsersManagement />}
           
           {/* Placeholders for other tabs */}
           {(activeTab === 'all_bookings' || activeTab === 'hall_bookings' || activeTab === 'my_bookings') && (
