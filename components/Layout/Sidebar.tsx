@@ -24,9 +24,10 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
+  siteName?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "SA Hall" }) => {
   if (!user) return null;
 
   const getMenuItems = () => {
@@ -68,14 +69,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         <div className="p-6 border-b border-border/50 flex flex-col items-center text-center">
           <img 
             src="/logo.png" 
-            alt="SA Hall Logo" 
+            alt={siteName} 
             className="w-24 h-auto mb-2 drop-shadow-sm"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/9b5de5/ffffff?text=SA+HALL';
+              (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/9b5de5/ffffff?text=LOGO';
             }}
           />
           <div>
-            <h1 className="text-xl font-black text-primary tracking-tighter leading-tight">SA Hall</h1>
+            <h1 className="text-xl font-black text-primary tracking-tighter leading-tight">{siteName}</h1>
             <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-70">Wedding Hall Saudi Arabia</p>
           </div>
         </div>

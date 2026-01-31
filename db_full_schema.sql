@@ -16,7 +16,43 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. جدول اشتراكات البائعين (SaaS Subscriptions)
+-- 3. وظيفة خاصة للتحقق من الدور لتجنب التكرار اللانهائي (SECURITY DEFINER)
+-- تحسين: استخدام النوع مباشرة وتحديد مسار البحث لزيادة الأمان والأداء
+CREATE OR REPLACE FUNCTION public.get_auth_role()
+RETURNS text AS $$
+DECLARE
+  user_role text;
+BEGIN
+  SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
+  RETURN user_role;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 4. وظيفة وتريجر لإنشاء الملف الشخصي تلقائياً عند التسجيل
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, role)
+  VALUES (
+    new.id, 
+    new.email, 
+    COALESCE(new.raw_user_meta_data->>'full_name', ''), 
+    COALESCE(new.raw_user_meta_data->>'role', 'user')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name),
+    role = COALESCE(public.profiles.role, EXCLUDED.role);
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 5. الجداول التابعة
 CREATE TABLE IF NOT EXISTS public.subscriptions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   vendor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -28,7 +64,6 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. جدول القاعات (Halls)
 CREATE TABLE IF NOT EXISTS public.halls (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   vendor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -46,7 +81,6 @@ CREATE TABLE IF NOT EXISTS public.halls (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. جدول الخدمات الإضافية (Services)
 CREATE TABLE IF NOT EXISTS public.services (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   vendor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -59,7 +93,6 @@ CREATE TABLE IF NOT EXISTS public.services (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 6. جدول الحجوزات (Bookings)
 CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   hall_id UUID REFERENCES public.halls(id) ON DELETE CASCADE,
@@ -75,7 +108,6 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. جدول المفضلة (Favorites)
 CREATE TABLE IF NOT EXISTS public.user_favorites (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -84,7 +116,6 @@ CREATE TABLE IF NOT EXISTS public.user_favorites (
   UNIQUE(user_id, hall_id)
 );
 
--- 8. جدول المراجعات
 CREATE TABLE IF NOT EXISTS public.reviews (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   hall_id UUID REFERENCES public.halls(id) ON DELETE CASCADE NOT NULL,
@@ -94,7 +125,6 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 9. جدول إعدادات النظام (System Settings)
 CREATE TABLE IF NOT EXISTS public.system_settings (
   key TEXT PRIMARY KEY,
   value JSONB,
@@ -106,7 +136,7 @@ INSERT INTO public.system_settings (key, value)
 VALUES ('platform_config', '{"site_name": "SA Hall", "commission_rate": 0.10, "vat_enabled": true}')
 ON CONFLICT (key) DO NOTHING;
 
--- 10. تفعيل الحماية (RLS)
+-- 6. تفعيل RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.halls ENABLE ROW LEVEL SECURITY;
@@ -116,65 +146,34 @@ ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
 
--- 11. سياسات الحماية الذكية (إيديمبوتنت)
-
+-- 7. سياسات الحماية (إصلاح التكرار اللانهائي والحفاظ على الوصول)
 DO $$ 
 BEGIN
     -- Profiles Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super admin manages all profiles') THEN
-        CREATE POLICY "Super admin manages all profiles" ON public.profiles FOR ALL USING (
-          (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'super_admin'
-        );
-    END IF;
+    DROP POLICY IF EXISTS "Super admin manages all profiles" ON public.profiles;
+    CREATE POLICY "Super admin manages all profiles" ON public.profiles FOR ALL USING (public.get_auth_role() = 'super_admin');
+    
+    DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+    CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 
-    -- System Settings Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super admin manages settings') THEN
-        CREATE POLICY "Super admin manages settings" ON public.system_settings FOR ALL USING (
-          (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'super_admin'
-        );
-    END IF;
+    -- Settings (تعديل للسماح بجميع العمليات لمدير النظام)
+    DROP POLICY IF EXISTS "Super admin manages settings" ON public.system_settings;
+    CREATE POLICY "Super admin manages settings" ON public.system_settings FOR ALL USING (public.get_auth_role() = 'super_admin');
+    
+    DROP POLICY IF EXISTS "Public can view settings" ON public.system_settings;
+    CREATE POLICY "Public can view settings" ON public.system_settings FOR SELECT USING (true);
 
-    -- Subscriptions Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Super admin manages subscriptions') THEN
-        CREATE POLICY "Super admin manages subscriptions" ON public.subscriptions FOR ALL USING (
-          (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'super_admin'
-        );
-    END IF;
+    -- Halls
+    DROP POLICY IF EXISTS "Vendors manage their own halls" ON public.halls;
+    CREATE POLICY "Vendors manage their own halls" ON public.halls FOR ALL USING (vendor_id = auth.uid());
+    
+    DROP POLICY IF EXISTS "Public view active halls" ON public.halls;
+    CREATE POLICY "Public view active halls" ON public.halls FOR SELECT USING (is_active = true);
 
-    -- Halls Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Vendors manage their own halls') THEN
-        CREATE POLICY "Vendors manage their own halls" ON public.halls FOR ALL USING (vendor_id = auth.uid());
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public view active halls') THEN
-        CREATE POLICY "Public view active halls" ON public.halls FOR SELECT USING (is_active = true);
-    END IF;
-
-    -- Bookings Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Vendors view their own bookings') THEN
-        CREATE POLICY "Vendors view their own bookings" ON public.bookings FOR SELECT USING (vendor_id = auth.uid());
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users view their own bookings') THEN
-        CREATE POLICY "Users view their own bookings" ON public.bookings FOR SELECT USING (user_id = auth.uid());
-    END IF;
-
-    -- Favorites Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users manage own favorites') THEN
-        CREATE POLICY "Users manage own favorites" ON public.user_favorites FOR ALL USING (user_id = auth.uid());
-    END IF;
-
-    -- Reviews Policies
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users manage own reviews') THEN
-        CREATE POLICY "Users manage own reviews" ON public.reviews FOR ALL USING (user_id = auth.uid());
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users view reviews') THEN
-        CREATE POLICY "Users view reviews" ON public.reviews FOR SELECT USING (true);
-    END IF;
+    -- Bookings
+    DROP POLICY IF EXISTS "Vendors view their own bookings" ON public.bookings;
+    CREATE POLICY "Vendors view their own bookings" ON public.bookings FOR SELECT USING (vendor_id = auth.uid() OR public.get_auth_role() = 'super_admin');
+    
+    DROP POLICY IF EXISTS "Users view their own bookings" ON public.bookings;
+    CREATE POLICY "Users view their own bookings" ON public.bookings FOR SELECT USING (user_id = auth.uid());
 END $$;
-
--- 12. الفهارس (Indexes) لسرعة الأداء
-CREATE INDEX IF NOT EXISTS idx_bookings_vendor ON public.bookings(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_halls_vendor ON public.halls(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_subs_vendor ON public.subscriptions(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_halls_city ON public.halls(city);
-CREATE INDEX IF NOT EXISTS idx_services_vendor ON public.services(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_reviews_hall ON public.reviews(hall_id);
