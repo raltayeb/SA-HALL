@@ -50,8 +50,9 @@ export const UsersManagement: React.FC = () => {
             .eq('id', currentUser.id);
         error = updateError;
     } else {
-        // Create (Insert into profiles only)
-        // Note: Real user creation requires Auth API, but this fulfills the DB CRUD requirement
+        // Create
+        // Use a random UUID. This works because we dropped the foreign key constraint in db_update.sql
+        // allowing "Ghost" profiles that can later be claimed or used for vendors.
         const fakeId = crypto.randomUUID(); 
         const { error: insertError } = await supabase
             .from('profiles')
@@ -178,7 +179,7 @@ export const UsersManagement: React.FC = () => {
             {!currentUser.id && (
                  <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-3 rounded-md text-xs flex gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <p>ملاحظة: إنشاء المستخدم هنا يضيفه لقاعدة البيانات فقط. لتمكينه من الدخول، يجب أن يتطابق المعرف مع سجل المصادقة (Auth).</p>
+                    <p>ملاحظة: هذا المستخدم لن يتمكن من تسجيل الدخول حتى يتم إنشاء حساب Auth بنفس المعرف (يتطلب تدخل برمجي).</p>
                  </div>
             )}
             
@@ -193,7 +194,7 @@ export const UsersManagement: React.FC = () => {
                 type="email"
                 value={currentUser.email || ''}
                 onChange={e => setCurrentUser({...currentUser, email: e.target.value})}
-                disabled={!!currentUser.id} // Disable email edit for existing users to prevent auth mismatch
+                disabled={!!currentUser.id} 
                 className={currentUser.id ? 'opacity-50' : ''}
             />
 
