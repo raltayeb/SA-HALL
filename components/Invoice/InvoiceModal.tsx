@@ -17,6 +17,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
 
   const subtotal = booking.total_amount / (1 + VAT_RATE);
   const vatAmount = booking.total_amount - subtotal;
+  
+  const hallPrice = booking.halls?.price_per_night || 0;
+  const servicePrice = booking.services?.price || 0;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="الفاتورة الضريبية الإلكترونية">
@@ -65,8 +68,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
                   <br />
                   <span className="text-xs text-muted-foreground">تاريخ المناسبة: {booking.booking_date}</span>
                 </td>
-                <td className="p-2 text-left">{formatCurrency(subtotal)}</td>
+                <td className="p-2 text-left">{formatCurrency(hallPrice)}</td>
               </tr>
+              {booking.services && (
+                <tr>
+                    <td className="p-2">
+                        خدمة إضافية: {booking.services.name}
+                        <br />
+                        <span className="text-xs text-muted-foreground">تصنيف: {booking.services.category}</span>
+                    </td>
+                    <td className="p-2 text-left">{formatCurrency(servicePrice)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

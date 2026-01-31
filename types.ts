@@ -13,6 +13,23 @@ export interface UserProfile {
   created_at?: string;
 }
 
+export interface Subscription {
+  id: string;
+  vendor_id: string;
+  plan_type: 'basic' | 'pro' | 'enterprise';
+  status: 'active' | 'expired' | 'trial';
+  start_date: string;
+  end_date: string;
+  amount_paid: number;
+  profiles?: UserProfile;
+}
+
+export interface SystemSettings {
+  site_name: string;
+  commission_rate: number;
+  vat_enabled: boolean;
+}
+
 export interface Hall {
   id: string;
   vendor_id: string;
@@ -31,7 +48,6 @@ export interface Hall {
   average_rating?: number;
 }
 
-// Fix: Add missing Service interface for vendor services management
 export interface Service {
   id: string;
   vendor_id: string;
@@ -42,12 +58,6 @@ export interface Service {
   image_url: string;
   is_active: boolean;
   created_at?: string;
-}
-
-export interface Favorite {
-  id: string;
-  user_id: string;
-  hall_id: string;
 }
 
 export interface Booking {
@@ -65,6 +75,7 @@ export interface Booking {
   created_at?: string;
   halls?: Hall;
   profiles?: UserProfile;
+  services?: Service;
 }
 
 export const SAUDI_CITIES = [
@@ -76,7 +87,6 @@ export const HALL_AMENITIES = [
   'مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية'
 ];
 
-// Fix: Add missing SERVICE_CATEGORIES constant for vendor services
 export const SERVICE_CATEGORIES = [
   'ضيافة وطعام', 'تصوير فوتوغرافي', 'تصوير فيديو', 'تنسيق زهور', 'كوشة وتصميم', 'توزيعات وهدايا', 'دي جي وصوت', 'زفة'
 ];

@@ -3,7 +3,6 @@ import React from 'react';
 import { UserProfile } from '../../types';
 import { 
   LayoutDashboard, 
-  CalendarDays, 
   Users, 
   Building2, 
   ClipboardList, 
@@ -13,7 +12,9 @@ import {
   User,
   Sparkles,
   Heart,
-  Wallet
+  Wallet,
+  ShieldCheck,
+  Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -34,8 +35,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
     if (user.role === 'super_admin') {
       return [
         ...common,
-        { id: 'all_bookings', label: 'جميع الحجوزات', icon: <CalendarDays className="w-5 h-5" /> },
+        { id: 'subscriptions', label: 'اشتراكات البائعين', icon: <ShieldCheck className="w-5 h-5" /> },
         { id: 'users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
+        { id: 'settings', label: 'إعدادات المنصة', icon: <Settings className="w-5 h-5" /> },
       ];
     }
     
@@ -67,7 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
           <div className="bg-primary/10 p-2.5 rounded-xl"><Building2 className="w-6 h-6 text-primary" /></div>
           <div>
             <h1 className="text-2xl font-black text-primary tracking-tighter">SA Hall</h1>
-            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Wedding SaaS</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">SaaS Edition</p>
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto no-scrollbar">

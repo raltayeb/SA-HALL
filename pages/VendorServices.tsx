@@ -5,7 +5,7 @@ import { UserProfile, Service, SERVICE_CATEGORIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { formatCurrency } from '../utils/currency';
-import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package } from 'lucide-react';
+import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 
@@ -18,6 +18,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service>>({});
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
   
   const { toast } = useToast();
 
@@ -69,15 +70,16 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذه الخدمة؟')) {
-      const { error } = await supabase.from('services').delete().eq('id', id);
-      if (!error) {
-        fetchServices();
-        toast({ title: 'تم الحذف', description: 'تم حذف الخدمة بنجاح', variant: 'success' });
-      } else {
-        toast({ title: 'خطأ', description: 'فشل حذف الخدمة', variant: 'destructive' });
-      }
+  const handleDelete = async () => {
+    if (!deletingServiceId) return;
+    
+    const { error } = await supabase.from('services').delete().eq('id', deletingServiceId);
+    if (!error) {
+      fetchServices();
+      toast({ title: 'تم الحذف', description: 'تم حذف الخدمة بنجاح', variant: 'success' });
+      setDeletingServiceId(null);
+    } else {
+      toast({ title: 'خطأ', description: 'فشل حذف الخدمة', variant: 'destructive' });
     }
   };
 
@@ -154,6 +156,31 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
         </div>
       </Modal>
 
+      {/* Deletion Confirmation Modal */}
+      <Modal 
+        isOpen={!!deletingServiceId} 
+        onClose={() => setDeletingServiceId(null)}
+        title="تأكيد حذف الخدمة"
+      >
+        <div className="space-y-4">
+          <div className="flex flex-col items-center gap-4 text-center py-4">
+            <div className="bg-destructive/10 p-4 rounded-full">
+              <AlertTriangle className="w-10 h-10 text-destructive" />
+            </div>
+            <div>
+              <h4 className="text-lg font-bold">هل أنت متأكد من حذف هذه الخدمة؟</h4>
+              <p className="text-sm text-muted-foreground">سيتم حذف الخدمة نهائياً ولن تكون متاحة للحجوزات الجديدة.</p>
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeletingServiceId(null)}>تراجع</Button>
+            <Button variant="destructive" className="flex-1 rounded-xl" onClick={handleDelete}>
+              تأكيد الحذف
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {services.map(service => (
           <div key={service.id} className="group overflow-hidden rounded-xl border bg-card shadow-sm hover:shadow-md transition-all">
@@ -186,7 +213,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
                 <Button size="sm" variant="outline" className="flex-1 gap-1" onClick={() => { setCurrentService(service); setIsEditing(true); }}>
                   <Edit className="w-3 h-3" /> تعديل
                 </Button>
-                <Button size="sm" variant="destructive" onClick={() => handleDelete(service.id)}>
+                <Button size="sm" variant="destructive" onClick={() => setDeletingServiceId(service.id)}>
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>

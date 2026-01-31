@@ -1,14 +1,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, VAT_RATE, SAUDI_CITIES } from '../types';
+import { Hall, UserProfile, VAT_RATE, SAUDI_CITIES, Service } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
-import { ImageOff, MapPin, CheckCircle2, Search, SlidersHorizontal, Users, Building2, ChevronRight, ChevronLeft, Eye, X, Heart, Star, Sparkles } from 'lucide-react';
+import { ImageOff, MapPin, CheckCircle2, Search, Users, Building2, Eye, X, Heart, Star, Sparkles, Calendar as CalendarIcon, Tag } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { DatePickerWithRange } from '../components/ui/DatePickerWithRange';
 import { DateRange } from 'react-day-picker';
-import { addDays } from 'date-fns';
+import { addDays, format } from 'date-fns';
+import { Modal } from '../components/ui/Modal';
+import { formatCurrency } from '../utils/currency';
 
 interface BrowseHallsProps {
   user: UserProfile;
@@ -17,14 +19,15 @@ interface BrowseHallsProps {
 export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   const [halls, setHalls] = useState<(Hall & { vendor?: { full_name: string, email: string } })[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bookingHall, setBookingHall] = useState<Hall | null>(null);
-  const [bookingDate, setBookingDate] = useState('');
   
   const [selectedHallDetails, setSelectedHallDetails] = useState<(Hall & { vendor?: any }) | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [similarHalls, setSimilarHalls] = useState<Hall[]>([]);
+
+  const [bookingHall, setBookingHall] = useState<Hall | null>(null);
+  const [vendorServices, setVendorServices] = useState<Service[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [bookingDate, setBookingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
@@ -40,7 +43,6 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
 
   useEffect(() => {
     fetchHalls();
-    fetchBookings();
     fetchFavorites();
   }, []);
 
@@ -60,9 +62,9 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     if (data) setFavorites(data.map(f => f.hall_id));
   };
 
-  const fetchBookings = async () => {
-    const { data } = await supabase.from('bookings').select('hall_id, booking_date, status');
-    if (data) setBookings(data);
+  const fetchVendorServices = async (vendorId: string) => {
+    const { data } = await supabase.from('services').select('*').eq('vendor_id', vendorId).eq('is_active', true);
+    if (data) setVendorServices(data);
   };
 
   const toggleFavorite = async (e: React.MouseEvent, hallId: string) => {
@@ -81,26 +83,37 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   const openDetails = (hall: any) => {
     setSelectedHallDetails(hall);
     setGalleryIndex(0);
-    const similar = halls.filter(h => 
-      h.id !== hall.id && (h.city === hall.city || Math.abs(h.price_per_night - hall.price_per_night) < 5000)
-    ).slice(0, 3);
-    setSimilarHalls(similar);
+  };
+
+  const handleOpenBooking = async (hall: Hall) => {
+    setBookingHall(hall);
+    setSelectedServiceId(null);
+    setVendorServices([]);
+    await fetchVendorServices(hall.vendor_id);
   };
 
   const handleBook = async () => {
     if (!bookingHall || !bookingDate) return;
-    const baseAmount = bookingHall.price_per_night;
+    
+    const selectedService = vendorServices.find(s => s.id === selectedServiceId);
+    const baseAmount = bookingHall.price_per_night + (selectedService?.price || 0);
     const vatAmount = baseAmount * VAT_RATE;
     const totalAmount = baseAmount + vatAmount;
 
     const { error } = await supabase.from('bookings').insert([{
-      hall_id: bookingHall.id, user_id: user.id, vendor_id: bookingHall.vendor_id,
-      booking_date: bookingDate, total_amount: totalAmount, vat_amount: vatAmount, status: 'pending'
+      hall_id: bookingHall.id,
+      service_id: selectedServiceId,
+      user_id: user.id,
+      vendor_id: bookingHall.vendor_id,
+      booking_date: bookingDate,
+      total_amount: totalAmount,
+      vat_amount: vatAmount,
+      status: 'pending'
     }]);
 
     if (!error) {
       toast({ title: 'تم إرسال الطلب', description: 'تم إرسال طلب الحجز بنجاح!', variant: 'success' });
-      setBookingHall(null); fetchBookings(); 
+      setBookingHall(null);
     } else {
       toast({ title: 'فشل الحجز', description: 'حدث خطأ أثناء محاولة الحجز.', variant: 'destructive' });
     }
@@ -113,6 +126,9 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     const matchesCapacity = hall.capacity >= minCapacity && hall.capacity <= maxCapacity;
     return matchesSearch && matchesCity && matchesPrice && matchesCapacity;
   });
+
+  const selectedService = vendorServices.find(s => s.id === selectedServiceId);
+  const currentTotal = bookingHall ? (bookingHall.price_per_night + (selectedService?.price || 0)) * (1 + VAT_RATE) : 0;
 
   if (loading) return <div className="p-12 text-center text-primary animate-pulse">جاري تحميل القاعات المتاحة...</div>;
 
@@ -157,6 +173,80 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         </div>
       </div>
 
+      {/* Booking Modal */}
+      <Modal 
+        isOpen={!!bookingHall} 
+        onClose={() => setBookingHall(null)}
+        title={`إتمام حجز: ${bookingHall?.name}`}
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4" /> تاريخ المناسبة
+            </label>
+            <input 
+              type="date" 
+              className="w-full h-11 bg-background border rounded-xl px-4 focus:ring-2 focus:ring-primary/20 outline-none"
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+              min={format(new Date(), 'yyyy-MM-dd')}
+            />
+          </div>
+
+          {vendorServices.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4" /> خدمات إضافية متوفرة
+              </label>
+              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                {vendorServices.map(service => (
+                  <div 
+                    key={service.id}
+                    onClick={() => setSelectedServiceId(selectedServiceId === service.id ? null : service.id)}
+                    className={`
+                      flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all
+                      ${selectedServiceId === service.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-muted/30 hover:bg-muted'}
+                    `}
+                  >
+                    <div>
+                      <p className="font-bold text-sm">{service.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{service.category}</p>
+                    </div>
+                    <PriceTag amount={service.price} className="text-sm" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">تكلفة القاعة:</span>
+              <PriceTag amount={bookingHall?.price_per_night || 0} />
+            </div>
+            {selectedService && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">تكلفة الخدمة ({selectedService.name}):</span>
+                <PriceTag amount={selectedService.price} />
+              </div>
+            )}
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>ضريبة القيمة المضافة (15%):</span>
+              <PriceTag amount={(currentTotal / (1 + VAT_RATE)) * VAT_RATE} />
+            </div>
+            <div className="flex justify-between font-black text-primary text-lg border-t border-primary/10 pt-2">
+              <span>الإجمالي الكلي:</span>
+              <PriceTag amount={currentTotal} iconSize={20} />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setBookingHall(null)}>إلغاء</Button>
+            <Button className="flex-[2] rounded-xl h-11 font-bold" onClick={handleBook}>تأكيد الحجز</Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Hall Details Modal */}
       {selectedHallDetails && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in">
@@ -170,6 +260,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                   <img src={selectedHallDetails.images[galleryIndex]} className="w-full h-full object-cover animate-in fade-in duration-500" alt={selectedHallDetails.name} />
                 ) : (
                   <ImageOff className="w-20 h-20 text-white opacity-20" />
+                )}
+                {selectedHallDetails.images && selectedHallDetails.images.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 p-2 bg-black/20 backdrop-blur-md rounded-full">
+                        {selectedHallDetails.images.map((_, idx) => (
+                            <button 
+                                key={idx} 
+                                onClick={() => setGalleryIndex(idx)}
+                                className={`w-2 h-2 rounded-full transition-all ${idx === galleryIndex ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'}`}
+                            />
+                        ))}
+                    </div>
                 )}
               </div>
               <div className="p-8 lg:p-12 space-y-8">
@@ -209,7 +310,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                 )}
 
                 <div className="pt-6 border-t flex gap-4">
-                   <Button className="flex-1 h-14 text-lg font-bold rounded-2xl shadow-xl shadow-primary/20" onClick={() => { setBookingHall(selectedHallDetails); setSelectedHallDetails(null); }}>احجز الآن</Button>
+                   <Button className="flex-1 h-14 text-lg font-bold rounded-2xl shadow-xl shadow-primary/20" onClick={() => { handleOpenBooking(selectedHallDetails); setSelectedHallDetails(null); }}>احجز الآن</Button>
                    <Button variant="outline" className="h-14 w-14 rounded-2xl" onClick={(e) => toggleFavorite(e, selectedHallDetails.id)}>
                       <Heart className={`w-6 h-6 ${favorites.includes(selectedHallDetails.id) ? 'fill-destructive text-destructive' : ''}`} />
                    </Button>
@@ -244,7 +345,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                 <p className="text-sm text-muted-foreground font-medium line-clamp-2 italic leading-relaxed">{hall.description || "استمتع بمناسبة لا تُنسى في أرقى القاعات السعودية المصممة خصيصاً لتناسب تطلعاتكم."}</p>
                 <div className="flex gap-2 pt-4">
                    <Button variant="outline" className="flex-1 rounded-2xl h-12 text-sm font-bold" onClick={() => openDetails(hall)}>التفاصيل</Button>
-                   <Button className="flex-[2] rounded-2xl h-12 text-base font-bold shadow-lg shadow-primary/10" onClick={() => setBookingHall(hall)}>احجز موعدك</Button>
+                   <Button className="flex-[2] rounded-2xl h-12 text-base font-bold shadow-lg shadow-primary/10" onClick={() => handleOpenBooking(hall)}>احجز موعدك</Button>
                 </div>
              </div>
           </div>

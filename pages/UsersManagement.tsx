@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Role } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Users, Edit, Trash2, Search, Plus, ShieldAlert } from 'lucide-react';
+import { Users, Edit, Trash2, Search, Plus, ShieldAlert, Phone, Building } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface FormErrors {
@@ -102,7 +103,9 @@ export const UsersManagement: React.FC = () => {
                 .from('profiles')
                 .update({ 
                     full_name: currentUser.full_name, 
-                    role: currentUser.role 
+                    role: currentUser.role,
+                    phone_number: currentUser.phone_number,
+                    business_name: currentUser.business_name
                 })
                 .eq('id', currentUser.id);
             error = updateError;
@@ -115,7 +118,9 @@ export const UsersManagement: React.FC = () => {
                     id: fakeId,
                     email: currentUser.email,
                     full_name: currentUser.full_name,
-                    role: currentUser.role || 'user'
+                    role: currentUser.role || 'user',
+                    phone_number: currentUser.phone_number,
+                    business_name: currentUser.business_name
                 }]);
             error = insertError;
         }
@@ -244,7 +249,7 @@ export const UsersManagement: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         title={currentUser.id ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
       >
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
             {errors.general && (
                 <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
                     {errors.general}
@@ -274,6 +279,22 @@ export const UsersManagement: React.FC = () => {
                 className={currentUser.id ? 'opacity-50' : ''}
                 error={errors.email}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+                <Input 
+                    label="رقم الهاتف"
+                    type="tel"
+                    placeholder="05xxxxxxx"
+                    value={currentUser.phone_number || ''}
+                    onChange={e => setCurrentUser({...currentUser, phone_number: e.target.value})}
+                />
+                <Input 
+                    label="اسم النشاط التجاري"
+                    placeholder="للبائعين فقط"
+                    value={currentUser.business_name || ''}
+                    onChange={e => setCurrentUser({...currentUser, business_name: e.target.value})}
+                />
+            </div>
 
             <div className="space-y-2">
                 <label className="text-sm font-medium">نوع الصلاحية</label>
