@@ -68,6 +68,27 @@
     <!-- DayPicker Styles -->
     <link rel="stylesheet" href="https://esm.sh/react-day-picker@8.10.0/dist/style.css">
     
+    <style>
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      .toast-slide-in {
+        animation: slideIn 0.3s ease-out forwards;
+      }
+      body {
+        direction: rtl;
+      }
+      /* Custom scrollbar for better SaaS look */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+
     <script type="importmap">
     {
       "imports": {
