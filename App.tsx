@@ -9,6 +9,7 @@ import { UsersManagement } from './pages/UsersManagement';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Menu } from 'lucide-react';
+import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -16,6 +17,8 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  const { toast } = useToast();
 
   // Auth State
   const [email, setEmail] = useState('');
@@ -67,17 +70,24 @@ const App: React.FC = () => {
           data: { full_name: fullName, role: role }
         }
       });
-      if (error) alert(error.message);
-      else alert('تم التسجيل! يرجى التحقق من بريدك الإلكتروني.');
+      if (error) {
+        toast({ title: 'فشل التسجيل', description: error.message, variant: 'destructive' });
+      } else {
+        toast({ title: 'تم التسجيل بنجاح', description: 'يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب.', variant: 'success' });
+        setIsRegister(false);
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) alert(error.message);
+      if (error) {
+        toast({ title: 'فشل تسجيل الدخول', description: error.message, variant: 'destructive' });
+      }
     }
     setLoading(false);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    toast({ title: 'تم تسجيل الخروج', description: 'إلى اللقاء!', variant: 'default' });
   };
 
   if (loading) {

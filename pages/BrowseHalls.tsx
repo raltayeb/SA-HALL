@@ -4,6 +4,7 @@ import { Hall, UserProfile, VAT_RATE } from '../types';
 import { Button } from '../components/ui/Button';
 import { formatCurrency } from '../utils/currency';
 import { ImageOff, MapPin, CheckCircle2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface BrowseHallsProps {
   user: UserProfile;
@@ -14,6 +15,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [bookingHall, setBookingHall] = useState<Hall | null>(null);
   const [bookingDate, setBookingDate] = useState('');
+  
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetch = async () => {
@@ -43,11 +46,19 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     }]);
 
     if (!error) {
-      alert('تم إرسال طلب الحجز بنجاح!');
+      toast({ 
+        title: 'تم إرسال الطلب', 
+        description: 'تم إرسال طلب الحجز بنجاح! سيتم التواصل معك قريباً.', 
+        variant: 'success' 
+      });
       setBookingHall(null);
       setBookingDate('');
     } else {
-      alert('فشل الحجز. حاول مرة أخرى.');
+      toast({ 
+        title: 'فشل الحجز', 
+        description: 'حدث خطأ أثناء محاولة الحجز. يرجى المحاولة مرة أخرى.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -59,7 +70,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
 
       {bookingHall && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="bg-card w-full max-w-md rounded-xl p-6 space-y-4 shadow-lg border">
+          <div className="bg-card w-full max-w-md rounded-xl p-6 space-y-4 shadow-lg border animate-in zoom-in-95">
             <h3 className="font-bold text-lg flex items-center gap-2">
               <CheckCircle2 className="text-primary w-5 h-5" />
               حجز {bookingHall.name}

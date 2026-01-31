@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { formatCurrency } from '../utils/currency';
 import { Plus, MapPin, Users, ImageOff, Edit, Trash2 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface VendorHallsProps {
   user: UserProfile;
@@ -15,6 +16,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentHall, setCurrentHall] = useState<Partial<Hall>>({});
+  
+  const { toast } = useToast();
 
   const fetchHalls = async () => {
     setLoading(true);
@@ -35,7 +38,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const handleSave = async () => {
     if (!currentHall.name || !currentHall.price_per_night || !currentHall.city) {
-      alert('يرجى تعبئة الحقول الإجبارية');
+      toast({ title: 'خطأ', description: 'يرجى تعبئة الحقول الإجبارية', variant: 'destructive' });
       return;
     }
 
@@ -59,16 +62,22 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setIsEditing(false);
       setCurrentHall({});
       fetchHalls();
+      toast({ title: 'نجاح', description: 'تم حفظ بيانات القاعة بنجاح', variant: 'success' });
     } else {
-      alert('حدث خطأ أثناء الحفظ');
       console.error(error);
+      toast({ title: 'خطأ', description: 'حدث خطأ أثناء الحفظ', variant: 'destructive' });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذه القاعة؟')) {
       const { error } = await supabase.from('halls').delete().eq('id', id);
-      if (!error) fetchHalls();
+      if (!error) {
+        fetchHalls();
+        toast({ title: 'تم الحذف', description: 'تم حذف القاعة بنجاح', variant: 'success' });
+      } else {
+        toast({ title: 'خطأ', description: 'فشل حذف القاعة', variant: 'destructive' });
+      }
     }
   };
 

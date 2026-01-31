@@ -5,11 +5,14 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Users, Edit, Trash2, Search, Plus, ShieldAlert } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export const UsersManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  const { toast } = useToast();
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,7 +52,7 @@ export const UsersManagement: React.FC = () => {
                 .from('profiles')
                 .select('id')
                 .eq('email', currentUser.email)
-                .maybeSingle(); // Use maybeSingle to avoid error if not found
+                .maybeSingle(); 
 
             if (checkError) {
                 throw new Error('فشل في التحقق من وجود المستخدم: ' + checkError.message);
@@ -75,8 +78,6 @@ export const UsersManagement: React.FC = () => {
             error = updateError;
         } else {
             // Create
-            // Use a random UUID. This works because we dropped the foreign key constraint in db_update.sql
-            // allowing "Ghost" profiles that can later be claimed or used for vendors.
             const fakeId = crypto.randomUUID(); 
             const { error: insertError } = await supabase
                 .from('profiles')
@@ -90,7 +91,6 @@ export const UsersManagement: React.FC = () => {
         }
 
         if (error) {
-            // Translate common RLS error
             if (error.message.includes('row-level security')) {
                 throw new Error('ليس لديك صلاحية لإجراء هذا التعديل. تأكد من أن حسابك يمتلك صلاحية "مدير نظام" (Super Admin).');
             }
@@ -101,6 +101,7 @@ export const UsersManagement: React.FC = () => {
         setIsModalOpen(false);
         setCurrentUser({});
         fetchUsers();
+        toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات المستخدم بنجاح', variant: 'success' });
 
     } catch (err: any) {
         console.error(err);
@@ -115,9 +116,11 @@ export const UsersManagement: React.FC = () => {
         try {
             const { error } = await supabase.from('profiles').delete().eq('id', id);
             if (error) throw error;
+            
             fetchUsers();
+            toast({ title: 'تم الحذف', description: 'تم حذف المستخدم بنجاح', variant: 'success' });
         } catch (err: any) {
-             alert('فشل الحذف: ' + err.message);
+             toast({ title: 'خطأ', description: 'فشل الحذف: ' + err.message, variant: 'destructive' });
         }
     }
   };
