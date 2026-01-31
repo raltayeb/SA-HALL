@@ -1,8 +1,16 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
 import { ToastProvider } from './context/ToastContext';
+
+// We rely on Tailwind CDN in index.html for instant previewing
+// but we keep the global css import for the deploy build process
+try {
+  import('./index.css');
+} catch (e) {
+  console.log('CSS processed via CDN in this environment');
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

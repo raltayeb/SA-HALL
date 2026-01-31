@@ -1,7 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking, VAT_RATE } from '../types';
-import { formatCurrency } from '../utils/currency';
+import { PriceTag } from '../components/ui/PriceTag';
 import { CalendarCheck, Banknote, Hourglass, Landmark, TrendingUp } from 'lucide-react';
 import { 
   BarChart, 
@@ -21,7 +22,6 @@ interface DashboardProps {
   user: UserProfile;
 }
 
-// Helper to get Arabic Month Name
 const getMonthName = (dateStr: string) => {
   const date = new Date(dateStr);
   return new Intl.DateTimeFormat('ar-SA', { month: 'short' }).format(date);
@@ -48,7 +48,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         } else if (user.role === 'user') {
           query = query.eq('user_id', user.id);
         }
-        // Super admin sees all
 
         const { data, error } = await query;
 
@@ -61,12 +60,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           totalBookings: bookings.length,
           totalRevenue: total,
           pendingBookings: bookings.filter(b => b.status === 'pending').length,
-          zatcaTax: total * (VAT_RATE / (1 + VAT_RATE)) // Extract VAT from total inclusive
+          zatcaTax: total * (VAT_RATE / (1 + VAT_RATE))
         });
 
-        // Process Chart Data (Only needed for Admin/Vendor)
         if (user.role !== 'user') {
-            // 1. Revenue per Month
             const revenueMap = new Map<string, number>();
             bookings.forEach(b => {
                 const month = getMonthName(b.booking_date);
@@ -75,15 +72,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             const revData = Array.from(revenueMap, ([name, total]) => ({ name, total }));
             setRevenueData(revData);
 
-            // 2. Status Distribution
             const statusCount = { pending: 0, confirmed: 0, cancelled: 0 };
             bookings.forEach(b => {
                 if(statusCount[b.status] !== undefined) statusCount[b.status]++;
             });
             setStatusData([
-                { name: 'قيد الانتظار', value: statusCount.pending, color: 'oklch(0.702 0.183 293.541)' }, // Ring color
-                { name: 'مؤكد', value: statusCount.confirmed, color: 'oklch(0.541 0.281 293.009)' }, // Primary
-                { name: 'ملغي', value: statusCount.cancelled, color: 'oklch(0.577 0.245 27.325)' }, // Destructive
+                { name: 'قيد الانتظار', value: statusCount.pending, color: 'oklch(0.702 0.183 293.541)' },
+                { name: 'مؤكد', value: statusCount.confirmed, color: 'oklch(0.541 0.281 293.009)' },
+                { name: 'ملغي', value: statusCount.cancelled, color: 'oklch(0.577 0.245 27.325)' },
             ].filter(i => i.value > 0));
         }
 
@@ -102,9 +98,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-card border p-2 rounded-lg shadow-sm text-sm">
+        <div className="bg-card border p-2 rounded-lg shadow-sm text-sm" dir="rtl">
           <p className="font-bold mb-1">{label}</p>
-          <p className="text-primary">{formatCurrency(payload[0].value)}</p>
+          <PriceTag amount={payload[0].value} className="text-primary" />
         </div>
       );
     }
@@ -129,7 +125,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <h3 className="tracking-tight text-sm font-medium">الإيرادات</h3>
               <Banknote className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
+            <PriceTag amount={stats.totalRevenue} className="text-2xl" iconSize={24} />
             <p className="text-xs text-muted-foreground mt-1">شاملة ضريبة القيمة المضافة</p>
           </div>
         )}
@@ -149,7 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
               <h3 className="tracking-tight text-sm font-medium text-primary">استحقاق الزكاة/الضريبة</h3>
               <Landmark className="h-4 w-4 text-primary" />
             </div>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(stats.zatcaTax)}</div>
+            <PriceTag amount={stats.zatcaTax} className="text-2xl text-primary" iconSize={24} />
             <p className="text-xs text-muted-foreground mt-1">تقدير ضريبة القيمة المضافة (15%)</p>
           </div>
         )}
@@ -178,7 +174,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                             <YAxis 
                                 tickLine={false} 
                                 axisLine={false} 
-                                tickFormatter={(val) => `SAR ${val/1000}k`} 
+                                tickFormatter={(val) => `${val/1000}k`} 
                                 tick={{fill: 'var(--muted-foreground)', fontSize: 12}} 
                             />
                             <Tooltip content={<CustomTooltip />} cursor={{fill: 'var(--muted)'}} />
@@ -216,15 +212,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-            </div>
-        </div>
-      )}
-
-      {user.role === 'user' && (
-        <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <div className="p-6">
-            <h3 className="font-semibold leading-none tracking-tight mb-2">مرحباً بك في SA Hall</h3>
-            <p className="text-sm text-muted-foreground">استمتع بتجربة حجز قاعات سهلة وموثوقة.</p>
             </div>
         </div>
       )}

@@ -9,28 +9,86 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Play CDN for instant preview support -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              border: "oklch(0.92 0.004 286.32)",
+              input: "oklch(0.92 0.004 286.32)",
+              ring: "oklch(0.702 0.183 293.541)",
+              background: "oklch(1 0 0)",
+              foreground: "oklch(0.141 0.005 285.823)",
+              primary: {
+                DEFAULT: "oklch(0.541 0.281 293.009)",
+                foreground: "oklch(0.969 0.016 293.756)",
+              },
+              secondary: {
+                DEFAULT: "oklch(0.967 0.001 286.375)",
+                foreground: "oklch(0.21 0.006 285.885)",
+              },
+              destructive: {
+                DEFAULT: "oklch(0.577 0.245 27.325)",
+                foreground: "oklch(0.969 0.016 293.756)",
+              },
+              muted: {
+                DEFAULT: "oklch(0.967 0.001 286.375)",
+                foreground: "oklch(0.552 0.016 285.938)",
+              },
+              accent: {
+                DEFAULT: "oklch(0.967 0.001 286.375)",
+                foreground: "oklch(0.21 0.006 285.885)",
+              },
+              popover: {
+                DEFAULT: "oklch(1 0 0)",
+                foreground: "oklch(0.141 0.005 285.823)",
+              },
+              card: {
+                DEFAULT: "oklch(1 0 0)",
+                foreground: "oklch(0.141 0.005 285.823)",
+              },
+            },
+            borderRadius: {
+              lg: "0.65rem",
+              md: "calc(0.65rem - 2px)",
+              sm: "calc(0.65rem - 4px)",
+            },
+            fontFamily: {
+              sans: ['Cairo', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    
     <!-- DayPicker Styles -->
     <link rel="stylesheet" href="https://esm.sh/react-day-picker@8.10.0/dist/style.css">
-  <script type="importmap">
-{
-  "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@0.300.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.0",
-    "react": "https://esm.sh/react@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.2.1",
-    "vite": "https://esm.sh/vite@5.0.0",
-    "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
-    "date-fns": "https://esm.sh/date-fns@3.3.1",
-    "react-day-picker": "https://esm.sh/react-day-picker@8.10.0?external=react,react-dom"
-  }
-}
-</script>
-</head>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "lucide-react": "https://esm.sh/lucide-react@0.300.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.0",
+        "react": "https://esm.sh/react@18.2.0",
+        "react/": "https://esm.sh/react@18.2.0/",
+        "react-dom": "https://esm.sh/react-dom@18.2.0",
+        "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+        "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@4.2.1",
+        "vite": "https://esm.sh/vite@5.0.0",
+        "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
+        "date-fns": "https://esm.sh/date-fns@3.3.1",
+        "react-day-picker": "https://esm.sh/react-day-picker@8.10.0?external=react,react-dom"
+      }
+    }
+    </script>
+  </head>
   <body class="bg-background text-foreground antialiased min-h-screen font-sans">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <!-- Use relative path to fix loading in subfolders/sandboxes -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.halls (
   price_per_night DECIMAL(10, 2) NOT NULL,
   description TEXT,
   image_url TEXT,
+  images JSONB DEFAULT '[]'::jsonb, -- Array of image URLs
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

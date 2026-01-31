@@ -5,6 +5,10 @@ export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  business_name?: string;
+  phone_number?: string;
+  bio?: string;
+  avatar_url?: string;
   role: Role;
   created_at?: string;
 }
@@ -18,10 +22,16 @@ export interface Hall {
   price_per_night: number;
   description: string;
   image_url: string;
+  images: string[];
+  amenities: string[];
   is_active: boolean;
+  latitude?: number;
+  longitude?: number;
   created_at?: string;
+  average_rating?: number;
 }
 
+// Fix: Add missing Service interface for vendor services management
 export interface Service {
   id: string;
   vendor_id: string;
@@ -34,6 +44,12 @@ export interface Service {
   created_at?: string;
 }
 
+export interface Favorite {
+  id: string;
+  user_id: string;
+  hall_id: string;
+}
+
 export interface Booking {
   id: string;
   hall_id?: string;
@@ -44,6 +60,8 @@ export interface Booking {
   total_amount: number;
   vat_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled';
+  notes?: string;
+  completed_at?: string;
   created_at?: string;
   halls?: Hall;
   profiles?: UserProfile;
@@ -54,8 +72,13 @@ export const SAUDI_CITIES = [
   'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'
 ];
 
+export const HALL_AMENITIES = [
+  'مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية'
+];
+
+// Fix: Add missing SERVICE_CATEGORIES constant for vendor services
 export const SERVICE_CATEGORIES = [
-  'بوفيه وضيافة', 'تصوير فوتوغرافي', 'تنسيق زهور', 'دي جي وصوتيات', 'كوشة وتصميم', 'ضيافة قهوة وشاي'
+  'ضيافة وطعام', 'تصوير فوتوغرافي', 'تصوير فيديو', 'تنسيق زهور', 'كوشة وتصميم', 'توزيعات وهدايا', 'دي جي وصوت', 'زفة'
 ];
 
 export const VAT_RATE = 0.15;
