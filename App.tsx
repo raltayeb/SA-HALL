@@ -13,9 +13,10 @@ import { VendorSubscriptions } from './pages/VendorSubscriptions';
 import { SystemSettings } from './pages/SystemSettings';
 import { Favorites } from './pages/Favorites';
 import { CalendarBoard } from './pages/CalendarBoard';
+import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Menu, Loader2, Bell } from 'lucide-react';
+import { Menu, Loader2, Bell, Check, ExternalLink } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
@@ -25,7 +26,8 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
     site_name: 'SA Hall',
     commission_rate: 0.10,
@@ -40,6 +42,17 @@ const App: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState('user');
 
+  // Apply Vendor Theme Color
+  useEffect(() => {
+    if (userProfile?.theme_color) {
+      document.documentElement.style.setProperty('--primary', userProfile.theme_color);
+      // Generate a slightly lighter version for backgrounds
+      document.documentElement.style.setProperty('--primary-muted', `${userProfile.theme_color}22`);
+    } else {
+      document.documentElement.style.setProperty('--primary', 'oklch(0.541 0.281 293.009)');
+    }
+  }, [userProfile?.theme_color]);
+
   const fetchSiteSettings = async () => {
     try {
       const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
@@ -47,13 +60,19 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
-  const fetchUnreadNotifications = async (userId: string) => {
-    const { count } = await supabase
+  const fetchNotifications = async (userId: string) => {
+    const { data } = await supabase
       .from('notifications')
-      .select('*', { count: 'exact', head: true })
+      .select('*')
       .eq('user_id', userId)
-      .eq('is_read', false);
-    setUnreadNotifications(count || 0);
+      .order('created_at', { ascending: false })
+      .limit(10);
+    setNotifications(data || []);
+  };
+
+  const markAsRead = async (notifId: string) => {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
   };
 
   useEffect(() => {
@@ -79,11 +98,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (userProfile?.id) {
-      fetchUnreadNotifications(userProfile.id);
+      fetchNotifications(userProfile.id);
       const channel = supabase
         .channel(`notifications:${userProfile.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userProfile.id}` }, (payload) => {
-          setUnreadNotifications(prev => prev + 1);
+          setNotifications(prev => [payload.new, ...prev]);
           toast({ title: payload.new.title, description: payload.new.message, variant: 'default' });
         })
         .subscribe();
@@ -114,6 +133,8 @@ const App: React.FC = () => {
     } catch (error: any) { toast({ title: 'خطأ', description: error.message, variant: 'destructive' }); }
     finally { setAuthLoading(false); }
   };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (loading) return (
     <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-4">
@@ -152,16 +173,66 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans">
       <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => supabase.auth.signOut()} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} siteName={siteSettings.site_name} />
-      <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b lg:hidden">
-        <div className="flex items-center gap-2">
-          <h1 className="font-black text-primary text-xl">{siteSettings.site_name}</h1>
+      
+      {/* Header for Desktop & Mobile */}
+      <div className="fixed top-0 left-0 right-0 lg:right-64 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}><Menu /></Button>
+          <h1 className="font-black text-primary text-xl lg:hidden">{siteSettings.site_name}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative"><Bell className="w-6 h-6 text-muted-foreground" />{unreadNotifications > 0 && <span className="absolute -top-1 -right-1 bg-destructive text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-bounce">{unreadNotifications}</span>}</div>
-          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}><Menu /></Button>
+        
+        <div className="flex items-center gap-4">
+          {/* Enhanced Notification Center */}
+          <div className="relative">
+            <Button variant="ghost" size="icon" className="relative rounded-full" onClick={() => setShowNotifDropdown(!showNotifDropdown)}>
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 bg-destructive text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+            
+            {showNotifDropdown && (
+              <div className="absolute left-0 mt-2 w-80 bg-card border rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left">
+                <div className="p-4 border-b bg-muted/10 flex justify-between items-center">
+                  <h4 className="font-black text-sm">الإشعارات</h4>
+                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">الأحدث</span>
+                </div>
+                <div className="max-h-96 overflow-y-auto no-scrollbar">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground italic">لا توجد إشعارات جديدة</div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div key={n.id} onClick={() => { markAsRead(n.id); if(n.action_url) setActiveTab(n.action_url); setShowNotifDropdown(false); }} className={`p-4 border-b hover:bg-muted/50 transition-colors cursor-pointer relative ${!n.is_read ? 'bg-primary/5' : ''}`}>
+                        <div className="flex justify-between items-start gap-2">
+                           <p className="text-xs font-black mb-1">{n.title}</p>
+                           {!n.is_read && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1"></div>}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</p>
+                        <span className="text-[9px] text-muted-foreground mt-2 block opacity-50">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <Button variant="ghost" className="w-full text-[10px] h-10 rounded-none border-t" onClick={() => setShowNotifDropdown(false)}>إغلاق القائمة</Button>
+              </div>
+            )}
+          </div>
+          
+          <div className="hidden lg:flex items-center gap-3 pr-4 border-r">
+             <div className="text-left">
+                <p className="text-xs font-black">{userProfile.full_name}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">{userProfile.role}</p>
+             </div>
+             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
+               {userProfile.full_name?.[0]}
+             </div>
+          </div>
         </div>
       </div>
-      <main className="flex-1 lg:mr-72 p-4 pt-24 lg:p-10">
+
+      <main className="flex-1 lg:mr-64 p-4 pt-24 lg:p-10 transition-all duration-300">
         <div className="mx-auto max-w-6xl">
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
@@ -172,6 +243,7 @@ const App: React.FC = () => {
           {activeTab === 'users' && <UsersManagement />}
           {activeTab === 'subscriptions' && <VendorSubscriptions />}
           {activeTab === 'settings' && <SystemSettings />}
+          {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={fetchProfile} />}
           {['all_bookings', 'hall_bookings', 'my_bookings'].includes(activeTab) && <Bookings user={userProfile} />}
         </div>
       </main>

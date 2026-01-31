@@ -6,7 +6,8 @@ import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
   ImageOff, MapPin, CheckCircle2, Search, Users, Eye, X, Heart, Sparkles, 
-  Calendar as CalendarIcon, Loader2, ChevronRight, ChevronLeft, Info, Star
+  Calendar as CalendarIcon, Loader2, ChevronRight, ChevronLeft, Info, Star,
+  MessageCircle, Mail, Phone
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
@@ -18,10 +19,10 @@ interface BrowseHallsProps {
 }
 
 export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
-  const [halls, setHalls] = useState<(Hall & { vendor?: { full_name: string } })[]>([]);
+  const [halls, setHalls] = useState<(Hall & { vendor?: UserProfile })[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewingHall, setViewingHall] = useState<Hall | null>(null);
+  const [viewingHall, setViewingHall] = useState<(Hall & { vendor?: UserProfile }) | null>(null);
   const [vendorServices, setVendorServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [bookingDate, setBookingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -33,7 +34,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
 
   const fetchHalls = async () => {
     setLoading(true);
-    const { data } = await supabase.from('halls').select('*, vendor:vendor_id(full_name)').eq('is_active', true);
+    const { data } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
     if (data) setHalls(data as any);
     setLoading(false);
   };
@@ -98,7 +99,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         user_id: viewingHall.vendor_id,
         title: 'طلب حجز جديد',
         message: `قام ${user.full_name} بطلب حجز قاعة ${viewingHall.name}${selectedService ? ` مع خدمة ${selectedService.name}` : ''}`,
-        type: 'booking_new'
+        type: 'booking_new',
+        action_url: 'hall_bookings'
       }]);
       toast({ title: 'نجاح', description: 'تم إرسال طلب الحجز بنجاح.', variant: 'success' });
       setViewingHall(null);
@@ -157,8 +159,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
              </button>
              
              <div className="aspect-[1.1/1] w-full bg-muted relative cursor-pointer overflow-hidden" onClick={() => { setViewingHall(hall); fetchVendorServices(hall.vendor_id); }}>
-              {hall.image_url || (hall.images && hall.images[0]) ? (
-                <img src={hall.image_url || hall.images[0]} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt={hall.name} />
+              {(hall.images && hall.images[0]) || hall.image_url ? (
+                <img src={hall.images?.[0] || hall.image_url} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt={hall.name} />
               ) : (
                 <div className="flex h-full items-center justify-center opacity-20"><ImageOff className="h-12 w-12" /></div>
               )}
@@ -213,11 +215,11 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
       </div>
 
       <Modal isOpen={!!viewingHall} onClose={() => { setViewingHall(null); setSelectedService(null); }} title={viewingHall?.name || 'تفاصيل القاعة'}>
-        <div className="space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar pr-1">
+        <div className="space-y-6 max-h-[85vh] overflow-y-auto no-scrollbar pr-1 pb-4">
           {/* Gallery Section */}
           {allImages.length > 0 && (
             <div className="space-y-3">
-              <div className="aspect-video relative rounded-3xl overflow-hidden bg-muted group">
+              <div className="aspect-video relative rounded-3xl overflow-hidden bg-muted group shadow-2xl">
                 <img 
                   src={allImages[activeImageIndex]} 
                   className="w-full h-full object-cover" 
@@ -260,6 +262,36 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
             </div>
           )}
 
+          {/* Vendor Brand & Contact Info */}
+          <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10 flex flex-col md:flex-row justify-between items-center gap-6">
+             <div className="flex items-center gap-4 text-center md:text-right">
+                <div className="w-16 h-16 rounded-2xl bg-card border flex items-center justify-center overflow-hidden shrink-0">
+                   {viewingHall?.vendor?.custom_logo_url ? <img src={viewingHall.vendor.custom_logo_url} className="w-full h-full object-contain" /> : <Building2 className="w-8 h-8 text-primary" />}
+                </div>
+                <div>
+                   <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-0.5">مقدّم الخدمة</p>
+                   <h4 className="text-xl font-black">{viewingHall?.vendor?.business_name || viewingHall?.vendor?.full_name}</h4>
+                </div>
+             </div>
+             <div className="flex gap-2">
+                {viewingHall?.vendor?.whatsapp_number && (
+                  <a href={`https://wa.me/${viewingHall.vendor.whatsapp_number}`} target="_blank" className="bg-green-500 text-white p-3 rounded-2xl shadow-lg hover:scale-110 transition-transform active:scale-95">
+                    <MessageCircle className="w-5 h-5" />
+                  </a>
+                )}
+                {viewingHall?.vendor?.business_email && (
+                  <a href={`mailto:${viewingHall.vendor.business_email}`} className="bg-primary text-white p-3 rounded-2xl shadow-lg hover:scale-110 transition-transform active:scale-95">
+                    <Mail className="w-5 h-5" />
+                  </a>
+                )}
+                {viewingHall?.vendor?.phone_number && (
+                  <a href={`tel:${viewingHall.vendor.phone_number}`} className="bg-card border p-3 rounded-2xl shadow-lg hover:scale-110 transition-transform active:scale-95">
+                    <Phone className="w-5 h-5 text-primary" />
+                  </a>
+                )}
+             </div>
+          </div>
+
           {/* Hall Info Section */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -297,7 +329,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
           <hr className="opacity-50" />
 
           {/* Booking Flow */}
-          <div className="space-y-6 bg-muted/10 p-6 rounded-[2rem] border border-border/50">
+          <div className="space-y-6 bg-muted/10 p-6 rounded-[2rem] border border-border/50 shadow-inner">
             <div className="space-y-2">
               <label className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
                 <CalendarIcon className="w-3.5 h-3.5" /> اختر تاريخ المناسبة
@@ -346,7 +378,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
               </div>
             )}
 
-            <div className="bg-primary/5 p-5 rounded-2xl space-y-3">
+            <div className="bg-primary/5 p-5 rounded-2xl space-y-3 shadow-inner">
                <div className="flex justify-between items-center text-xs font-bold text-muted-foreground">
                  <span>المجموع الفرعي</span>
                  <span>{formatCurrency((viewingHall?.price_per_night || 0) + (selectedService?.price || 0))}</span>
@@ -375,3 +407,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     </div>
   );
 };
+
+// Internal Helper for Building Icon
+const Building2 = (props: any) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M8 10h.01"/><path d="M16 10h.01"/><path d="M8 14h.01"/><path d="M16 14h.01"/></svg>
+);

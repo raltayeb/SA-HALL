@@ -11,6 +11,11 @@ export interface UserProfile {
   avatar_url?: string;
   role: Role;
   created_at?: string;
+  // Added fields for vendor branding and contact info
+  custom_logo_url?: string;
+  whatsapp_number?: string;
+  business_email?: string;
+  theme_color?: string;
 }
 
 export interface Subscription {
