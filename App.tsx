@@ -10,6 +10,7 @@ import { BrowseHalls } from './pages/BrowseHalls';
 import { UsersManagement } from './pages/UsersManagement';
 import { Bookings } from './pages/Bookings';
 import { VendorSubscriptions } from './pages/VendorSubscriptions';
+import { SystemSettings } from './pages/SystemSettings';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Menu, AlertCircle, HelpCircle } from 'lucide-react';
@@ -86,17 +87,26 @@ const App: React.FC = () => {
     toast({ title: 'تم تسجيل الخروج', description: 'نراك قريباً!', variant: 'default' });
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-background text-primary animate-pulse font-black">SA HALL SaaS...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-background text-primary animate-pulse font-black text-xl">SA HALL SaaS...</div>;
 
   if (!session || !userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
-        <div className="w-full max-w-md space-y-6 rounded-2xl border bg-card p-8 shadow-2xl">
-          <div className="space-y-2 text-center">
+        <div className="w-full max-w-md space-y-6 rounded-3xl border bg-card p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+          <div className="space-y-4 text-center relative z-10">
+            <img 
+              src="/logo.png" 
+              alt="SA Hall" 
+              className="w-32 h-auto mx-auto mb-2"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/9b5de5/ffffff?text=SA+HALL';
+              }}
+            />
             <h1 className="text-4xl font-black tracking-tighter text-primary">SA Hall</h1>
-            <p className="text-muted-foreground font-medium">منصة SaaS لإدارة وحجز القاعات</p>
+            <p className="text-muted-foreground font-medium text-sm">Wedding Hall Saudi Arabia | SaaS Solution</p>
           </div>
-          <form onSubmit={handleAuth} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4 relative z-10">
             {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required />}
             <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required />
             <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -104,14 +114,14 @@ const App: React.FC = () => {
               <div className="p-3 bg-muted/30 rounded-xl space-y-2">
                 <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">نوع الحساب</label>
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" value="user" checked={role === 'user'} onChange={() => setRole('user')} /> مستخدم</label>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" value="vendor" checked={role === 'vendor'} onChange={() => setRole('vendor')} /> بائع</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="role" value="user" checked={role === 'user'} onChange={() => setRole('user')} /> مستخدم</label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="role" value="vendor" checked={role === 'vendor'} onChange={() => setRole('vendor')} /> بائع</label>
                 </div>
               </div>
             )}
-            <Button type="submit" className="w-full h-11 rounded-xl font-bold">{isRegister ? 'إنشاء حساب' : 'دخول'}</Button>
+            <Button type="submit" className="w-full h-12 rounded-xl font-bold text-base shadow-lg shadow-primary/20">{isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول'}</Button>
           </form>
-          <div className="text-center"><button onClick={() => setIsRegister(!isRegister)} className="text-sm underline">{isRegister ? 'لديك حساب؟ سجل دخول' : 'ليس لديك حساب؟ سجل الآن'}</button></div>
+          <div className="text-center relative z-10"><button onClick={() => setIsRegister(!isRegister)} className="text-sm font-bold text-primary/80 hover:text-primary transition-colors underline-offset-4 hover:underline">{isRegister ? 'لديك حساب؟ سجل دخول' : 'ليس لديك حساب؟ انضم إلينا الآن'}</button></div>
         </div>
       </div>
     );
@@ -127,7 +137,10 @@ const App: React.FC = () => {
       />
       
       <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b lg:hidden">
-        <h1 className="font-black text-primary text-xl tracking-tighter">SA Hall</h1>
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" className="w-10 h-auto" alt="Logo" onError={(e) => (e.target as any).style.display = 'none'} />
+          <h1 className="font-black text-primary text-xl tracking-tighter">SA Hall</h1>
+        </div>
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}><Menu /></Button>
       </div>
 
@@ -139,6 +152,7 @@ const App: React.FC = () => {
           {activeTab === 'browse' && <BrowseHalls user={userProfile} />}
           {activeTab === 'users' && <UsersManagement />}
           {activeTab === 'subscriptions' && <VendorSubscriptions />}
+          {activeTab === 'settings' && <SystemSettings />}
           {isBookingTab && <Bookings user={userProfile} />}
         </div>
       </main>

@@ -65,11 +65,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
     <>
       {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
       <aside className={`fixed top-4 bottom-4 right-4 z-50 w-64 bg-card/95 backdrop-blur-md border border-border rounded-2xl flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-[110%] lg:translate-x-0'}`}>
-        <div className="p-8 border-b border-border/50 flex items-center gap-2">
-          <div className="bg-primary/10 p-2.5 rounded-xl"><Building2 className="w-6 h-6 text-primary" /></div>
+        <div className="p-6 border-b border-border/50 flex flex-col items-center text-center">
+          <img 
+            src="/logo.png" 
+            alt="SA Hall Logo" 
+            className="w-24 h-auto mb-2 drop-shadow-sm"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/9b5de5/ffffff?text=SA+HALL';
+            }}
+          />
           <div>
-            <h1 className="text-2xl font-black text-primary tracking-tighter">SA Hall</h1>
-            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">SaaS Edition</p>
+            <h1 className="text-xl font-black text-primary tracking-tighter leading-tight">SA Hall</h1>
+            <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-70">Wedding Hall Saudi Arabia</p>
           </div>
         </div>
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto no-scrollbar">
