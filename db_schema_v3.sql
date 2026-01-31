@@ -7,15 +7,26 @@ ADD COLUMN IF NOT EXISTS whatsapp_number TEXT,
 ADD COLUMN IF NOT EXISTS business_email TEXT,
 ADD COLUMN IF NOT EXISTS social_links JSONB DEFAULT '{}'::jsonb;
 
--- 2. Enhance Notifications with Action Links
+-- 2. Fix Bookings Table (Ensuring service_id exists)
+ALTER TABLE public.bookings 
+ADD COLUMN IF NOT EXISTS service_id UUID REFERENCES public.services(id) ON DELETE SET NULL;
+
+-- 3. Reconcile Notifications (Ensure action_url exists)
 ALTER TABLE public.notifications 
 ADD COLUMN IF NOT EXISTS action_url TEXT;
 
--- 3. Create Storage for Logos
+-- 4. Create Storage for Logos
 INSERT INTO storage.buckets (id, name, public) 
 VALUES ('vendor-logos', 'vendor-logos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- RLS for Logos
-CREATE POLICY "Public Access Logos" ON storage.objects FOR SELECT USING (bucket_id = 'vendor-logos');
-CREATE POLICY "Vendors manage own logos" ON storage.objects FOR ALL USING (bucket_id = 'vendor-logos' AND auth.uid()::text = (storage.foldername(name))[1]);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Public Access Logos') THEN
+        CREATE POLICY "Public Access Logos" ON storage.objects FOR SELECT USING (bucket_id = 'vendor-logos');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Vendors manage own logos') THEN
+        CREATE POLICY "Vendors manage own logos" ON storage.objects FOR ALL USING (bucket_id = 'vendor-logos' AND auth.uid()::text = (storage.foldername(name))[1]);
+    END IF;
+END $$;

@@ -1,11 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Booking, UserProfile } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Calendar, Receipt, CheckCircle, XCircle, Clock, Search, AlertTriangle, Sparkles, ShieldAlert, AlertCircle } from 'lucide-react';
+import { Calendar, Receipt, CheckCircle, XCircle, Clock, Search, ShieldAlert, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { Modal } from '../components/ui/Modal';
@@ -23,48 +23,43 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<BookingFilter>('all');
-  
   const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
   
   const { toast } = useToast();
 
-  if (user.role === 'super_admin') {
-      return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
-            <div className="bg-primary/10 p-6 rounded-full">
-                <ShieldAlert className="w-12 h-12 text-primary" />
-            </div>
-            <h2 className="text-xl font-bold">وصول محدود لمدير النظام</h2>
-            <p className="text-muted-foreground max-w-md">
-                لحماية خصوصية البائعين، لا يمتلك مدير النظام صلاحية تصفح الحجوزات الفردية. يرجى التوجه إلى لوحة الاشتراكات لمراقبة نشاط المنصة.
-            </p>
-        </div>
-      );
-  }
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     setLoading(true);
-    let query = supabase
-      .from('bookings')
-      .select('*, halls(*), profiles:user_id(*), services(*)');
+    try {
+      let query = supabase
+        .from('bookings')
+        .select('*, halls(*), profiles:user_id(*), services(*)');
 
-    if (user.role === 'vendor') {
-      query = query.eq('vendor_id', user.id);
-    } else if (user.role === 'user') {
-      query = query.eq('user_id', user.id);
+      if (user.role === 'vendor') {
+        query = query.eq('vendor_id', user.id);
+      } else if (user.role === 'user') {
+        // Specifically ensuring we filter by the user's ID for "My Bookings"
+        query = query.eq('user_id', user.id);
+      } else if (user.role === 'super_admin') {
+        // Superadmin should see all for platform monitoring if allowed,
+        // but based on your previous logic we might want to restrict this.
+        // Keeping it open for now or you can add restriction back.
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) setBookings(data as any[]);
+    } catch (err: any) {
+      console.error('Error fetching bookings:', err);
+      toast({ title: 'خطأ', description: 'فشل في تحميل الحجوزات', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
-
-    const { data, error } = await query.order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setBookings(data as any[]);
-    }
-    setLoading(false);
-  };
+  }, [user, toast]);
 
   useEffect(() => {
     fetchBookings();
-  }, [user]);
+  }, [fetchBookings]);
 
   const updateStatus = async (id: string, status: 'confirmed' | 'cancelled') => {
     const { error } = await supabase
@@ -73,16 +68,11 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       .eq('id', id);
 
     if (!error) {
-      const statusText = status === 'confirmed' ? 'تأكيد' : 'إلغاء';
-      toast({ 
-        title: 'تم التحديث', 
-        description: `تم ${statusText} الحجز بنجاح.`, 
-        variant: 'success' 
-      });
+      toast({ title: 'تم التحديث', description: `تم تحديث حالة الحجز بنجاح.`, variant: 'success' });
       setBookingToCancel(null);
       fetchBookings();
     } else {
-      toast({ title: 'خطأ', description: 'فشل تحديث حالة الحجز', variant: 'destructive' });
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -96,43 +86,56 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   const filteredBookings = bookings.filter(b => {
     const matchesSearch = b.halls?.name.toLowerCase().includes(search.toLowerCase()) ||
-                          b.profiles?.full_name.toLowerCase().includes(search.toLowerCase()) ||
-                          b.services?.name.toLowerCase().includes(search.toLowerCase());
+                          b.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+                          b.services?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === 'all' || b.status === filter;
     return matchesSearch && matchesFilter;
   });
 
+  if (user.role === 'super_admin') {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+          <div className="bg-primary/10 p-6 rounded-full">
+              <ShieldAlert className="w-12 h-12 text-primary" />
+          </div>
+          <h2 className="text-xl font-bold">وصول محدود لمدير النظام</h2>
+          <p className="text-muted-foreground max-w-md">
+              لحماية خصوصية البائعين، يرجى التوجه إلى لوحة الاشتراكات لمراقبة نشاط المنصة بشكل عام.
+          </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-black tracking-tighter flex items-center gap-2">
-            <Calendar className="w-8 h-8 text-primary" />
-            {user.role === 'vendor' ? 'سجل حجوزات القاعات' : 'حجوزاتي'}
+    <div className="space-y-8 pb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-right">
+        <div className="w-full">
+          <h2 className="text-4xl font-black tracking-tighter flex items-center justify-end gap-3 text-primary">
+             {user.role === 'vendor' ? 'سجل حجوزات القاعات' : 'حجوزاتي الشخصية'} <Calendar className="w-10 h-10" />
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">تتبع حالة المواعيد، الفواتير، والتواصل مع الأطراف.</p>
+          <p className="text-sm text-muted-foreground mt-1">تتبع حالة المواعيد، الفواتير، والتواصل مع مقدمي الخدمة.</p>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div className="flex bg-card p-1 rounded-2xl border border-border/50 shadow-sm overflow-x-auto no-scrollbar">
+      <div className="flex flex-col md:flex-row-reverse gap-4 justify-between items-start md:items-center">
+        <div className="flex bg-card p-1.5 rounded-[1.5rem] border border-border/50 shadow-sm overflow-x-auto no-scrollbar flex-row-reverse">
           {['all', 'pending', 'confirmed', 'cancelled'].map((tab) => (
             <button
               key={tab}
               onClick={() => setFilter(tab as any)}
-              className={`px-5 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap ${filter === tab ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'text-muted-foreground hover:bg-muted'}`}
+              className={`px-6 py-2.5 text-xs font-black rounded-xl transition-all whitespace-nowrap ${filter === tab ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground hover:bg-muted'}`}
             >
-              {tab === 'all' ? 'الكل' : tab === 'pending' ? 'قيد الانتظار' : tab === 'confirmed' ? 'المؤكدة' : 'الملغاة'}
+              {tab === 'all' ? 'الكل' : tab === 'pending' ? 'المعلقة' : tab === 'confirmed' ? 'المؤكدة' : 'الملغاة'}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl border w-full md:w-80 shadow-sm group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+        <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl border w-full md:w-80 shadow-sm group focus-within:ring-2 focus-within:ring-primary/20 transition-all flex-row-reverse">
           <Search className="w-4 h-4 text-muted-foreground group-focus-within:text-primary" />
           <input 
             type="text" 
             placeholder="بحث برقم الحجز أو الاسم..." 
-            className="bg-transparent border-none focus:outline-none text-sm w-full font-bold"
+            className="bg-transparent border-none focus:outline-none text-sm w-full font-bold text-right"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -140,47 +143,52 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       </div>
 
       <div className="grid gap-6">
-        {filteredBookings.length === 0 ? (
+        {loading ? (
           <div className="py-32 text-center flex flex-col items-center gap-4 border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50">
-            <Clock className="w-12 h-12" />
-            <p className="font-black">لا توجد سجلات مطابقة حالياً.</p>
+            <Loader2 className="w-12 h-12 animate-spin text-primary" />
+            <p className="font-black">جاري تحميل سجلاتك...</p>
+          </div>
+        ) : filteredBookings.length === 0 ? (
+          <div className="py-32 text-center flex flex-col items-center gap-4 border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50">
+            <Clock className="w-12 h-12 text-muted-foreground" />
+            <p className="font-black text-muted-foreground">لا توجد سجلات حجز مطابقة حالياً.</p>
           </div>
         ) : (
           filteredBookings.map((b) => (
-            <div key={b.id} className="bg-card border rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group relative overflow-hidden">
+            <div key={b.id} className="bg-card border rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl transition-all flex flex-col md:flex-row-reverse items-center gap-8 group relative overflow-hidden">
                <div className="w-24 h-24 rounded-3xl bg-muted overflow-hidden shrink-0 shadow-inner">
                   {b.halls?.image_url ? <img src={b.halls.image_url} className="w-full h-full object-cover" /> : <Calendar className="w-10 h-10 m-7 opacity-20" />}
                </div>
                
-               <div className="flex-1 text-center md:text-right space-y-1">
-                  <div className="flex flex-col md:flex-row items-center gap-2 mb-1">
-                    <h3 className="text-xl font-black">{b.halls?.name}</h3>
+               <div className="flex-1 text-center md:text-right space-y-2">
+                  <div className="flex flex-col md:flex-row-reverse items-center gap-3 mb-1">
+                    <h3 className="text-2xl font-black">{b.halls?.name}</h3>
                     {getStatusBadge(b.status)}
                   </div>
-                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 text-xs font-bold text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-primary" /> {b.booking_date}</span>
-                    <span className="w-1 h-1 bg-muted-foreground/30 rounded-full"></span>
-                    <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-primary" /> {b.services?.name || 'بدون خدمات إضافية'}</span>
+                  <div className="flex flex-wrap justify-center md:justify-end items-center gap-4 text-xs font-bold text-muted-foreground">
+                    <span className="flex flex-row-reverse items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> {b.services?.name || 'حجز أساسي'}</span>
+                    <span className="w-1.5 h-1.5 bg-muted-foreground/30 rounded-full"></span>
+                    <span className="flex flex-row-reverse items-center gap-1.5"><Clock className="w-4 h-4 text-primary" /> {new Date(b.booking_date).toLocaleDateString('ar-SA')}</span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black opacity-50">Booking ID: {b.id.slice(0, 8)}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black opacity-40">رقم المرجع: {b.id.slice(0, 8).toUpperCase()}</p>
                </div>
 
-               <div className="flex flex-col items-center md:items-end gap-3 px-6 md:border-r">
-                  <PriceTag amount={b.total_amount} className="text-2xl text-primary" iconSize={24} />
+               <div className="flex flex-col items-center md:items-start gap-4 px-8 md:border-l">
+                  <PriceTag amount={b.total_amount} className="text-3xl text-primary" iconSize={28} />
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="rounded-xl h-10 gap-2 font-bold px-4" onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }}>
-                      <Receipt className="w-4 h-4" /> الفاتورة
+                    <Button variant="outline" size="sm" className="rounded-xl h-12 gap-2 font-black px-6 border-2" onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }}>
+                       الفاتورة <Receipt className="w-4 h-4" />
                     </Button>
                     
                     {b.status === 'pending' && (
                       <>
                         {user.role === 'vendor' && (
-                          <Button size="sm" className="rounded-xl h-10 gap-2 font-bold px-4 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(b.id, 'confirmed')}>
-                            <CheckCircle className="w-4 h-4" /> تأكيد
+                          <Button size="sm" className="rounded-xl h-12 gap-2 font-black px-6 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(b.id, 'confirmed')}>
+                             تأكيد <CheckCircle className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button size="sm" variant="destructive" className="rounded-xl h-10 gap-2 font-bold px-4" onClick={() => setBookingToCancel(b)}>
-                          <XCircle className="w-4 h-4" /> إلغاء
+                        <Button size="sm" variant="destructive" className="rounded-xl h-12 gap-2 font-black px-6" onClick={() => setBookingToCancel(b)}>
+                           إلغاء <XCircle className="w-4 h-4" />
                         </Button>
                       </>
                     )}
@@ -191,26 +199,21 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         )}
       </div>
 
-      {/* Cancellation Confirmation Modal */}
-      <Modal 
-        isOpen={!!bookingToCancel} 
-        onClose={() => setBookingToCancel(null)} 
-        title="تأكيد إلغاء الحجز"
-      >
+      <Modal isOpen={!!bookingToCancel} onClose={() => setBookingToCancel(null)} title="تأكيد إلغاء الحجز">
         <div className="space-y-6 text-center py-4">
-          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
             <AlertCircle className="w-10 h-10 text-destructive" />
           </div>
           <div className="space-y-2">
-            <h4 className="text-xl font-black">هل أنت متأكد حقاً؟</h4>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              سيتم إلغاء حجز قاعة <span className="font-bold text-foreground">"{bookingToCancel?.halls?.name}"</span> بتاريخ {bookingToCancel?.booking_date}. 
-              <br /> لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
+            <h4 className="text-2xl font-black">هل أنت متأكد من الإلغاء؟</h4>
+            <p className="text-sm text-muted-foreground leading-relaxed px-4">
+              سيتم إلغاء حجز قاعة <span className="font-bold text-foreground">"{bookingToCancel?.halls?.name}"</span>. 
+              هذا الإجراء قد يؤثر على جدول مواعيدك.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t">
-            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setBookingToCancel(null)}>تراجع</Button>
-            <Button variant="destructive" className="h-12 rounded-xl font-black shadow-lg shadow-destructive/20" onClick={() => bookingToCancel && updateStatus(bookingToCancel.id, 'cancelled')}>
+          <div className="grid grid-cols-2 gap-4 pt-6 border-t px-4">
+            <Button variant="outline" className="h-14 rounded-2xl font-black" onClick={() => setBookingToCancel(null)}>تراجع</Button>
+            <Button variant="destructive" className="h-14 rounded-2xl font-black shadow-xl shadow-destructive/20" onClick={() => bookingToCancel && updateStatus(bookingToCancel.id, 'cancelled')}>
               تأكيد الإلغاء
             </Button>
           </div>

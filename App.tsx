@@ -31,8 +31,9 @@ const App: React.FC = () => {
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
     site_name: 'SA Hall',
     commission_rate: 0.10,
-    vat_enabled: true
-  });
+    vat_enabled: true,
+    platform_logo_url: ''
+  } as any);
   
   const { toast } = useToast();
 
@@ -91,7 +92,11 @@ const App: React.FC = () => {
       else { setUserProfile(null); setLoading(false); }
     });
 
-    return () => subscription.unsubscribe();
+    window.addEventListener('settingsUpdated', fetchSiteSettings);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('settingsUpdated', fetchSiteSettings);
+    };
   }, []);
 
   useEffect(() => {
@@ -180,10 +185,10 @@ const App: React.FC = () => {
         onLogout={() => supabase.auth.signOut()} 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
-        siteName={siteSettings.site_name} 
+        siteName={siteSettings.site_name}
+        platformLogo={(siteSettings as any).platform_logo_url}
       />
       
-      {/* Minimal Floating Header Actions */}
       <div className="fixed top-6 left-6 z-40 flex items-center gap-3">
         <Button variant="ghost" size="icon" className="lg:hidden bg-card border shadow-xl rounded-full w-12 h-12" onClick={() => setIsSidebarOpen(true)}>
           <Menu className="w-5 h-5" />
@@ -196,18 +201,18 @@ const App: React.FC = () => {
             className={`bg-card border shadow-xl rounded-full w-12 h-12 relative transition-all active:scale-95 ${showNotifDropdown ? 'ring-2 ring-primary border-primary' : ''}`} 
             onClick={() => setShowNotifDropdown(!showNotifDropdown)}
           >
-            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-primary animate-bounce-slow' : 'text-muted-foreground'}`} />
+            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
             {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 bg-primary text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-card shadow-lg">
+              <span className="absolute top-0 right-0 bg-primary text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-card shadow-lg animate-pulse">
                 {unreadCount}
               </span>
             )}
           </Button>
           
           {showNotifDropdown && (
-            <div className="absolute left-0 mt-4 w-80 bg-card border shadow-2xl rounded-[2rem] overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left p-2">
+            <div className="absolute left-0 mt-4 w-80 bg-card border shadow-2xl rounded-[2.5rem] overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left p-2">
               <div className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[1.5rem]">
-                <h4 className="font-black text-sm">التنبيهات</h4>
+                <h4 className="font-black text-sm text-right w-full">التنبيهات</h4>
                 <button onClick={() => setShowNotifDropdown(false)} className="p-1 hover:bg-muted rounded-full transition-colors"><X className="w-4 h-4" /></button>
               </div>
               <div className="max-h-96 overflow-y-auto no-scrollbar py-2">
@@ -220,9 +225,9 @@ const App: React.FC = () => {
                       onClick={() => { markAsRead(n.id); if(n.action_url) setActiveTab(n.action_url); setShowNotifDropdown(false); }} 
                       className={`mx-2 my-1 p-4 rounded-2xl hover:bg-muted/50 transition-all cursor-pointer group relative ${!n.is_read ? 'bg-primary/5 border-r-4 border-primary' : 'bg-transparent opacity-70'}`}
                     >
-                      <p className="text-[12px] font-black group-hover:text-primary transition-colors">{n.title}</p>
-                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">{n.message}</p>
-                      <span className="text-[9px] text-muted-foreground mt-2 block opacity-40 font-bold">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
+                      <p className="text-[12px] font-black group-hover:text-primary transition-colors text-right">{n.title}</p>
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed text-right">{n.message}</p>
+                      <span className="text-[9px] text-muted-foreground mt-2 block opacity-40 font-bold text-right">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
                     </div>
                   ))
                 )}
@@ -230,20 +235,10 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
-
-        <div className="hidden lg:flex items-center gap-3 bg-card border shadow-xl p-1.5 pr-4 rounded-full">
-           <div className="text-right">
-              <p className="text-[11px] font-black leading-none mb-0.5">{userProfile.full_name}</p>
-              <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter opacity-50">{userProfile.role}</p>
-           </div>
-           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-purple-400 flex items-center justify-center text-white font-black text-xs shadow-inner">
-             {userProfile.full_name?.[0]}
-           </div>
-        </div>
       </div>
 
-      <main className="lg:mr-[18rem] p-6 lg:p-10 min-h-screen">
-        <div className="mx-auto max-w-5xl">
+      <main className="lg:mr-80 p-6 lg:p-10 min-h-screen">
+        <div className="mx-auto max-w-6xl">
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
           {activeTab === 'my_halls' && <VendorHalls user={userProfile} />}

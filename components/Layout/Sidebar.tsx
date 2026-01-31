@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   Settings,
   Palette,
-  X
+  X,
+  User as UserIcon
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -27,9 +28,10 @@ interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
   siteName?: string;
+  platformLogo?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "SA Hall" }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "SA Hall", platformLogo }) => {
   if (!user) return null;
 
   const getMenuItems = () => {
@@ -64,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
   };
 
   const items = getMenuItems();
+  const logoToDisplay = user.role === 'vendor' ? user.custom_logo_url : platformLogo;
 
   return (
     <>
@@ -71,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
       
       <aside className={`
-        fixed top-4 bottom-4 right-4 z-50 w-64 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+        fixed top-4 bottom-4 right-4 z-50 w-72 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
         ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0 lg:translate-x-0 lg:opacity-100'}
       `}>
         {/* Close button for mobile */}
@@ -87,20 +90,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         <div className="p-8 flex flex-col items-center text-center">
           <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-400 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            {user.custom_logo_url ? (
-              <img src={user.custom_logo_url} alt="Logo" className="relative w-16 h-16 object-contain rounded-2xl bg-card border p-2 shadow-sm" />
+            {logoToDisplay ? (
+              <img src={logoToDisplay} alt="Logo" className="relative w-20 h-20 object-contain rounded-2xl bg-card border p-2 shadow-sm" />
             ) : (
-              <div className="relative w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20">
-                <Building2 className="w-8 h-8" />
+              <div className="relative w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20">
+                <Building2 className="w-10 h-10" />
               </div>
             )}
           </div>
           <h1 className="mt-4 text-sm font-black text-primary tracking-tighter line-clamp-1">
             {user.role === 'vendor' ? (user.business_name || siteName) : siteName}
           </h1>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-60">
-            {user.role === 'vendor' ? 'شريك معتمد' : user.role === 'super_admin' ? 'مدير المنصة' : 'عميل'}
-          </p>
         </div>
         
         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto no-scrollbar">
@@ -124,13 +124,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         </nav>
         
         <div className="p-4 mt-auto">
-          <div className="bg-muted/30 p-2 rounded-[2rem] border border-border/40">
-             <button 
+          <div className="bg-muted/30 p-4 rounded-[2.5rem] border border-border/40 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-xs shadow-lg">
+                {user.full_name?.[0] || <UserIcon className="w-4 h-4" />}
+              </div>
+              <div className="text-right overflow-hidden">
+                <p className="text-[12px] font-black leading-none truncate">{user.full_name}</p>
+                <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">
+                  {user.role === 'vendor' ? 'بائع' : user.role === 'super_admin' ? 'مدير' : 'عميل'}
+                </p>
+              </div>
+            </div>
+            <button 
               onClick={onLogout} 
-              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-black text-destructive hover:bg-destructive/10 rounded-2xl transition-all active:scale-95"
+              className="w-full flex items-center justify-center gap-2 py-3 text-[11px] font-black text-destructive hover:bg-destructive/10 rounded-2xl transition-all active:scale-95 border border-destructive/10"
             >
               <LogOut className="w-4 h-4" />
-              <span>خروج</span>
+              <span>تسجيل الخروج</span>
             </button>
           </div>
         </div>
