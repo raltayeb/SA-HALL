@@ -28,30 +28,30 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // Form State
   const [bookingDate, setBookingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [clientName, setClientName] = useState(user.full_name || '');
   const [clientPhone, setClientPhone] = useState(user.phone_number || '');
   const [specialNotes, setSpecialNotes] = useState('');
 
-  // Availability State
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
-  const checkAbortController = useRef<AbortController | null>(null);
 
   const { toast } = useToast();
 
-  const fetchHalls = async () => {
+  const fetchHalls = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
-    if (data) setHalls(data as any);
-    setLoading(false);
-  };
+    try {
+      const { data } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
+      if (data) setHalls(data as any);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
     const { data } = await supabase.from('user_favorites').select('hall_id').eq('user_id', user.id);
     if (data) setFavorites(data.map(f => f.hall_id));
-  };
+  }, [user.id]);
 
   const fetchVendorServices = async (vendorId: string) => {
     const { data } = await supabase.from('services').select('*').eq('vendor_id', vendorId).eq('is_active', true);
@@ -65,30 +65,22 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
       setViewingHall(e.detail);
       fetchVendorServices(e.detail.vendor_id);
       setActiveImageIndex(0);
-      setIsAvailable(null); // Reset availability when opening new hall
+      setIsAvailable(null);
     };
     window.addEventListener('openHall', handleOpen);
     return () => window.removeEventListener('openHall', handleOpen);
-  }, []);
+  }, [fetchHalls, fetchFavorites]);
 
-  // Stabilized availability check to prevent infinite loading
   const performCheck = useCallback(async (hallId: string, date: string) => {
     if (!date || !hallId) return;
-
-    // Reset status and start loading
     setIsAvailable(null);
     setIsCheckingAvailability(true);
-
     try {
       const [bookings, blocks] = await Promise.all([
         supabase.from('bookings').select('id').eq('hall_id', hallId).eq('booking_date', date).neq('status', 'cancelled').maybeSingle(),
         supabase.from('availability_blocks').select('id').eq('hall_id', hallId).eq('block_date', date).maybeSingle()
       ]);
-      
       setIsAvailable(!bookings.data && !blocks.data);
-    } catch (err) {
-      console.error('Availability check failed:', err);
-      setIsAvailable(false);
     } finally {
       setIsCheckingAvailability(false);
     }
@@ -98,15 +90,13 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     if (viewingHall?.id && bookingDate) {
       const timer = setTimeout(() => {
         performCheck(viewingHall.id, bookingDate);
-      }, 500); // Debounce to prevent rapid hits while typing/selecting
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [bookingDate, viewingHall?.id, performCheck]);
 
   const handleBook = async () => {
     if (!viewingHall || isAvailable !== true) return;
-    
-    // Validate custom form fields
     if (!clientName.trim() || !clientPhone.trim()) {
       toast({ title: 'تنبيه', description: 'يرجى إكمال بيانات التواصل أولاً.', variant: 'destructive' });
       return;
@@ -130,11 +120,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
       bookingPayload.service_id = selectedService.id;
     }
 
-    const { error: bookingError } = await supabase
-      .from('bookings')
-      .insert([bookingPayload])
-      .select()
-      .single();
+    const { error: bookingError } = await supabase.from('bookings').insert([bookingPayload]).select().single();
 
     if (!bookingError) {
       await supabase.from('notifications').insert([{
@@ -144,11 +130,9 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         type: 'booking_new',
         action_url: 'hall_bookings'
       }]);
-      
       toast({ title: 'نجاح', description: 'تم إرسال طلب الحجز، سيقوم البائع بالتواصل معك قريباً.', variant: 'success' });
       setViewingHall(null);
       setSelectedService(null);
-      setSpecialNotes('');
     } else {
       toast({ title: 'خطأ', description: bookingError.message, variant: 'destructive' });
     }
@@ -171,7 +155,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   if (loading) return (
     <div className="flex flex-col items-center justify-center p-20 gap-4">
       <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      <p className="font-bold text-muted-foreground animate-pulse">جاري استكشاف القاعات المتاحة...</p>
+      <p className="font-bold text-muted-foreground animate-pulse text-right">جاري استكشاف القاعات المتاحة...</p>
     </div>
   );
 
@@ -187,7 +171,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
           <input 
             type="text" 
             placeholder="ابحث بالمدينة أو اسم القاعة..."
-            className="w-full h-14 bg-card border rounded-2xl pr-12 pl-4 outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-right"
+            className="w-full h-14 bg-card border rounded-2xl pr-12 pl-4 outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm text-right font-bold"
           />
         </div>
       </div>
@@ -248,7 +232,6 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         ))}
       </div>
 
-      {/* Cinematic Full-Screen Overlay */}
       {viewingHall && (
         <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500">
           <header className="p-6 border-b flex justify-between items-center bg-card/50 backdrop-blur-xl shrink-0">
@@ -275,26 +258,9 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
           <div className="flex-1 overflow-y-auto no-scrollbar">
             <div className="max-w-7xl mx-auto p-6 lg:p-12 space-y-12">
               <div className="grid lg:grid-cols-5 gap-12">
-                
-                {/* Visuals & Details */}
                 <div className="lg:col-span-3 space-y-10 text-right">
                   <div className="relative aspect-video rounded-[3rem] overflow-hidden shadow-2xl group bg-muted border">
-                    <img 
-                      src={allImages[activeImageIndex]} 
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-                      alt="Hall Preview" 
-                    />
-                    {allImages.length > 1 && (
-                      <div className="absolute inset-x-0 bottom-8 flex justify-center gap-2 px-8">
-                        {allImages.map((_, i) => (
-                          <button 
-                            key={i} 
-                            onClick={() => setActiveImageIndex(i)}
-                            className={`h-1.5 transition-all rounded-full ${activeImageIndex === i ? 'w-12 bg-white shadow-xl' : 'w-2 bg-white/40 hover:bg-white/60'}`}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <img src={allImages[activeImageIndex]} className="w-full h-full object-cover" alt="Hall" />
                   </div>
 
                   <div className="flex flex-wrap justify-end gap-3">
@@ -306,158 +272,66 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-3xl font-black text-right">وصف القاعة ومزاياها</h4>
-                    <p className="text-muted-foreground leading-loose text-lg opacity-80 text-right">{viewingHall.description || "تتميز هذه القاعة بتصميم عصري وفريد يجمع بين الرقي والفخامة، مما يجعلها المكان المثالي لمناسباتكم الخاصة."}</p>
+                    <h4 className="text-3xl font-black">وصف القاعة ومزاياها</h4>
+                    <p className="text-muted-foreground leading-loose text-lg opacity-80">{viewingHall.description || "تتميز هذه القاعة بتصميم عصري وفريد يجمع بين الرقي والفخامة."}</p>
                   </div>
 
-                  {/* Vendor Contact Quick Icons */}
                   <div className="p-8 bg-card border rounded-[3rem] shadow-xl flex flex-col md:flex-row-reverse justify-between items-center gap-8">
                      <div className="flex items-center flex-row-reverse gap-6">
-                        <div className="w-24 h-24 rounded-[1.5rem] bg-muted border flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                        <div className="w-24 h-24 rounded-[1.5rem] bg-muted border flex items-center justify-center overflow-hidden">
                            {viewingHall.vendor?.custom_logo_url ? <img src={viewingHall.vendor.custom_logo_url} className="w-full h-full object-contain p-2" /> : <Building2 className="w-12 h-12 text-primary" />}
                         </div>
                         <div className="text-right">
-                           <p className="text-xs font-black text-primary uppercase tracking-widest mb-1">المزود المعتمد</p>
                            <h4 className="text-2xl font-black">{viewingHall.vendor?.business_name || viewingHall.vendor?.full_name}</h4>
-                           <p className="text-sm text-muted-foreground mt-1">تواصل مباشرة مع إدارة القاعة لأي استفسار خاص.</p>
+                           <p className="text-sm text-muted-foreground mt-1">تواصل مباشرة مع إدارة القاعة.</p>
                         </div>
                      </div>
                      <div className="flex gap-4">
                         {viewingHall.vendor?.whatsapp_number && (
-                          <a 
-                            href={`https://wa.me/${viewingHall.vendor.whatsapp_number}`} 
-                            target="_blank" 
-                            className="bg-green-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
-                            title="WhatsApp"
-                          >
-                            <MessageSquare className="w-6 h-6" />
-                          </a>
+                          <a href={`https://wa.me/${viewingHall.vendor.whatsapp_number}`} target="_blank" className="w-14 h-14 rounded-full bg-green-500 text-white flex items-center justify-center hover:scale-110 transition-all shadow-lg"><MessageSquare className="w-6 h-6" /></a>
                         )}
                         {viewingHall.vendor?.phone_number && (
-                          <a 
-                            href={`tel:${viewingHall.vendor.phone_number}`} 
-                            className="bg-primary text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
-                            title="Call Now"
-                          >
-                            <Phone className="w-6 h-6" />
-                          </a>
+                          <a href={`tel:${viewingHall.vendor.phone_number}`} className="w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center hover:scale-110 transition-all shadow-lg"><Phone className="w-6 h-6" /></a>
                         )}
                         {viewingHall.vendor?.business_email && (
-                          <a 
-                            href={`mailto:${viewingHall.vendor.business_email}`} 
-                            className="bg-muted text-foreground w-14 h-14 rounded-full shadow-xl border flex items-center justify-center hover:scale-110 transition-transform active:scale-95"
-                            title="Email"
-                          >
-                            <Mail className="w-6 h-6" />
-                          </a>
+                          <a href={`mailto:${viewingHall.vendor.business_email}`} className="w-14 h-14 rounded-full bg-card border flex items-center justify-center hover:scale-110 transition-all shadow-lg"><Mail className="w-6 h-6" /></a>
                         )}
                      </div>
                   </div>
                 </div>
 
-                {/* Booking Form Card */}
                 <div className="lg:col-span-2">
                   <div className="sticky top-12 space-y-6 text-right">
                     <div className="bg-card border rounded-[3.5rem] p-10 shadow-2xl space-y-8 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mt-16 blur-3xl"></div>
-                      
                       <div className="space-y-2">
-                        <div className="flex justify-between items-center flex-row-reverse">
-                          <h4 className="text-xl font-black">طلب حجز القاعة</h4>
-                          <ShieldCheck className="w-6 h-6 text-green-600 opacity-50" />
-                        </div>
+                        <h4 className="text-xl font-black">طلب حجز القاعة</h4>
                         <PriceTag amount={(viewingHall.price_per_night || 0) + (selectedService?.price || 0)} className="text-5xl text-primary" iconSize={36} />
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">شامل الرسوم والضرائب التقديرية</p>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">شامل الرسوم التقديرية</p>
                       </div>
 
                       <div className="space-y-6">
-                        {/* 1. Date Selection */}
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center justify-end gap-2">
-                            تاريخ الموعد <CalendarIcon className="w-3.5 h-3.5" />
-                          </label>
-                          <input 
-                            type="date" 
-                            className="w-full h-16 bg-muted/30 border rounded-2xl px-6 outline-none focus:ring-2 focus:ring-primary/20 transition-all font-black text-lg text-right" 
-                            value={bookingDate} 
-                            onChange={e => setBookingDate(e.target.value)} 
-                            min={format(new Date(), 'yyyy-MM-dd')} 
-                          />
+                          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center justify-end gap-2">تاريخ الموعد <CalendarIcon className="w-3.5 h-3.5" /></label>
+                          <input type="date" className="w-full h-16 bg-muted/30 border rounded-2xl px-6 outline-none font-black text-lg text-right" value={bookingDate} onChange={e => setBookingDate(e.target.value)} />
                           {isCheckingAvailability ? (
-                            <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground mt-1 font-black animate-pulse">جاري التحقق من التوفر... <Loader2 className="w-3 h-3 animate-spin" /></div>
+                            <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-end gap-2 animate-pulse">جاري التحقق... <Loader2 className="w-3 h-3 animate-spin" /></div>
                           ) : isAvailable === true ? (
-                            <div className="flex items-center justify-end gap-1.5 text-[11px] text-green-600 font-black mt-1"><CheckCircle2 className="w-4 h-4" /> التاريخ متاح للحجز</div>
+                            <div className="text-[11px] text-green-600 font-black mt-1 text-right">التاريخ متاح للحجز ✓</div>
                           ) : isAvailable === false ? (
-                            <div className="flex items-center justify-end gap-1.5 text-[11px] text-destructive font-black mt-1"><X className="w-4 h-4" /> التاريخ غير متاح</div>
+                            <div className="text-[11px] text-destructive font-black mt-1 text-right">عذراً، التاريخ غير متاح</div>
                           ) : null}
                         </div>
 
-                        {/* 2. Client Details (NEW) */}
                         <div className="space-y-4 pt-4 border-t border-dashed">
-                           <h5 className="text-xs font-black uppercase text-primary tracking-widest">بيانات التواصل والطلب</h5>
-                           <div className="space-y-3">
-                              <Input 
-                                label="اسم العميل"
-                                placeholder="ادخل اسمك الكامل"
-                                value={clientName}
-                                onChange={e => setClientName(e.target.value)}
-                                className="h-12 rounded-2xl text-right font-bold"
-                              />
-                              <Input 
-                                label="رقم الجوال"
-                                placeholder="05xxxxxxxx"
-                                value={clientPhone}
-                                onChange={e => setClientPhone(e.target.value)}
-                                className="h-12 rounded-2xl text-right font-bold"
-                              />
-                              <div className="space-y-1.5">
-                                 <label className="text-[11px] font-black mr-1 text-muted-foreground">ملاحظات إضافية (اختياري)</label>
-                                 <textarea 
-                                   className="w-full h-24 bg-muted/30 border rounded-2xl p-4 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all text-right resize-none"
-                                   placeholder="أي تفاصيل خاصة ترغب بإضافتها..."
-                                   value={specialNotes}
-                                   onChange={e => setSpecialNotes(e.target.value)}
-                                 />
-                              </div>
-                           </div>
+                           <Input label="اسم العميل" placeholder="ادخل اسمك الكامل" value={clientName} onChange={e => setClientName(e.target.value)} className="h-12 rounded-2xl text-right font-bold" />
+                           <Input label="رقم الجوال" placeholder="05xxxxxxxx" value={clientPhone} onChange={e => setClientPhone(e.target.value)} className="h-12 rounded-2xl text-right font-bold" />
+                           <textarea className="w-full h-24 bg-muted/30 border rounded-2xl p-4 text-xs font-bold outline-none text-right resize-none" placeholder="ملاحظات إضافية..." value={specialNotes} onChange={e => setSpecialNotes(e.target.value)} />
                         </div>
-
-                        {/* 3. Services Selection */}
-                        {vendorServices.length > 0 && (
-                          <div className="space-y-3 pt-4 border-t border-dashed">
-                            <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center justify-end gap-2">
-                               الخدمات الإضافية <Sparkles className="w-3.5 h-3.5 text-primary" />
-                            </label>
-                            <div className="space-y-2">
-                              {vendorServices.map(service => (
-                                <button 
-                                  key={service.id}
-                                  onClick={() => setSelectedService(selectedService?.id === service.id ? null : service)}
-                                  className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedService?.id === service.id ? 'bg-primary/5 border-primary shadow-lg shadow-primary/10' : 'bg-card border-border hover:bg-muted/30'}`}
-                                >
-                                  <span className="text-xs font-black text-primary">{formatCurrency(service.price)}</span>
-                                  <div className="text-right">
-                                    <p className="text-xs font-black">{service.name}</p>
-                                    <p className="text-[9px] text-muted-foreground font-bold">{service.category}</p>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
-                      <Button 
-                        className="w-full rounded-[2rem] h-16 font-black text-xl shadow-2xl shadow-primary/30 active:scale-95 transition-all" 
-                        disabled={!isAvailable || isCheckingAvailability || !bookingDate || !clientName || !clientPhone} 
-                        onClick={handleBook}
-                      >
+                      <Button className="w-full rounded-[2rem] h-16 font-black text-xl shadow-2xl shadow-primary/30" disabled={!isAvailable || isCheckingAvailability || !clientName || !clientPhone} onClick={handleBook}>
                         {isCheckingAvailability ? 'بانتظار التحقق...' : 'إرسال طلب الحجز'}
                       </Button>
-                      
-                      <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-bold italic opacity-60">
-                         <ShieldCheck className="w-4 h-4" /> جميع العمليات مشفرة وآمنة
-                      </div>
                     </div>
                   </div>
                 </div>

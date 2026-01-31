@@ -179,19 +179,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                 <Input label="السعة (أفراد)" type="number" value={currentHall.capacity || ''} onChange={e => setCurrentHall({...currentHall, capacity: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
                 <Input label="السعر لليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">المرافق المتوفرة</label>
-                <div className="grid grid-cols-2 gap-2 p-4 border rounded-[1.5rem] bg-muted/20">
-                  {HALL_AMENITIES.map(am => (
-                    <button key={am} onClick={() => {
-                      const cur = currentHall.amenities || [];
-                      setCurrentHall({...currentHall, amenities: cur.includes(am) ? cur.filter(x => x !== am) : [...cur, am]});
-                    }} className={`flex items-center justify-end gap-2 p-3 rounded-xl text-[10px] font-black border transition-all ${currentHall.amenities?.includes(am) ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-card hover:bg-muted'}`}>
-                      {am} {currentHall.amenities?.includes(am) ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="space-y-6">
@@ -210,7 +197,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
                   </div>
                </div>
-               
                <div className="grid grid-cols-4 gap-3">
                   {(currentHall.images || []).map((img, idx) => (
                     <div key={idx} className="aspect-square relative rounded-2xl overflow-hidden bg-muted group border shadow-sm">
@@ -218,10 +204,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                       <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, i) => i !== idx)})} className="absolute inset-0 bg-destructive/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-5 h-5" /></button>
                     </div>
                   ))}
-               </div>
-               <div className="space-y-2">
-                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">وصف القاعة</label>
-                  <textarea className="w-full h-36 rounded-2xl border p-5 text-sm outline-none resize-none font-bold bg-muted/10 text-right" placeholder="تحدث عن مميزات القاعة وتفاصيلها..." value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
                </div>
             </div>
           </div>
@@ -267,8 +249,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
           {!loading && halls.length === 0 && (
             <div className="col-span-full py-32 text-center border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50 flex flex-col items-center gap-4">
                <Building2 className="w-16 h-16 text-muted-foreground" />
-               <p className="font-black text-xl text-muted-foreground">لا يوجد قاعات مسجلة حالياً، ابدأ بإضافة قاعتك الأولى!</p>
-               <Button onClick={() => { setCurrentHall({ images: [], amenities: [], i_active: true }); setIsEditing(true); }} className="rounded-2xl h-14 px-10 font-black">إضافة قاعة الآن</Button>
+               <p className="font-black text-xl text-muted-foreground text-right">لا يوجد قاعات مسجلة حالياً، ابدأ بإضافة قاعتك الأولى!</p>
+               <Button onClick={() => { setCurrentHall({ images: [], amenities: [], is_active: true }); setIsEditing(true); }} className="rounded-2xl h-14 px-10 font-black">إضافة قاعة الآن</Button>
             </div>
           )}
         </div>
@@ -286,10 +268,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
            <div className="space-y-3">
              <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">المواعيد المحظورة حالياً</p>
              <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar pr-1">
-               {blockedDates.length === 0 ? (
-                 <p className="p-10 text-center text-xs text-muted-foreground italic font-bold">جميع التواريخ متاحة</p>
-               ) : (
-                 blockedDates.map(b => (
+               {blockedDates.map(b => (
                    <div key={b.id} className="flex justify-between items-center p-4 bg-muted/30 rounded-xl border border-dashed flex-row-reverse">
                      <span className="font-black text-sm">{format(new Date(b.block_date), 'yyyy/MM/dd')}</span>
                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={async () => {
@@ -297,8 +276,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                        openAvailability(selectedHallForAvailability!);
                      }}><Trash2 className="w-4 h-4" /></Button>
                    </div>
-                 ))
-               )}
+                 ))}
              </div>
            </div>
         </div>

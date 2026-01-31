@@ -122,7 +122,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
           <Input label="سعر الخدمة (ر.س)" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
           
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">صورة الخدمة <Tag className="w-4 h-4 text-primary" /></label>
+            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2 text-right">صورة الخدمة <Tag className="w-4 h-4 text-primary" /></label>
             <div 
               onClick={() => fileInputRef.current?.click()}
               className="aspect-[1.5/1] border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-muted/30 transition-all overflow-hidden relative group"
@@ -184,7 +184,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
         {!loading && services.length === 0 && (
           <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50 flex flex-col items-center gap-4">
              <Package className="w-12 h-12 text-muted-foreground" />
-             <p className="font-black text-muted-foreground">لا يوجد خدمات مضافة حالياً.</p>
+             <p className="font-black text-muted-foreground text-right">لا يوجد خدمات مضافة حالياً.</p>
              <Button onClick={() => { setCurrentService({ is_active: true, category: SERVICE_CATEGORIES[0] }); setIsEditing(true); }} variant="outline" className="font-black">أضف خدمتك الأولى</Button>
           </div>
         )}
