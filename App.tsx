@@ -16,7 +16,7 @@ import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Menu, Loader2, Bell, Check, ExternalLink } from 'lucide-react';
+import { Menu, Loader2, Bell, X, Building2 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
@@ -42,11 +42,9 @@ const App: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState('user');
 
-  // Apply Vendor Theme Color
   useEffect(() => {
     if (userProfile?.theme_color) {
       document.documentElement.style.setProperty('--primary', userProfile.theme_color);
-      // Generate a slightly lighter version for backgrounds
       document.documentElement.style.setProperty('--primary-muted', `${userProfile.theme_color}22`);
     } else {
       document.documentElement.style.setProperty('--primary', 'oklch(0.541 0.281 293.009)');
@@ -145,95 +143,107 @@ const App: React.FC = () => {
 
   if (!session || !userProfile) return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
-      <div className="w-full max-w-md space-y-6 rounded-3xl border bg-card p-10 shadow-2xl relative overflow-hidden">
+      <div className="w-full max-w-md space-y-6 rounded-[2.5rem] border bg-card p-10 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
         <div className="space-y-4 text-center relative z-10">
-          <img src="/logo.png" alt="Logo" className="w-32 h-auto mx-auto mb-2" onError={(e) => (e.target as any).src = 'https://placehold.co/200x200/9b5de5/ffffff?text=LOGO'} />
-          <h1 className="text-4xl font-black text-primary tracking-tighter">{siteSettings.site_name}</h1>
+          <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto border border-primary/20 shadow-inner">
+            <Building2 className="w-10 h-10" />
+          </div>
+          <h1 className="text-3xl font-black text-primary tracking-tighter">{siteSettings.site_name}</h1>
+          <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">منصة حجز القاعات الذكية</p>
         </div>
         <form onSubmit={handleAuth} className="space-y-4 relative z-10">
-          {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required />}
-          <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required />
-          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required />
+          {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-12 rounded-2xl" />}
+          <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-2xl" />
+          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-2xl" />
           {isRegister && (
-            <div className="p-3 bg-muted/30 rounded-xl flex gap-4">
-              <label className="flex items-center gap-2 text-sm"><input type="radio" value="user" checked={role === 'user'} onChange={() => setRole('user')} /> مستخدم</label>
-              <label className="flex items-center gap-2 text-sm"><input type="radio" value="vendor" checked={role === 'vendor'} onChange={() => setRole('vendor')} /> بائع</label>
+            <div className="p-2 bg-muted/30 rounded-2xl flex gap-2">
+              <button type="button" onClick={() => setRole('user')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>مستخدم</button>
+              <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>بائع</button>
             </div>
           )}
-          <Button type="submit" className="w-full h-12 rounded-xl font-bold" disabled={authLoading}>
-            {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب' : 'دخول')}
+          <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/25" disabled={authLoading}>
+            {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول')}
           </Button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="w-full text-sm font-bold text-primary/80">{isRegister ? 'لديك حساب؟ سجل دخول' : 'ليس لديك حساب؟ انضم لنا'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="w-full text-xs font-black text-primary/80 hover:text-primary transition-colors tracking-widest uppercase">{isRegister ? 'لديك حساب؟ ادخل هنا' : 'لا تملك حساب؟ انضم للمنصة'}</button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground font-sans">
-      <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={() => supabase.auth.signOut()} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} siteName={siteSettings.site_name} />
+    <div className="min-h-screen bg-background text-foreground font-sans">
+      <Sidebar 
+        user={userProfile} 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        onLogout={() => supabase.auth.signOut()} 
+        isOpen={isSidebarOpen} 
+        setIsOpen={setIsSidebarOpen} 
+        siteName={siteSettings.site_name} 
+      />
       
-      {/* Header for Desktop & Mobile */}
-      <div className="fixed top-0 left-0 right-0 lg:right-64 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-md border-b">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsSidebarOpen(true)}><Menu /></Button>
-          <h1 className="font-black text-primary text-xl lg:hidden">{siteSettings.site_name}</h1>
-        </div>
+      {/* Minimal Floating Header Actions */}
+      <div className="fixed top-6 left-6 z-40 flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="lg:hidden bg-card border shadow-xl rounded-full w-12 h-12" onClick={() => setIsSidebarOpen(true)}>
+          <Menu className="w-5 h-5" />
+        </Button>
         
-        <div className="flex items-center gap-4">
-          {/* Enhanced Notification Center */}
-          <div className="relative">
-            <Button variant="ghost" size="icon" className="relative rounded-full" onClick={() => setShowNotifDropdown(!showNotifDropdown)}>
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 bg-destructive text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
-            </Button>
-            
-            {showNotifDropdown && (
-              <div className="absolute left-0 mt-2 w-80 bg-card border rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left">
-                <div className="p-4 border-b bg-muted/10 flex justify-between items-center">
-                  <h4 className="font-black text-sm">الإشعارات</h4>
-                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">الأحدث</span>
-                </div>
-                <div className="max-h-96 overflow-y-auto no-scrollbar">
-                  {notifications.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-muted-foreground italic">لا توجد إشعارات جديدة</div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div key={n.id} onClick={() => { markAsRead(n.id); if(n.action_url) setActiveTab(n.action_url); setShowNotifDropdown(false); }} className={`p-4 border-b hover:bg-muted/50 transition-colors cursor-pointer relative ${!n.is_read ? 'bg-primary/5' : ''}`}>
-                        <div className="flex justify-between items-start gap-2">
-                           <p className="text-xs font-black mb-1">{n.title}</p>
-                           {!n.is_read && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1"></div>}
-                        </div>
-                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{n.message}</p>
-                        <span className="text-[9px] text-muted-foreground mt-2 block opacity-50">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <Button variant="ghost" className="w-full text-[10px] h-10 rounded-none border-t" onClick={() => setShowNotifDropdown(false)}>إغلاق القائمة</Button>
-              </div>
+        <div className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={`bg-card border shadow-xl rounded-full w-12 h-12 relative transition-all active:scale-95 ${showNotifDropdown ? 'ring-2 ring-primary border-primary' : ''}`} 
+            onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+          >
+            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-primary animate-bounce-slow' : 'text-muted-foreground'}`} />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 bg-primary text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-card shadow-lg">
+                {unreadCount}
+              </span>
             )}
-          </div>
+          </Button>
           
-          <div className="hidden lg:flex items-center gap-3 pr-4 border-r">
-             <div className="text-left">
-                <p className="text-xs font-black">{userProfile.full_name}</p>
-                <p className="text-[10px] text-muted-foreground uppercase">{userProfile.role}</p>
-             </div>
-             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold">
-               {userProfile.full_name?.[0]}
-             </div>
-          </div>
+          {showNotifDropdown && (
+            <div className="absolute left-0 mt-4 w-80 bg-card border shadow-2xl rounded-[2rem] overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left p-2">
+              <div className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[1.5rem]">
+                <h4 className="font-black text-sm">التنبيهات</h4>
+                <button onClick={() => setShowNotifDropdown(false)} className="p-1 hover:bg-muted rounded-full transition-colors"><X className="w-4 h-4" /></button>
+              </div>
+              <div className="max-h-96 overflow-y-auto no-scrollbar py-2">
+                {notifications.length === 0 ? (
+                  <div className="p-10 text-center text-[11px] text-muted-foreground italic font-bold">هدوء تام.. لا يوجد تنبيهات</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div 
+                      key={n.id} 
+                      onClick={() => { markAsRead(n.id); if(n.action_url) setActiveTab(n.action_url); setShowNotifDropdown(false); }} 
+                      className={`mx-2 my-1 p-4 rounded-2xl hover:bg-muted/50 transition-all cursor-pointer group relative ${!n.is_read ? 'bg-primary/5 border-r-4 border-primary' : 'bg-transparent opacity-70'}`}
+                    >
+                      <p className="text-[12px] font-black group-hover:text-primary transition-colors">{n.title}</p>
+                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">{n.message}</p>
+                      <span className="text-[9px] text-muted-foreground mt-2 block opacity-40 font-bold">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden lg:flex items-center gap-3 bg-card border shadow-xl p-1.5 pr-4 rounded-full">
+           <div className="text-right">
+              <p className="text-[11px] font-black leading-none mb-0.5">{userProfile.full_name}</p>
+              <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter opacity-50">{userProfile.role}</p>
+           </div>
+           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-purple-400 flex items-center justify-center text-white font-black text-xs shadow-inner">
+             {userProfile.full_name?.[0]}
+           </div>
         </div>
       </div>
 
-      <main className="flex-1 lg:mr-64 p-4 pt-24 lg:p-10 transition-all duration-300">
-        <div className="mx-auto max-w-6xl">
+      <main className="lg:mr-[18rem] p-6 lg:p-10 min-h-screen">
+        <div className="mx-auto max-w-5xl">
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
           {activeTab === 'my_halls' && <VendorHalls user={userProfile} />}

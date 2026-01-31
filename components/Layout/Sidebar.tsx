@@ -9,15 +9,15 @@ import {
   Search, 
   Ticket, 
   LogOut, 
-  User,
   Sparkles,
   Heart,
   CalendarDays,
   ShieldCheck,
   Settings,
-  Bell,
-  Palette
+  Palette,
+  X
 } from 'lucide-react';
+import { Button } from '../ui/Button';
 
 interface SidebarProps {
   user: UserProfile | null;
@@ -33,25 +33,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
   if (!user) return null;
 
   const getMenuItems = () => {
-    const common = [{ id: 'dashboard', label: 'لوحة التحكم', icon: <LayoutDashboard className="w-5 h-5" /> }];
+    const common = [{ id: 'dashboard', label: 'الرئيسية', icon: <LayoutDashboard className="w-5 h-5" /> }];
     
     if (user.role === 'super_admin') {
       return [
         ...common,
-        { id: 'subscriptions', label: 'اشتراكات البائعين', icon: <ShieldCheck className="w-5 h-5" /> },
+        { id: 'subscriptions', label: 'الاشتراكات', icon: <ShieldCheck className="w-5 h-5" /> },
         { id: 'users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
-        { id: 'settings', label: 'إعدادات المنصة', icon: <Settings className="w-5 h-5" /> },
+        { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-5 h-5" /> },
       ];
     }
     
     if (user.role === 'vendor') {
       return [
         ...common,
-        { id: 'calendar', label: 'لوحة المواعيد', icon: <CalendarDays className="w-5 h-5" /> },
+        { id: 'calendar', label: 'التقويم', icon: <CalendarDays className="w-5 h-5" /> },
         { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-5 h-5" /> },
         { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-5 h-5" /> },
-        { id: 'hall_bookings', label: 'حجوزات القاعات', icon: <ClipboardList className="w-5 h-5" /> },
-        { id: 'brand_settings', label: 'الهوية والتواصل', icon: <Palette className="w-5 h-5" /> },
+        { id: 'hall_bookings', label: 'الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
+        { id: 'brand_settings', label: 'هوية المتجر', icon: <Palette className="w-5 h-5" /> },
       ];
     }
     
@@ -67,33 +67,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
 
   return (
     <>
-      {isOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
-      <aside className={`fixed top-0 bottom-0 right-0 z-50 w-64 bg-card border-l flex flex-col transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-[100%] lg:translate-x-0'}`}>
-        <div className="p-6 border-b flex flex-col items-center text-center">
-          {user.custom_logo_url ? (
-            <img src={user.custom_logo_url} alt={user.business_name || siteName} className="w-20 h-20 object-contain mb-3 rounded-xl" />
-          ) : (
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-3">
-              <Building2 className="w-8 h-8" />
-            </div>
-          )}
-          <h1 className="text-lg font-black text-primary tracking-tighter leading-tight">
+      {/* Mobile Overlay */}
+      {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
+      
+      <aside className={`
+        fixed top-4 bottom-4 right-4 z-50 w-64 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+        ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0 lg:translate-x-0 lg:opacity-100'}
+      `}>
+        {/* Close button for mobile */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute left-4 top-4 lg:hidden rounded-full" 
+          onClick={() => setIsOpen(false)}
+        >
+          <X className="w-5 h-5" />
+        </Button>
+
+        <div className="p-8 flex flex-col items-center text-center">
+          <div className="relative group">
+            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-400 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+            {user.custom_logo_url ? (
+              <img src={user.custom_logo_url} alt="Logo" className="relative w-16 h-16 object-contain rounded-2xl bg-card border p-2 shadow-sm" />
+            ) : (
+              <div className="relative w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20">
+                <Building2 className="w-8 h-8" />
+              </div>
+            )}
+          </div>
+          <h1 className="mt-4 text-sm font-black text-primary tracking-tighter line-clamp-1">
             {user.role === 'vendor' ? (user.business_name || siteName) : siteName}
           </h1>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-60">
+            {user.role === 'vendor' ? 'شريك معتمد' : user.role === 'super_admin' ? 'مدير المنصة' : 'عميل'}
+          </p>
         </div>
         
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto no-scrollbar">
           {items.map((item) => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); setIsOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === item.id ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' : 'text-muted-foreground hover:bg-muted'}`}>
-              <span className="shrink-0">{item.icon}</span>{item.label}
+            <button 
+              key={item.id} 
+              onClick={() => { setActiveTab(item.id); setIsOpen(false); }} 
+              className={`
+                w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-[13px] font-black transition-all group
+                ${activeTab === item.id 
+                  ? 'bg-primary text-primary-foreground shadow-xl shadow-primary/25 translate-x-[-4px]' 
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+              `}
+            >
+              <span className={`shrink-0 transition-transform duration-300 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+                {item.icon}
+              </span>
+              {item.label}
             </button>
           ))}
         </nav>
         
-        <div className="p-4 border-t bg-muted/20">
-          <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold text-destructive hover:bg-destructive/10 rounded-xl transition-colors">
-            <LogOut className="w-4 h-4" /><span>تسجيل خروج</span>
-          </button>
+        <div className="p-4 mt-auto">
+          <div className="bg-muted/30 p-2 rounded-[2rem] border border-border/40">
+             <button 
+              onClick={onLogout} 
+              className="w-full flex items-center justify-center gap-2 py-3 text-xs font-black text-destructive hover:bg-destructive/10 rounded-2xl transition-all active:scale-95"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>خروج</span>
+            </button>
+          </div>
         </div>
       </aside>
     </>
