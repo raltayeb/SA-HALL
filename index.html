@@ -5,135 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SA Hall | منصة حجز القاعات السعودية</title>
     
-    <!-- Fonts: Cairo for Arabic -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-      :root {
-        --radius: 0.65rem;
-        --background: 100% 0 0; /* Converted oklch(1 0 0) to HSL-ish for tailwind mapping or raw */
-        /* Since Tailwind CDN doesn't fully support oklch seamlessly without plugin, we map roughly or use custom properties. 
-           However, to strictly follow the requested theme, we define the CSS vars and use them in tailwind config.
-        */
-        --font-cairo: 'Cairo', sans-serif;
-      }
-      
-      /* Applied requested theme exactly */
-      :root {
-          --background: 100% 0 0; /* oklch(1 0 0) - White */
-          --foreground: 14.1% 0.005 285.823;
-          --card: 100% 0 0;
-          --card-foreground: 14.1% 0.005 285.823;
-          --popover: 100% 0 0;
-          --popover-foreground: 14.1% 0.005 285.823;
-          --primary: 54.1% 0.281 293.009; /* Deep Violet */
-          --primary-foreground: 96.9% 0.016 293.756;
-          --secondary: 96.7% 0.001 286.375;
-          --secondary-foreground: 21% 0.006 285.885;
-          --muted: 96.7% 0.001 286.375;
-          --muted-foreground: 55.2% 0.016 285.938;
-          --accent: 96.7% 0.001 286.375;
-          --accent-foreground: 21% 0.006 285.885;
-          --destructive: 57.7% 0.245 27.325;
-          --border: 92% 0.004 286.32;
-          --input: 92% 0.004 286.32;
-          --ring: 70.2% 0.183 293.541;
-          --sidebar: 98.5% 0 0;
-          --sidebar-foreground: 14.1% 0.005 285.823;
-          --sidebar-primary: 54.1% 0.281 293.009;
-          --sidebar-primary-foreground: 96.9% 0.016 293.756;
-          --sidebar-accent: 96.7% 0.001 286.375;
-          --sidebar-accent-foreground: 21% 0.006 285.885;
-          --sidebar-border: 92% 0.004 286.32;
-          --sidebar-ring: 70.2% 0.183 293.541;
-      }
-
-      body {
-        background-color: oklch(1 0 0);
-        color: oklch(0.141 0.005 285.823);
-        font-family: 'Cairo', sans-serif;
-      }
-      
-      /* Utility class to hide scrollbar but keep functionality */
-      .no-scrollbar::-webkit-scrollbar {
-          display: none;
-      }
-      .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-      }
-    </style>
-
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              border: "oklch(0.92 0.004 286.32)",
-              input: "oklch(0.92 0.004 286.32)",
-              ring: "oklch(0.702 0.183 293.541)",
-              background: "oklch(1 0 0)",
-              foreground: "oklch(0.141 0.005 285.823)",
-              primary: {
-                DEFAULT: "oklch(0.541 0.281 293.009)",
-                foreground: "oklch(0.969 0.016 293.756)",
-              },
-              secondary: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.21 0.006 285.885)",
-              },
-              destructive: {
-                DEFAULT: "oklch(0.577 0.245 27.325)",
-                foreground: "oklch(0.969 0.016 293.756)", // Adjusted for readability
-              },
-              muted: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.552 0.016 285.938)",
-              },
-              accent: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.21 0.006 285.885)",
-              },
-              popover: {
-                DEFAULT: "oklch(1 0 0)",
-                foreground: "oklch(0.141 0.005 285.823)",
-              },
-              card: {
-                DEFAULT: "oklch(1 0 0)",
-                foreground: "oklch(0.141 0.005 285.823)",
-              },
-            },
-            borderRadius: {
-              lg: "0.65rem",
-              md: "calc(0.65rem - 2px)",
-              sm: "calc(0.65rem - 4px)",
-            },
-            fontFamily: {
-              sans: ['Cairo', 'sans-serif'],
-            }
-          }
-        }
-      }
-    </script>
   <script type="importmap">
 {
   "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.93.3",
+    "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.93.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
 </head>
-  <body class="bg-background text-foreground antialiased min-h-screen">
+  <body class="bg-background text-foreground antialiased min-h-screen font-sans">
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
