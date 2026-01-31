@@ -36,7 +36,12 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     try {
       let query = supabase
         .from('bookings')
-        .select('*, halls(*), profiles:user_id(*), services(*)');
+        .select(`
+          *,
+          halls:hall_id (*),
+          profiles:user_id (*),
+          services:service_id (*)
+        `);
 
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
@@ -62,28 +67,44 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   const updateStatus = async (booking: Booking, status: 'confirmed' | 'cancelled') => {
     try {
-      const { error } = await supabase
+      // 1. Perform the update
+      const { data, error } = await supabase
         .from('bookings')
         .update({ status })
-        .eq('id', booking.id);
+        .eq('id', booking.id)
+        .select();
 
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error('فشل تحديث الحالة في قاعدة البيانات. تأكد من صلاحيات الوصول.');
+      }
 
-      // Real-time notification to the CLIENT
+      // 2. Insert the notification for the client
       const statusAr = status === 'confirmed' ? 'تأكيد' : 'إلغاء';
-      await supabase.from('notifications').insert([{
+      const { error: notifError } = await supabase.from('notifications').insert([{
         user_id: booking.user_id,
-        title: `تحديث في حالة الحجز`,
-        message: `تم ${statusAr} حجزك لقاعة ${booking.halls?.name} من قبل الإدارة.`,
+        title: `تحديث حجز: ${statusAr}`,
+        message: `تم ${statusAr} حجزك لقاعة ${booking.halls?.name || 'المختارة'} من قبل الإدارة.`,
         type: status === 'confirmed' ? 'booking_confirmed' : 'booking_cancelled',
-        action_url: 'my_bookings'
+        action_url: 'my_bookings',
+        is_read: false
       }]);
 
-      toast({ title: 'تم التحديث', description: `تم ${statusAr} الحجز وإشعار العميل بنجاح.`, variant: 'success' });
+      if (notifError) console.error('Notification failed but status updated:', notifError);
+
+      // 3. Update UI
+      toast({ 
+        title: status === 'confirmed' ? 'تم التأكيد بنجاح' : 'تم الإلغاء', 
+        description: `تم تحديث حالة الحجز وإرسال تنبيه للعميل.`, 
+        variant: status === 'confirmed' ? 'success' : 'default' 
+      });
+      
       setBookingToCancel(null);
-      fetchBookings(); // Refresh list to show updated status
+      await fetchBookings(); // Force refresh to move item to the correct list
     } catch (err: any) {
-      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+      console.error('Status update error:', err);
+      toast({ title: 'خطأ في التحديث', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -97,9 +118,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   const filteredBookings = bookings.filter(b => {
     const matchesSearch = 
-      b.halls?.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.profiles?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      b.notes?.toLowerCase().includes(search.toLowerCase());
+      (b.halls?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.profiles?.full_name || '').toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === 'all' || b.status === filter;
     return matchesSearch && matchesFilter;
   });
@@ -109,10 +129,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-right">
         <div className="w-full">
           <h2 className="text-4xl font-black tracking-tighter flex items-center justify-end gap-3 text-primary">
-             {user.role === 'vendor' ? 'إدارة طلبات الحجز' : 'سجل حجوزاتي'} <Calendar className="w-10 h-10" />
+             {user.role === 'vendor' ? 'طلبات الحجز الواردة' : 'حجوزاتي'} <Calendar className="w-10 h-10" />
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {user.role === 'vendor' ? 'راجع تفاصيل العملاء وأكد الحجوزات الواردة.' : 'تتبع حالة حجوزاتك وفواتيرك الإلكترونية.'}
+            {user.role === 'vendor' ? 'إدارة الطلبات، تأكيد الحجوزات، والتواصل مع العملاء.' : 'متابعة حالة حجوزاتك وفواتيرك.'}
           </p>
         </div>
       </div>
@@ -146,12 +166,12 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         {loading ? (
           <div className="py-32 text-center flex flex-col items-center gap-4 border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50">
             <Loader2 className="w-12 h-12 animate-spin text-primary" />
-            <p className="font-black">جاري جلب السجلات...</p>
+            <p className="font-black">جاري جلب البيانات...</p>
           </div>
         ) : filteredBookings.length === 0 ? (
           <div className="py-32 text-center flex flex-col items-center gap-4 border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50">
             <Clock className="w-12 h-12 text-muted-foreground" />
-            <p className="font-black text-muted-foreground">لا توجد سجلات مطابقة حالياً.</p>
+            <p className="font-black text-muted-foreground">لا توجد سجلات في هذا القسم حالياً.</p>
           </div>
         ) : (
           filteredBookings.map((b) => (
@@ -163,9 +183,9 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                <div className="flex-1 text-center md:text-right space-y-4 w-full">
                   <div className="flex flex-col md:flex-row-reverse items-center justify-between gap-3 mb-1">
                     <div className="flex flex-col items-center md:items-end">
-                      <h3 className="text-2xl font-black">{b.halls?.name}</h3>
+                      <h3 className="text-2xl font-black">{b.halls?.name || 'قاعة غير محددة'}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">ID: {b.id.slice(0, 8).toUpperCase()}</span>
+                        <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">المعرف: {b.id.slice(0, 8).toUpperCase()}</span>
                         {getStatusBadge(b.status)}
                       </div>
                     </div>
@@ -174,26 +194,16 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                           <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1 flex items-center gap-1 flex-row-reverse">
                             <UserIcon className="w-3 h-3" /> بيانات العميل
                           </p>
-                          <p className="text-sm font-black">{b.profiles?.full_name || 'غير محدد'}</p>
+                          <p className="text-sm font-black">{b.profiles?.full_name || 'عميل مجهول'}</p>
                           <p className="text-xs font-bold text-muted-foreground mt-1 flex items-center gap-1.5 flex-row-reverse">
-                            <Phone className="w-3 h-3" /> {b.profiles?.phone_number || 'لا يوجد هاتف'}
+                            <Phone className="w-3 h-3" /> {b.profiles?.phone_number || 'بدون هاتف'}
                           </p>
                       </div>
                     )}
                   </div>
 
-                  {b.notes && (
-                    <div className="bg-muted/30 p-4 rounded-2xl border border-dashed text-right flex items-start gap-3 flex-row-reverse">
-                       <StickyNote className="w-4 h-4 text-primary shrink-0 mt-1" />
-                       <div className="flex-1">
-                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">تفاصيل إضافية</p>
-                         <p className="text-xs font-bold leading-relaxed">{b.notes}</p>
-                       </div>
-                    </div>
-                  )}
-
                   <div className="flex flex-wrap justify-center md:justify-end items-center gap-4 text-xs font-bold text-muted-foreground">
-                    <span className="flex flex-row-reverse items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> {b.services?.name || 'خدمات أساسية'}</span>
+                    <span className="flex flex-row-reverse items-center gap-1.5"><Sparkles className="w-4 h-4 text-primary" /> {b.services?.name || 'حجز أساسي'}</span>
                     <span className="w-1.5 h-1.5 bg-muted-foreground/30 rounded-full"></span>
                     <span className="flex flex-row-reverse items-center gap-1.5"><Clock className="w-4 h-4 text-primary" /> {new Date(b.booking_date).toLocaleDateString('ar-SA')}</span>
                   </div>
@@ -231,8 +241,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
           <div className="space-y-2">
             <h4 className="text-2xl font-black">تأكيد الإلغاء؟</h4>
             <p className="text-sm text-muted-foreground leading-relaxed px-4 text-right">
-              سيتم إلغاء حجز قاعة <span className="font-bold text-foreground">"{bookingToCancel?.halls?.name}"</span> 
-              وإرسال تنبيه فوري للعميل بهذا الإجراء.
+              سيتم إلغاء الحجز بشكل نهائي وإشعار العميل بهذا الإجراء. لا يمكن التراجع عن هذه الخطوة.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-6 border-t px-4">
