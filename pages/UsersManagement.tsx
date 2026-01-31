@@ -14,6 +14,7 @@ export const UsersManagement: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Partial<UserProfile>>({});
+  const [modalError, setModalError] = useState('');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -21,7 +22,7 @@ export const UsersManagement: React.FC = () => {
     if (!error && data) {
       setUsers(data as UserProfile[]);
     } else {
-        console.error(error);
+        console.error('Error fetching users:', error);
     }
     setLoading(false);
   };
@@ -31,57 +32,92 @@ export const UsersManagement: React.FC = () => {
   }, []);
 
   const handleSave = async () => {
+    setModalError('');
+    
+    // 1. Validation
     if (!currentUser.email || !currentUser.full_name) {
-      alert('جميع الحقول مطلوبة');
+      setModalError('جميع الحقول مطلوبة (الاسم والبريد الإلكتروني)');
       return;
     }
 
     setLoading(true);
-    let error;
 
-    if (currentUser.id) {
-        // Update
-        const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ 
-                full_name: currentUser.full_name, 
-                role: currentUser.role 
-            })
-            .eq('id', currentUser.id);
-        error = updateError;
-    } else {
-        // Create
-        // Use a random UUID. This works because we dropped the foreign key constraint in db_update.sql
-        // allowing "Ghost" profiles that can later be claimed or used for vendors.
-        const fakeId = crypto.randomUUID(); 
-        const { error: insertError } = await supabase
-            .from('profiles')
-            .insert([{
-                id: fakeId,
-                email: currentUser.email,
-                full_name: currentUser.full_name,
-                role: currentUser.role || 'user'
-            }]);
-        error = insertError;
-    }
+    try {
+        // 2. Check if email exists (Only for CREATE operation)
+        if (!currentUser.id) {
+            const { data: existingUser, error: checkError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', currentUser.email)
+                .maybeSingle(); // Use maybeSingle to avoid error if not found
 
-    setLoading(false);
-    if (!error) {
+            if (checkError) {
+                throw new Error('فشل في التحقق من وجود المستخدم: ' + checkError.message);
+            }
+
+            if (existingUser) {
+                throw new Error('هذا البريد الإلكتروني مسجل بالفعل لمستخدم آخر.');
+            }
+        }
+
+        let error;
+
+        // 3. Perform Insert or Update
+        if (currentUser.id) {
+            // Update
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ 
+                    full_name: currentUser.full_name, 
+                    role: currentUser.role 
+                })
+                .eq('id', currentUser.id);
+            error = updateError;
+        } else {
+            // Create
+            // Use a random UUID. This works because we dropped the foreign key constraint in db_update.sql
+            // allowing "Ghost" profiles that can later be claimed or used for vendors.
+            const fakeId = crypto.randomUUID(); 
+            const { error: insertError } = await supabase
+                .from('profiles')
+                .insert([{
+                    id: fakeId,
+                    email: currentUser.email,
+                    full_name: currentUser.full_name,
+                    role: currentUser.role || 'user'
+                }]);
+            error = insertError;
+        }
+
+        if (error) {
+            // Translate common RLS error
+            if (error.message.includes('row-level security')) {
+                throw new Error('ليس لديك صلاحية لإجراء هذا التعديل. تأكد من أن حسابك يمتلك صلاحية "مدير نظام" (Super Admin).');
+            }
+            throw error;
+        }
+
+        // Success
         setIsModalOpen(false);
         setCurrentUser({});
         fetchUsers();
-    } else {
-        alert('حدث خطأ: ' + error.message);
+
+    } catch (err: any) {
+        console.error(err);
+        setModalError(err.message || 'حدث خطأ غير متوقع');
+    } finally {
+        setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا المستخدم؟ سيتم حذف جميع الحجوزات والقاعات المرتبطة به.')) {
-        const { error } = await supabase.from('profiles').delete().eq('id', id);
-        if (!error) {
+        try {
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            if (error) throw error;
             fetchUsers();
-        } else {
-            alert('فشل الحذف: ' + error.message);
+        } catch (err: any) {
+             alert('فشل الحذف: ' + err.message);
         }
     }
   };
@@ -101,7 +137,7 @@ export const UsersManagement: React.FC = () => {
             </h2>
             <p className="text-sm text-muted-foreground">عرض وتعديل صلاحيات المستخدمين والبائعين.</p>
         </div>
-        <Button onClick={() => { setCurrentUser({ role: 'user' }); setIsModalOpen(true); }} className="gap-2">
+        <Button onClick={() => { setCurrentUser({ role: 'user' }); setModalError(''); setIsModalOpen(true); }} className="gap-2">
           <Plus className="w-4 h-4" /> إضافة مستخدم
         </Button>
       </div>
@@ -154,7 +190,7 @@ export const UsersManagement: React.FC = () => {
                                 </td>
                                 <td className="p-4">
                                     <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setCurrentUser(u); setIsModalOpen(true); }}>
+                                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setCurrentUser(u); setModalError(''); setIsModalOpen(true); }}>
                                             <Edit className="w-3 h-3" />
                                         </Button>
                                         <Button size="sm" variant="destructive" className="h-8 w-8 p-0" onClick={() => handleDelete(u.id)}>
@@ -176,6 +212,12 @@ export const UsersManagement: React.FC = () => {
         title={currentUser.id ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
       >
         <div className="space-y-4">
+            {modalError && (
+                <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
+                    {modalError}
+                </div>
+            )}
+            
             {!currentUser.id && (
                  <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-3 rounded-md text-xs flex gap-2">
                     <ShieldAlert className="w-4 h-4 shrink-0" />
@@ -221,7 +263,7 @@ export const UsersManagement: React.FC = () => {
             <div className="flex justify-end gap-2 mt-6">
                 <Button variant="outline" onClick={() => setIsModalOpen(false)}>إلغاء</Button>
                 <Button onClick={handleSave} disabled={loading}>
-                    {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+                    {loading ? 'جاري المعالجة...' : 'حفظ التغييرات'}
                 </Button>
             </div>
         </div>
