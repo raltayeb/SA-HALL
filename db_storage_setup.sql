@@ -9,10 +9,12 @@ VALUES ('service-images', 'service-images', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Storage Policies for Hall Images
-CREATE POLICY "Public Access" 
+-- Allow public to view images
+CREATE POLICY "Public Access Hall Images" 
 ON storage.objects FOR SELECT 
 USING ( bucket_id = 'hall-images' );
 
+-- Allow authenticated vendors to upload images
 CREATE POLICY "Vendors can upload hall images" 
 ON storage.objects FOR INSERT 
 WITH CHECK (
@@ -20,15 +22,16 @@ WITH CHECK (
   auth.role() = 'authenticated'
 );
 
+-- Allow vendors to delete their own images
 CREATE POLICY "Vendors can delete own hall images" 
 ON storage.objects FOR DELETE 
 USING (
   bucket_id = 'hall-images' AND 
-  auth.uid()::text = (storage.foldername(name))[1]
+  (storage.foldername(name))[1] = auth.uid()::text
 );
 
 -- 3. Storage Policies for Service Images
-CREATE POLICY "Public Service Images" 
+CREATE POLICY "Public Service Images Access" 
 ON storage.objects FOR SELECT 
 USING ( bucket_id = 'service-images' );
 

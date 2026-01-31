@@ -40,11 +40,9 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        // DayPicker v9+ replaces IconLeft and IconRight with a single Chevron component
-        Chevron: ({ orientation }) => {
-          const Icon = orientation === "left" ? ChevronRight : ChevronLeft;
-          return <Icon className="h-4 w-4" />;
-        },
+        // Reverting to v8 compatible IconLeft and IconRight to fix build error
+        IconLeft: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        IconRight: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
       }}
       {...props}
     />

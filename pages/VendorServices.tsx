@@ -39,7 +39,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
     setUploading(true);
     try {
       const file = files[0];
-      const filePath = `${user.id}/service-${Math.random()}.${file.name.split('.').pop()}`;
+      const filePath = `${user.id}/service-${Date.now()}.${file.name.split('.').pop()}`;
 
       const { error: uploadError } = await supabase.storage.from('service-images').upload(filePath, file);
       if (uploadError) throw uploadError;

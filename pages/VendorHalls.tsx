@@ -53,7 +53,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     try {
       const file = files[0];
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Math.random()}.${fileExt}`;
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
