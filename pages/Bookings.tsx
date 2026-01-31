@@ -5,7 +5,7 @@ import { Booking, UserProfile } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Calendar, Receipt, CheckCircle, XCircle, Clock, Search, AlertTriangle, Sparkles, ShieldAlert } from 'lucide-react';
+import { Calendar, Receipt, CheckCircle, XCircle, Clock, Search, AlertTriangle, Sparkles, ShieldAlert, AlertCircle } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { Modal } from '../components/ui/Modal';
@@ -24,11 +24,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<BookingFilter>('all');
   
-  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
   
   const { toast } = useToast();
 
-  // Security check: Super Admins should not see individual bookings
   if (user.role === 'super_admin') {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
@@ -80,7 +79,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         description: `تم ${statusText} الحجز بنجاح.`, 
         variant: 'success' 
       });
-      setCancellingBookingId(null);
+      setBookingToCancel(null);
       fetchBookings();
     } else {
       toast({ title: 'خطأ', description: 'فشل تحديث حالة الحجز', variant: 'destructive' });
@@ -103,150 +102,122 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     return matchesSearch && matchesFilter;
   });
 
-  const filterTabs = [
-    { id: 'all', label: 'الكل' },
-    { id: 'pending', label: 'قيد الانتظار' },
-    { id: 'confirmed', label: 'المؤكدة' },
-    { id: 'cancelled', label: 'الملغاة' },
-  ] as const;
-
-  if (loading && bookings.length === 0) return <div className="p-12 text-center animate-pulse">جاري تحميل الحجوزات...</div>;
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-primary" />
-            {user.role === 'vendor' ? 'إدارة حجوزات قاعاتي' : 'حجوزاتي'}
+          <h2 className="text-3xl font-black tracking-tighter flex items-center gap-2">
+            <Calendar className="w-8 h-8 text-primary" />
+            {user.role === 'vendor' ? 'سجل حجوزات القاعات' : 'حجوزاتي'}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            تتبع حالة الحجوزات والفواتير الضريبية.
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">تتبع حالة المواعيد، الفواتير، والتواصل مع الأطراف.</p>
         </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-        <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50">
-          {filterTabs.map((tab) => (
+        <div className="flex bg-card p-1 rounded-2xl border border-border/50 shadow-sm overflow-x-auto no-scrollbar">
+          {['all', 'pending', 'confirmed', 'cancelled'].map((tab) => (
             <button
-              key={tab.id}
-              onClick={() => setFilter(tab.id)}
-              className={`
-                px-4 py-1.5 text-xs font-bold rounded-lg transition-all
-                ${filter === tab.id 
-                  ? 'bg-primary text-primary-foreground shadow-sm' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'}
-              `}
+              key={tab}
+              onClick={() => setFilter(tab as any)}
+              className={`px-5 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap ${filter === tab ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105' : 'text-muted-foreground hover:bg-muted'}`}
             >
-              {tab.label}
+              {tab === 'all' ? 'الكل' : tab === 'pending' ? 'قيد الانتظار' : tab === 'confirmed' ? 'المؤكدة' : 'الملغاة'}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border w-full md:w-64">
-          <Search className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl border w-full md:w-80 shadow-sm group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <Search className="w-4 h-4 text-muted-foreground group-focus-within:text-primary" />
           <input 
             type="text" 
-            placeholder="البحث في الحجوزات..." 
-            className="bg-transparent border-none focus:outline-none text-sm w-full"
+            placeholder="بحث برقم الحجز أو الاسم..." 
+            className="bg-transparent border-none focus:outline-none text-sm w-full font-bold"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-right">
-            <thead className="bg-muted/50 text-muted-foreground">
-              <tr>
-                <th className="p-4 font-medium">القاعة والخدمة</th>
-                {user.role !== 'user' && <th className="p-4 font-medium">العميل</th>}
-                <th className="p-4 font-medium">تاريخ المناسبة</th>
-                <th className="p-4 font-medium">المبلغ الإجمالي</th>
-                <th className="p-4 font-medium">الحالة</th>
-                <th className="p-4 font-medium">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredBookings.length === 0 ? (
-                <tr>
-                  <td colSpan={user.role === 'user' ? 5 : 6} className="p-20 text-center text-muted-foreground">
-                    <div className="flex flex-col items-center gap-4">
-                      <Clock className="w-12 h-12 opacity-10" />
-                      <div>
-                        <p className="text-lg font-bold">لا توجد حجوزات مطابقة</p>
-                        <p className="text-sm">جرب تغيير حالة الفلتر أو البحث عن اسم آخر.</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-muted/10 transition-colors group">
-                    <td className="p-4">
-                        <div className="font-medium">{b.halls?.name}</div>
-                        {b.services && (
-                            <div className="flex items-center gap-1 text-[10px] text-primary mt-0.5">
-                                <Sparkles className="w-3 h-3" />
-                                <span>{b.services.name}</span>
-                            </div>
+      <div className="grid gap-6">
+        {filteredBookings.length === 0 ? (
+          <div className="py-32 text-center flex flex-col items-center gap-4 border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50">
+            <Clock className="w-12 h-12" />
+            <p className="font-black">لا توجد سجلات مطابقة حالياً.</p>
+          </div>
+        ) : (
+          filteredBookings.map((b) => (
+            <div key={b.id} className="bg-card border rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row items-center gap-6 group relative overflow-hidden">
+               <div className="w-24 h-24 rounded-3xl bg-muted overflow-hidden shrink-0 shadow-inner">
+                  {b.halls?.image_url ? <img src={b.halls.image_url} className="w-full h-full object-cover" /> : <Calendar className="w-10 h-10 m-7 opacity-20" />}
+               </div>
+               
+               <div className="flex-1 text-center md:text-right space-y-1">
+                  <div className="flex flex-col md:flex-row items-center gap-2 mb-1">
+                    <h3 className="text-xl font-black">{b.halls?.name}</h3>
+                    {getStatusBadge(b.status)}
+                  </div>
+                  <div className="flex flex-wrap justify-center md:justify-start items-center gap-3 text-xs font-bold text-muted-foreground">
+                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-primary" /> {b.booking_date}</span>
+                    <span className="w-1 h-1 bg-muted-foreground/30 rounded-full"></span>
+                    <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-primary" /> {b.services?.name || 'بدون خدمات إضافية'}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-black opacity-50">Booking ID: {b.id.slice(0, 8)}</p>
+               </div>
+
+               <div className="flex flex-col items-center md:items-end gap-3 px-6 md:border-r">
+                  <PriceTag amount={b.total_amount} className="text-2xl text-primary" iconSize={24} />
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="rounded-xl h-10 gap-2 font-bold px-4" onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }}>
+                      <Receipt className="w-4 h-4" /> الفاتورة
+                    </Button>
+                    
+                    {b.status === 'pending' && (
+                      <>
+                        {user.role === 'vendor' && (
+                          <Button size="sm" className="rounded-xl h-10 gap-2 font-bold px-4 bg-green-600 hover:bg-green-700" onClick={() => updateStatus(b.id, 'confirmed')}>
+                            <CheckCircle className="w-4 h-4" /> تأكيد
+                          </Button>
                         )}
-                    </td>
-                    {user.role !== 'user' && <td className="p-4">{b.profiles?.full_name}</td>}
-                    <td className="p-4 text-muted-foreground">{b.booking_date}</td>
-                    <td className="p-4">
-                      <PriceTag amount={b.total_amount} className="text-primary" />
-                    </td>
-                    <td className="p-4">{getStatusBadge(b.status)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8 gap-1 rounded-lg"
-                          onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }}
-                        >
-                          <Receipt className="w-3.5 h-3.5" /> الفاتورة
+                        <Button size="sm" variant="destructive" className="rounded-xl h-10 gap-2 font-bold px-4" onClick={() => setBookingToCancel(b)}>
+                          <XCircle className="w-4 h-4" /> إلغاء
                         </Button>
-                        
-                        {(user.role === 'vendor' || user.role === 'user') && b.status === 'pending' && (
-                          <>
-                            {user.role === 'vendor' && (
-                              <Button 
-                                size="sm" 
-                                className="h-8 gap-1 bg-green-600 hover:bg-green-700 rounded-lg"
-                                onClick={() => updateStatus(b.id, 'confirmed')}
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" /> تأكيد
-                              </Button>
-                            )}
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              className="h-8 gap-1 rounded-lg"
-                              onClick={() => setCancellingBookingId(b.id)}
-                            >
-                              <XCircle className="w-3.5 h-3.5" /> إلغاء
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </>
+                    )}
+                  </div>
+               </div>
+            </div>
+          ))
+        )}
       </div>
 
-      <InvoiceModal 
-        isOpen={isInvoiceOpen} 
-        onClose={() => setIsInvoiceOpen(false)} 
-        booking={selectedBooking} 
-      />
+      {/* Cancellation Confirmation Modal */}
+      <Modal 
+        isOpen={!!bookingToCancel} 
+        onClose={() => setBookingToCancel(null)} 
+        title="تأكيد إلغاء الحجز"
+      >
+        <div className="space-y-6 text-center py-4">
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-10 h-10 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h4 className="text-xl font-black">هل أنت متأكد حقاً؟</h4>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              سيتم إلغاء حجز قاعة <span className="font-bold text-foreground">"{bookingToCancel?.halls?.name}"</span> بتاريخ {bookingToCancel?.booking_date}. 
+              <br /> لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 pt-4 border-t">
+            <Button variant="outline" className="h-12 rounded-xl font-bold" onClick={() => setBookingToCancel(null)}>تراجع</Button>
+            <Button variant="destructive" className="h-12 rounded-xl font-black shadow-lg shadow-destructive/20" onClick={() => bookingToCancel && updateStatus(bookingToCancel.id, 'cancelled')}>
+              تأكيد الإلغاء
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} booking={selectedBooking} />
     </div>
   );
 };

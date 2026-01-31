@@ -40,10 +40,10 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        // Use custom Chevron component for navigation icons as per react-day-picker v9+ types
-        Chevron: ({ orientation, ...props }) => {
-          const Icon = orientation === "left" ? ChevronLeft : ChevronRight;
-          return <Icon className="h-4 w-4" {...props} />;
+        // DayPicker v9+ replaces IconLeft and IconRight with a single Chevron component
+        Chevron: ({ orientation }) => {
+          const Icon = orientation === "left" ? ChevronRight : ChevronLeft;
+          return <Icon className="h-4 w-4" />;
         },
       }}
       {...props}
