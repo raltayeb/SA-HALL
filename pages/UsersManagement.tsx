@@ -7,6 +7,12 @@ import { Modal } from '../components/ui/Modal';
 import { Users, Edit, Trash2, Search, Plus, ShieldAlert } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
+interface FormErrors {
+  general?: string;
+  email?: string;
+  full_name?: string;
+}
+
 export const UsersManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +23,9 @@ export const UsersManagement: React.FC = () => {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Partial<UserProfile>>({});
-  const [modalError, setModalError] = useState('');
+  
+  // Centralized Error State
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -34,12 +42,34 @@ export const UsersManagement: React.FC = () => {
     fetchUsers();
   }, []);
 
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+    let isValid = true;
+
+    if (!currentUser.full_name?.trim()) {
+      newErrors.full_name = 'الاسم الكامل مطلوب';
+      isValid = false;
+    }
+
+    if (!currentUser.email?.trim()) {
+      newErrors.email = 'البريد الإلكتروني مطلوب';
+      isValid = false;
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(currentUser.email)) {
+        newErrors.email = 'يرجى إدخال بريد إلكتروني صحيح';
+        isValid = false;
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleSave = async () => {
-    setModalError('');
+    setErrors({});
     
-    // 1. Validation
-    if (!currentUser.email || !currentUser.full_name) {
-      setModalError('جميع الحقول مطلوبة (الاسم والبريد الإلكتروني)');
+    if (!validateForm()) {
       return;
     }
 
@@ -105,7 +135,7 @@ export const UsersManagement: React.FC = () => {
 
     } catch (err: any) {
         console.error(err);
-        setModalError(err.message || 'حدث خطأ غير متوقع');
+        setErrors(prev => ({ ...prev, general: err.message || 'حدث خطأ غير متوقع' }));
     } finally {
         setLoading(false);
     }
@@ -140,7 +170,7 @@ export const UsersManagement: React.FC = () => {
             </h2>
             <p className="text-sm text-muted-foreground">عرض وتعديل صلاحيات المستخدمين والبائعين.</p>
         </div>
-        <Button onClick={() => { setCurrentUser({ role: 'user' }); setModalError(''); setIsModalOpen(true); }} className="gap-2">
+        <Button onClick={() => { setCurrentUser({ role: 'user' }); setErrors({}); setIsModalOpen(true); }} className="gap-2">
           <Plus className="w-4 h-4" /> إضافة مستخدم
         </Button>
       </div>
@@ -193,7 +223,7 @@ export const UsersManagement: React.FC = () => {
                                 </td>
                                 <td className="p-4">
                                     <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setCurrentUser(u); setModalError(''); setIsModalOpen(true); }}>
+                                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setCurrentUser(u); setErrors({}); setIsModalOpen(true); }}>
                                             <Edit className="w-3 h-3" />
                                         </Button>
                                         <Button size="sm" variant="destructive" className="h-8 w-8 p-0" onClick={() => handleDelete(u.id)}>
@@ -215,9 +245,9 @@ export const UsersManagement: React.FC = () => {
         title={currentUser.id ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
       >
         <div className="space-y-4">
-            {modalError && (
+            {errors.general && (
                 <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
-                    {modalError}
+                    {errors.general}
                 </div>
             )}
             
@@ -232,6 +262,7 @@ export const UsersManagement: React.FC = () => {
                 label="الاسم الكامل"
                 value={currentUser.full_name || ''}
                 onChange={e => setCurrentUser({...currentUser, full_name: e.target.value})}
+                error={errors.full_name}
             />
             
             <Input 
@@ -241,6 +272,7 @@ export const UsersManagement: React.FC = () => {
                 onChange={e => setCurrentUser({...currentUser, email: e.target.value})}
                 disabled={!!currentUser.id} 
                 className={currentUser.id ? 'opacity-50' : ''}
+                error={errors.email}
             />
 
             <div className="space-y-2">

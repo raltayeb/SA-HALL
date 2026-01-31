@@ -23,6 +23,7 @@ const App: React.FC = () => {
   // Auth State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [fullName, setFullName] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState('user');
@@ -59,8 +60,24 @@ const App: React.FC = () => {
     setLoading(false);
   };
 
+  const validatePassword = (pwd: string) => {
+    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
+    const regex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+    return regex.test(pwd);
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordError('');
+    
+    if (isRegister) {
+        if (!validatePassword(password)) {
+            setPasswordError('كلمة المرور يجب أن تكون 8 أحرف على الأقل، وتحتوي على حرف كبير، حرف صغير، ورقم.');
+            toast({ title: 'كلمة المرور ضعيفة', description: 'يرجى التأكد من استيفاء شروط كلمة المرور.', variant: 'destructive' });
+            return;
+        }
+    }
+
     setLoading(true);
     if (isRegister) {
       const { error } = await supabase.auth.signUp({
@@ -128,8 +145,12 @@ const App: React.FC = () => {
               type="password" 
               placeholder="كلمة المرور" 
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={e => {
+                  setPassword(e.target.value);
+                  if(passwordError) setPasswordError('');
+              }}
               required 
+              error={passwordError}
             />
             
             {isRegister && (
@@ -155,7 +176,10 @@ const App: React.FC = () => {
           
           <div className="text-center text-sm">
             <button 
-              onClick={() => setIsRegister(!isRegister)}
+              onClick={() => {
+                  setIsRegister(!isRegister);
+                  setPasswordError('');
+              }}
               className="text-primary hover:underline underline-offset-4"
             >
               {isRegister ? 'لديك حساب بالفعل؟ سجل دخول' : 'ليس لديك حساب؟ سجل الآن'}
