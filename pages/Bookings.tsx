@@ -53,9 +53,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       .eq('id', id);
 
     if (!error) {
+      const statusText = status === 'confirmed' ? 'تأكيد' : 'إلغاء';
       toast({ 
         title: 'تم التحديث', 
-        description: `تم ${status === 'confirmed' ? 'تأكيد' : 'إلغاء'} الحجز بنجاح.`, 
+        description: `تم ${statusText} الحجز بنجاح. تم إرسال بريد إلكتروني تلقائي للعميل.`, 
         variant: 'success' 
       });
       fetchBookings();
@@ -95,7 +96,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border flex-1 max-w-sm">
+        <div className="flex items-center gap-2 bg-card p-2 rounded-lg border flex-1 max-sm:w-full max-w-sm">
           <Search className="w-4 h-4 text-muted-foreground" />
           <input 
             type="text" 

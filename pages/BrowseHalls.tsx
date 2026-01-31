@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Hall, UserProfile, VAT_RATE, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { formatCurrency } from '../utils/currency';
-import { ImageOff, MapPin, CheckCircle2, Search, SlidersHorizontal, Users, Building2 } from 'lucide-react';
+import { ImageOff, MapPin, CheckCircle2, Search, SlidersHorizontal, Users, Building2, User } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface BrowseHallsProps {
@@ -12,7 +12,7 @@ interface BrowseHallsProps {
 }
 
 export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
-  const [halls, setHalls] = useState<(Hall & { vendor?: { full_name: string } })[]>([]);
+  const [halls, setHalls] = useState<(Hall & { vendor?: { full_name: string, email: string } })[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingHall, setBookingHall] = useState<Hall | null>(null);
   const [bookingDate, setBookingDate] = useState('');
@@ -20,7 +20,9 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
-  const [maxPrice, setMaxPrice] = useState<number>(10000);
+  const [maxPrice, setMaxPrice] = useState<number>(20000);
+  const [minCapacity, setMinCapacity] = useState<number>(0);
+  const [maxCapacity, setMaxCapacity] = useState<number>(5000);
 
   const { toast } = useToast();
 
@@ -33,7 +35,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     // Fetch halls with vendor info
     const { data, error } = await supabase
       .from('halls')
-      .select('*, vendor:vendor_id(full_name)')
+      .select('*, vendor:vendor_id(full_name, email)')
       .eq('is_active', true);
     
     if (!error && data) {
@@ -62,7 +64,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     if (!error) {
       toast({ 
         title: 'تم إرسال الطلب', 
-        description: 'تم إرسال طلب الحجز بنجاح! سيتم مراجعة طلبك من قبل إدارة القاعة.', 
+        description: 'تم إرسال طلب الحجز بنجاح! تم إخطار صاحب القاعة عبر البريد الإلكتروني.', 
         variant: 'success' 
       });
       setBookingHall(null);
@@ -81,7 +83,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                           hall.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCity = selectedCity === '' || hall.city === selectedCity;
     const matchesPrice = hall.price_per_night <= maxPrice;
-    return matchesSearch && matchesCity && matchesPrice;
+    const matchesCapacity = hall.capacity >= minCapacity && hall.capacity <= maxCapacity;
+    return matchesSearch && matchesCity && matchesPrice && matchesCapacity;
   });
 
   if (loading) return <div className="p-12 text-center text-primary animate-pulse">جاري تحميل القاعات المتاحة...</div>;
@@ -97,7 +100,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
 
       {/* Filter Bar */}
       <div className="bg-card border rounded-xl p-4 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="relative">
             <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input 
@@ -134,8 +137,30 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
             />
           </div>
 
-          <Button variant="outline" className="gap-2" onClick={() => { setSearchTerm(''); setSelectedCity(''); setMaxPrice(20000); }}>
-            <SlidersHorizontal className="w-4 h-4" /> إعادة تعيين
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[10px] text-muted-foreground uppercase font-bold">السعة (من)</label>
+              <input 
+                type="number" 
+                className="w-full bg-background border rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none"
+                value={minCapacity}
+                onChange={e => setMinCapacity(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-muted-foreground uppercase font-bold">السعة (إلى)</label>
+              <input 
+                type="number" 
+                className="w-full bg-background border rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none"
+                value={maxCapacity}
+                onChange={e => setMaxCapacity(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end pt-2 border-t mt-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => { setSearchTerm(''); setSelectedCity(''); setMaxPrice(20000); setMinCapacity(0); setMaxCapacity(5000); }}>
+            <SlidersHorizontal className="w-4 h-4" /> إعادة تعيين الفلاتر
           </Button>
         </div>
       </div>
@@ -239,7 +264,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
             <div className="flex flex-col items-center gap-3">
               <Search className="w-12 h-12 text-muted-foreground opacity-20" />
               <p className="text-lg font-medium text-muted-foreground">لم نجد أي قاعات تطابق بحثك.</p>
-              <Button variant="outline" onClick={() => { setSearchTerm(''); setSelectedCity(''); setMaxPrice(20000); }}>تصفح كافة القاعات</Button>
+              <Button variant="outline" onClick={() => { setSearchTerm(''); setSelectedCity(''); setMaxPrice(20000); setMinCapacity(0); setMaxCapacity(5000); }}>تصفح كافة القاعات</Button>
             </div>
           </div>
         )}
