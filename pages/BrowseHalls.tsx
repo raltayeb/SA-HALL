@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Hall, UserProfile, VAT_RATE } from '../types';
 import { Button } from '../components/ui/Button';
 import { formatCurrency } from '../utils/currency';
+import { ImageOff, MapPin, CheckCircle2 } from 'lucide-react';
 
 interface BrowseHallsProps {
   user: UserProfile;
@@ -57,14 +58,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
       <h2 className="text-2xl font-bold tracking-tight">تصفح القاعات المتاحة</h2>
 
       {bookingHall && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-card w-full max-w-md rounded-xl p-6 space-y-4">
-            <h3 className="font-bold text-lg">حجز {bookingHall.name}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="bg-card w-full max-w-md rounded-xl p-6 space-y-4 shadow-lg border">
+            <h3 className="font-bold text-lg flex items-center gap-2">
+              <CheckCircle2 className="text-primary w-5 h-5" />
+              حجز {bookingHall.name}
+            </h3>
             <div className="space-y-2">
               <label className="text-sm font-medium">تاريخ المناسبة</label>
               <input 
                 type="date" 
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2"
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-foreground"
                 value={bookingDate}
                 onChange={e => setBookingDate(e.target.value)}
               />
@@ -95,19 +99,24 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {halls.map(hall => (
-          <div key={hall.id} className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm">
-             <div className="aspect-video w-full bg-muted relative">
+          <div key={hall.id} className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all group">
+             <div className="aspect-video w-full bg-muted relative overflow-hidden">
               {hall.image_url ? (
-                <img src={hall.image_url} alt={hall.name} className="h-full w-full object-cover" />
+                <img src={hall.image_url} alt={hall.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">صورة القاعة</div>
+                <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                  <ImageOff className="h-8 w-8 mb-2 opacity-50" />
+                  <span className="text-xs">صورة القاعة</span>
+                </div>
               )}
              </div>
              <div className="p-4">
                <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-bold">{hall.name}</h3>
-                    <p className="text-xs text-muted-foreground">{hall.city}</p>
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                      <MapPin className="w-3 h-3" /> {hall.city}
+                    </p>
                   </div>
                   <div className="text-right">
                     <span className="block font-bold text-primary">{formatCurrency(hall.price_per_night)}</span>
@@ -120,6 +129,11 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
              </div>
           </div>
         ))}
+        {halls.length === 0 && (
+          <div className="col-span-full py-20 text-center text-muted-foreground">
+            لا توجد قاعات متاحة حالياً.
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking, VAT_RATE } from '../types';
 import { formatCurrency } from '../utils/currency';
+import { CalendarCheck, Banknote, Hourglass, Landmark } from 'lucide-react';
 
 interface DashboardProps {
   user: UserProfile;
@@ -57,40 +58,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border bg-card text-card-foreground p-6">
+        <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="tracking-tight text-sm font-medium">إجمالي الحجوزات</h3>
-            <span className="text-2xl">📅</span>
+            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold">{stats.totalBookings}</div>
           <p className="text-xs text-muted-foreground mt-1">حجوزات مسجلة في النظام</p>
         </div>
 
         {(user.role === 'vendor' || user.role === 'super_admin') && (
-          <div className="rounded-xl border bg-card text-card-foreground p-6">
+          <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="tracking-tight text-sm font-medium">الإيرادات</h3>
-              <span className="text-2xl">💰</span>
+              <Banknote className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
             <p className="text-xs text-muted-foreground mt-1">شاملة ضريبة القيمة المضافة</p>
           </div>
         )}
 
-        <div className="rounded-xl border bg-card text-card-foreground p-6">
+        <div className="rounded-xl border bg-card text-card-foreground p-6 shadow-sm">
           <div className="flex flex-row items-center justify-between space-y-0 pb-2">
             <h3 className="tracking-tight text-sm font-medium">قيد الانتظار</h3>
-            <span className="text-2xl">⏳</span>
+            <Hourglass className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-2xl font-bold">{stats.pendingBookings}</div>
           <p className="text-xs text-muted-foreground mt-1">طلبات تحتاج إلى تأكيد</p>
         </div>
 
         {(user.role === 'vendor' || user.role === 'super_admin') && (
-          <div className="rounded-xl border bg-card text-card-foreground p-6 bg-primary/5 border-primary/20">
+          <div className="rounded-xl border bg-card text-card-foreground p-6 bg-primary/5 border-primary/20 shadow-sm">
             <div className="flex flex-row items-center justify-between space-y-0 pb-2">
               <h3 className="tracking-tight text-sm font-medium text-primary">استحقاق الزكاة/الضريبة</h3>
-              <span className="text-2xl">🏛️</span>
+              <Landmark className="h-4 w-4 text-primary" />
             </div>
             <div className="text-2xl font-bold text-primary">{formatCurrency(stats.zatcaTax)}</div>
             <p className="text-xs text-muted-foreground mt-1">تقدير ضريبة القيمة المضافة (15%)</p>
@@ -98,14 +99,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         )}
       </div>
 
-      <div className="rounded-xl border bg-card text-card-foreground">
+      <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
         <div className="p-6 flex flex-col space-y-1.5">
           <h3 className="font-semibold leading-none tracking-tight">نظرة عامة</h3>
           <p className="text-sm text-muted-foreground">مرحباً بك، {user.full_name}.</p>
         </div>
         <div className="p-6 pt-0">
           <div className="h-[200px] w-full flex items-center justify-center border-2 border-dashed border-muted rounded-lg bg-muted/20">
-            <p className="text-muted-foreground text-sm">مساحة الرسوم البيانية (قريباً)</p>
+            <p className="text-muted-foreground text-sm flex items-center gap-2">
+              <CalendarCheck className="w-5 h-5" />
+              مساحة الرسوم البيانية (قريباً)
+            </p>
           </div>
         </div>
       </div>

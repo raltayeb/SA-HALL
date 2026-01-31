@@ -4,6 +4,7 @@ import { UserProfile, Hall, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { formatCurrency } from '../utils/currency';
+import { Plus, MapPin, Users, ImageOff, Edit, Trash2 } from 'lucide-react';
 
 interface VendorHallsProps {
   user: UserProfile;
@@ -77,8 +78,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold tracking-tight">إدارة قاعاتي</h2>
-        <Button onClick={() => { setCurrentHall({}); setIsEditing(true); }}>
-          + إضافة قاعة جديدة
+        <Button onClick={() => { setCurrentHall({}); setIsEditing(true); }} className="gap-2">
+          <Plus className="w-4 h-4" /> إضافة قاعة جديدة
         </Button>
       </div>
 
@@ -143,16 +144,23 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               {hall.image_url ? (
                 <img src={hall.image_url} alt={hall.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">لا توجد صورة</div>
+                <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                  <ImageOff className="h-8 w-8 mb-2 opacity-50" />
+                  <span className="text-xs">لا توجد صورة</span>
+                </div>
               )}
-              <div className="absolute top-2 right-2 bg-background/90 px-2 py-1 rounded text-xs font-medium">
+              <div className="absolute top-2 right-2 bg-background/90 px-2 py-1 rounded text-xs font-medium flex items-center gap-1 shadow-sm">
+                <MapPin className="w-3 h-3 text-primary" />
                 {hall.city}
               </div>
             </div>
             <div className="p-4">
               <h3 className="font-bold text-lg">{hall.name}</h3>
               <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
-                <span>👥 {hall.capacity} شخص</span>
+                <span className="flex items-center gap-1">
+                  <Users className="w-4 h-4" /> 
+                  {hall.capacity} شخص
+                </span>
                 <span className="font-bold text-primary">{formatCurrency(hall.price_per_night)}</span>
               </div>
               <p className="mt-2 text-sm line-clamp-2 text-muted-foreground">{hall.description}</p>
@@ -161,25 +169,29 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full"
+                  className="w-full gap-2"
                   onClick={() => { setCurrentHall(hall); setIsEditing(true); }}
                 >
-                  تعديل
+                  <Edit className="w-3 h-3" /> تعديل
                 </Button>
                 <Button 
                   variant="destructive" 
                   size="sm"
+                  className="gap-2"
                   onClick={() => handleDelete(hall.id)}
                 >
-                  حذف
+                  <Trash2 className="w-3 h-3" /> حذف
                 </Button>
               </div>
             </div>
           </div>
         ))}
         {halls.length === 0 && !isEditing && (
-          <div className="col-span-full py-12 text-center text-muted-foreground">
-            لا توجد قاعات مضافة. ابدأ بإضافة قاعتك الأولى!
+          <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">
+            <div className="flex flex-col items-center gap-2">
+              <Plus className="w-8 h-8 opacity-50" />
+              <p>لا توجد قاعات مضافة. ابدأ بإضافة قاعتك الأولى!</p>
+            </div>
           </div>
         )}
       </div>

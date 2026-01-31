@@ -7,6 +7,7 @@ import { VendorHalls } from './pages/VendorHalls';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
+import { Menu } from 'lucide-react';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -170,7 +171,7 @@ const App: React.FC = () => {
       <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b lg:hidden">
         <h1 className="font-bold text-lg">SA Hall</h1>
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
-          <span className="text-xl">☰</span>
+          <Menu className="h-6 w-6" />
         </Button>
       </div>
 
