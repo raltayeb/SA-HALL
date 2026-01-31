@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from './supabaseClient';
 import { UserProfile } from './types';
@@ -6,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { UsersManagement } from './pages/UsersManagement';
+import { Bookings } from './pages/Bookings';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Menu } from 'lucide-react';
@@ -61,7 +63,6 @@ const App: React.FC = () => {
   };
 
   const validatePassword = (pwd: string) => {
-    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
     const regex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
     return regex.test(pwd);
   };
@@ -73,7 +74,6 @@ const App: React.FC = () => {
     if (isRegister) {
         if (!validatePassword(password)) {
             setPasswordError('كلمة المرور يجب أن تكون 8 أحرف على الأقل، وتحتوي على حرف كبير، حرف صغير، ورقم.');
-            toast({ title: 'كلمة المرور ضعيفة', description: 'يرجى التأكد من استيفاء شروط كلمة المرور.', variant: 'destructive' });
             return;
         }
     }
@@ -90,7 +90,7 @@ const App: React.FC = () => {
       if (error) {
         toast({ title: 'فشل التسجيل', description: error.message, variant: 'destructive' });
       } else {
-        toast({ title: 'تم التسجيل بنجاح', description: 'يرجى التحقق من بريدك الإلكتروني لتفعيل الحساب.', variant: 'success' });
+        toast({ title: 'تم التسجيل بنجاح', description: 'يرجى التحقق من بريدك الإلكتروني.', variant: 'success' });
         setIsRegister(false);
       }
     } else {
@@ -115,7 +115,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Auth Screen
   if (!session || !userProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
@@ -145,10 +144,7 @@ const App: React.FC = () => {
               type="password" 
               placeholder="كلمة المرور" 
               value={password}
-              onChange={e => {
-                  setPassword(e.target.value);
-                  if(passwordError) setPasswordError('');
-              }}
+              onChange={e => setPassword(e.target.value)}
               required 
               error={passwordError}
             />
@@ -190,7 +186,8 @@ const App: React.FC = () => {
     );
   }
 
-  // Main App Layout
+  const isBookingTab = ['all_bookings', 'hall_bookings', 'my_bookings'].includes(activeTab);
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <Sidebar 
@@ -202,7 +199,6 @@ const App: React.FC = () => {
         setIsOpen={setIsSidebarOpen}
       />
       
-      {/* Mobile Header */}
       <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-between p-4 bg-background/80 backdrop-blur-sm border-b lg:hidden">
         <h1 className="font-bold text-lg">SA Hall</h1>
         <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)}>
@@ -215,18 +211,8 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'my_halls' && userProfile.role === 'vendor' && <VendorHalls user={userProfile} />}
           {activeTab === 'browse' && <BrowseHalls user={userProfile} />}
-          
-          {/* Super Admin Routes */}
           {activeTab === 'users' && userProfile.role === 'super_admin' && <UsersManagement />}
-          
-          {/* Placeholders for other tabs */}
-          {(activeTab === 'all_bookings' || activeTab === 'hall_bookings' || activeTab === 'my_bookings') && (
-            <div className="text-center py-20 text-muted-foreground">
-              <span className="text-4xl block mb-4">🚧</span>
-              <h2 className="text-xl font-bold mb-2">قسم الحجوزات قيد التطوير</h2>
-              <p>سيتم عرض تفاصيل الحجوزات والفواتير المتوافقة مع هيئة الزكاة هنا.</p>
-            </div>
-          )}
+          {isBookingTab && <Bookings user={userProfile} />}
         </div>
       </main>
     </div>
