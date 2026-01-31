@@ -1,3 +1,4 @@
+
 export type Role = 'super_admin' | 'vendor' | 'user';
 
 export interface UserProfile {
@@ -21,9 +22,22 @@ export interface Hall {
   created_at?: string;
 }
 
+export interface Service {
+  id: string;
+  vendor_id: string;
+  name: string;
+  category: string;
+  price: number;
+  description: string;
+  image_url: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
 export interface Booking {
   id: string;
-  hall_id: string;
+  hall_id?: string;
+  service_id?: string;
   user_id: string;
   vendor_id: string;
   booking_date: string;
@@ -31,13 +45,17 @@ export interface Booking {
   vat_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled';
   created_at?: string;
-  halls?: Hall; // Joined data
-  profiles?: UserProfile; // Joined data
+  halls?: Hall;
+  profiles?: UserProfile;
 }
 
 export const SAUDI_CITIES = [
   'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 
   'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'
+];
+
+export const SERVICE_CATEGORIES = [
+  'بوفيه وضيافة', 'تصوير فوتوغرافي', 'تنسيق زهور', 'دي جي وصوتيات', 'كوشة وتصميم', 'ضيافة قهوة وشاي'
 ];
 
 export const VAT_RATE = 0.15;

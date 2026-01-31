@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { UserProfile } from '../../types';
 import { 
@@ -9,7 +10,8 @@ import {
   Search, 
   Ticket, 
   LogOut, 
-  User 
+  User,
+  Sparkles
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       return [
         ...common,
         { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-5 h-5" /> },
+        { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-5 h-5" /> },
         { id: 'hall_bookings', label: 'حجوزات القاعات', icon: <ClipboardList className="w-5 h-5" /> },
       ];
     }
@@ -112,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium truncate">{user.full_name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.role}</p>
+              <p className="text-xs text-muted-foreground truncate text-right uppercase tracking-tighter">{user.role}</p>
             </div>
           </div>
           <button

@@ -5,6 +5,7 @@ import { UserProfile } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
+import { VendorServices } from './pages/VendorServices';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { UsersManagement } from './pages/UsersManagement';
 import { Bookings } from './pages/Bookings';
@@ -238,6 +239,7 @@ const App: React.FC = () => {
         <div className="mx-auto max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-700">
           {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
           {activeTab === 'my_halls' && userProfile.role === 'vendor' && <VendorHalls user={userProfile} />}
+          {activeTab === 'my_services' && userProfile.role === 'vendor' && <VendorServices user={userProfile} />}
           {activeTab === 'browse' && <BrowseHalls user={userProfile} />}
           {activeTab === 'users' && userProfile.role === 'super_admin' && <UsersManagement />}
           {isBookingTab && <Bookings user={userProfile} />}
