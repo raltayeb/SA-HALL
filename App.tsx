@@ -14,10 +14,12 @@ import { SystemSettings } from './pages/SystemSettings';
 import { Favorites } from './pages/Favorites';
 import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
+import { VendorPOS } from './pages/VendorPOS';
+import { VendorCoupons } from './pages/VendorCoupons';
 import { Home } from './pages/Home';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Menu, Loader2, Bell, X, Building2, RefreshCw, LogIn, User } from 'lucide-react';
+import { Menu, Loader2, X, ShieldAlert } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
@@ -32,10 +34,12 @@ const App: React.FC = () => {
   const lastFetchedUserId = useRef<string | null>(null);
   
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
-    site_name: 'قاعه',
+    site_name: 'القاعة',
     commission_rate: 0.10,
     vat_enabled: true,
-    platform_logo_url: ''
+    platform_logo_url: '',
+    hall_listing_fee: 500,
+    service_listing_fee: 200
   } as any);
   
   const { toast } = useToast();
@@ -46,15 +50,6 @@ const App: React.FC = () => {
   const [isRegister, setIsRegister] = useState(false);
   const [role, setRole] = useState('user');
 
-  useEffect(() => {
-    if (userProfile?.theme_color) {
-      document.documentElement.style.setProperty('--primary', userProfile.theme_color);
-      document.documentElement.style.setProperty('--primary-muted', `${userProfile.theme_color}22`);
-    } else {
-      document.documentElement.style.setProperty('--primary', '#4B0082');
-    }
-  }, [userProfile?.theme_color]);
-
   const fetchSiteSettings = async () => {
     try {
       const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
@@ -63,62 +58,31 @@ const App: React.FC = () => {
   };
 
   const fetchProfile = async (userId: string) => {
-    if (lastFetchedUserId.current === userId && userProfile) {
-      setLoading(false);
-      return;
-    }
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (error) throw error;
       if (data) {
         setUserProfile(data as UserProfile);
         lastFetchedUserId.current = userId;
       }
-    } catch (err: any) { 
-      console.error('Profile fetch failed:', err);
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err: any) { console.error(err); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
     fetchSiteSettings();
-    const safetyTimer = setTimeout(() => setLoading(false), 5000);
-
-    const checkInitialSession = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
-        if (initialSession?.user) {
-          await fetchProfile(initialSession.user.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) { 
-        setLoading(false);
-      }
-    };
-    checkInitialSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      setSession(newSession);
-      if (newSession?.user) {
-        if (newSession.user.id !== lastFetchedUserId.current) {
-          await fetchProfile(newSession.user.id);
-        } else {
-          setLoading(false);
-        }
-      } else {
-        setUserProfile(null);
-        lastFetchedUserId.current = null;
-        setLoading(false);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) fetchProfile(session.user.id);
+      else setLoading(false);
     });
 
-    return () => {
-      clearTimeout(safetyTimer);
-      subscription.unsubscribe();
-    };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) fetchProfile(session.user.id);
+      else { setUserProfile(null); setLoading(false); }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -127,9 +91,8 @@ const App: React.FC = () => {
     try {
       if (isRegister) {
         const { error } = await supabase.auth.signUp({ 
-          email, 
-          password, 
-          options: { data: { full_name: fullName, role: role } } 
+          email, password, 
+          options: { data: { full_name: fullName, role: role, is_enabled: true } } 
         });
         if (error) throw error;
         toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني.', variant: 'default' });
@@ -140,9 +103,7 @@ const App: React.FC = () => {
       setShowAuthModal(false);
     } catch (error: any) { 
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' }); 
-    } finally { 
-      setAuthLoading(false); 
-    }
+    } finally { setAuthLoading(false); }
   };
 
   const handleLogout = async () => {
@@ -153,7 +114,7 @@ const App: React.FC = () => {
 
   if (loading) return (
     <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-4">
-      <div className="text-7xl font-ruqaa animate-pulse">قاعه</div>
+      <div className="text-7xl font-ruqaa animate-pulse text-primary">القاعة</div>
       <Loader2 className="w-10 h-10 animate-spin opacity-20" />
     </div>
   );
@@ -161,39 +122,31 @@ const App: React.FC = () => {
   const isMarketplace = activeTab === 'home' || activeTab === 'browse';
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white" dir="rtl">
-      {/* Sidebar (Admin/Vendor ONLY) */}
-      {!isMarketplace && (
+    <div className="min-h-screen bg-[#F9FAFB] text-[#111827]" dir="rtl">
+      {!isMarketplace && userProfile && (
         <Sidebar 
-          user={userProfile} 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          onLogout={handleLogout} 
-          isOpen={isSidebarOpen} 
-          setIsOpen={setIsSidebarOpen} 
-          siteName={siteSettings.site_name}
-          platformLogo={siteSettings.platform_logo_url}
+          user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
+          onLogout={handleLogout} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} 
+          siteName={siteSettings.site_name} platformLogo={siteSettings.platform_logo_url}
         />
       )}
 
-      {/* Auth Modal Overlay - Dark Refinement */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[1000] bg-background/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-md bg-card border border-white/10 rounded-[1.125rem] p-12 shadow-2xl relative animate-in zoom-in-95 ring-1 ring-white/5">
-             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-white/5 rounded-full"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-[1000] bg-white/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-md bg-white border border-gray-100 rounded-[2.5rem] p-12 shadow-2xl relative animate-in zoom-in-95">
+             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-gray-50 rounded-full"><X className="w-5 h-5" /></button>
              <div className="text-center space-y-4 mb-8">
-                <div className="text-6xl font-ruqaa text-primary mx-auto">قاعه</div>
-                <h2 className="text-3xl font-black text-foreground">{isRegister ? 'انضم كشريك' : 'تسجيل الدخول'}</h2>
-                <p className="text-sm text-muted-foreground font-bold">ابدأ بإدارة قاعاتك وخدماتك باحترافية.</p>
+                <div className="text-6xl font-ruqaa text-primary mx-auto">القاعة</div>
+                <h2 className="text-3xl font-black text-gray-900">{isRegister ? 'انضم كشريك' : 'تسجيل الدخول'}</h2>
              </div>
              <form onSubmit={handleAuth} className="space-y-4 text-right">
-                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />}
-                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />
-                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />
+                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-gray-50 border-none" />}
+                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-gray-50 border-none" />
+                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-gray-50 border-none" />
                 {isRegister && (
-                  <div className="p-2 bg-muted/20 rounded-xl flex gap-2 border border-white/5">
-                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>عميل</button>
-                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>بائع</button>
+                  <div className="p-2 bg-gray-50 rounded-xl flex gap-2">
+                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-gray-400'}`}>عميل</button>
+                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-gray-400'}`}>بائع</button>
                   </div>
                 )}
                 <Button type="submit" className="w-full h-16 rounded-xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
@@ -205,13 +158,11 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Viewport */}
-      <main className={`${!isMarketplace && userProfile ? 'lg:pr-64' : ''}`}>
+      <main className={`${!isMarketplace && userProfile ? 'lg:pr-[280px]' : ''}`}>
         <div className={`mx-auto w-full ${!isMarketplace && userProfile ? 'p-6 lg:p-10' : ''}`}>
-          {/* Mobile Menu Trigger */}
           {!isMarketplace && userProfile && (
             <div className="lg:hidden flex justify-start mb-6">
-               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-[1.125rem] border-white/10 bg-card">
+               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl border-gray-100 bg-white">
                   <Menu className="w-5 h-5 text-primary" />
                </Button>
             </div>
@@ -219,30 +170,25 @@ const App: React.FC = () => {
 
           {activeTab === 'home' && (
             <Home 
-              user={userProfile} 
-              onLoginClick={() => setShowAuthModal(true)} 
+              user={userProfile} onLoginClick={() => setShowAuthModal(true)} 
               onBrowseHalls={() => { setActiveTab('browse'); setBrowseMode('halls'); }}
               onBrowseServices={() => { setActiveTab('browse'); setBrowseMode('services'); }}
-              onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              onNavigate={setActiveTab} onLogout={handleLogout}
             />
           )}
           {activeTab === 'browse' && (
             <BrowseHalls 
-              user={userProfile} 
-              mode={browseMode} 
-              onBack={() => setActiveTab('home')}
-              onLoginClick={() => setShowAuthModal(true)}
-              onNavigate={setActiveTab}
-              onLogout={handleLogout}
+              user={userProfile} mode={browseMode} onBack={() => setActiveTab('home')}
+              onLoginClick={() => setShowAuthModal(true)} onNavigate={setActiveTab} onLogout={handleLogout}
             />
           )}
           {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
           {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
           {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
           {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
+          {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
+          {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
           {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
-          {activeTab === 'users' && <UsersManagement />}
           {activeTab === 'subscriptions' && <VendorSubscriptions />}
           {activeTab === 'settings' && <SystemSettings />}
           {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={fetchProfile} />}

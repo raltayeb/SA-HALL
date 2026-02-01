@@ -1,5 +1,4 @@
 
-
 export type Role = 'super_admin' | 'vendor' | 'user';
 
 export interface UserProfile {
@@ -11,35 +10,47 @@ export interface UserProfile {
   bio?: string;
   avatar_url?: string;
   role: Role;
+  is_enabled: boolean; // Super admin control
   created_at?: string;
-  // Added fields for vendor branding and contact info
   custom_logo_url?: string;
   whatsapp_number?: string;
   business_email?: string;
   theme_color?: string;
-  // Social media links
   facebook_url?: string;
   instagram_url?: string;
   twitter_url?: string;
-}
-
-export interface Subscription {
-  id: string;
-  vendor_id: string;
-  plan_type: 'basic' | 'pro' | 'enterprise';
-  status: 'active' | 'expired' | 'trial';
-  start_date: string;
-  end_date: string;
-  amount_paid: number;
-  profiles?: UserProfile;
 }
 
 export interface SystemSettings {
   site_name: string;
   commission_rate: number;
   vat_enabled: boolean;
-  // Added missing field to match usage in App.tsx and SystemSettings.tsx
   platform_logo_url?: string;
+  hall_listing_fee: number; // Price per hall
+  service_listing_fee: number; // Price per service
+}
+
+export interface POSItem {
+  id: string;
+  vendor_id: string;
+  hall_id: string; // POS items can be hall-specific
+  name: string;
+  price: number;
+  stock: number;
+  image_url?: string;
+}
+
+export interface Coupon {
+  id: string;
+  vendor_id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  start_date: string;
+  end_date: string;
+  applicable_to: 'halls' | 'services' | 'both';
+  target_ids: string[]; // Specific IDs of halls or services
+  is_active: boolean;
 }
 
 export interface Hall {
@@ -54,10 +65,7 @@ export interface Hall {
   images: string[];
   amenities: string[];
   is_active: boolean;
-  latitude?: number;
-  longitude?: number;
   created_at?: string;
-  average_rating?: number;
 }
 
 export interface Service {
@@ -72,11 +80,6 @@ export interface Service {
   created_at?: string;
 }
 
-/**
- * Booking interface with support for joined profiles.
- * 'client' is an alias for the user profile associated with user_id.
- * 'vendor' is an alias for the user profile associated with vendor_id.
- */
 export interface Booking {
   id: string;
   hall_id?: string;
@@ -88,26 +91,14 @@ export interface Booking {
   vat_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled';
   notes?: string;
-  completed_at?: string;
   created_at?: string;
   halls?: Hall;
   profiles?: UserProfile;
   services?: Service;
   client?: UserProfile;
-  vendor?: UserProfile;
 }
 
-export const SAUDI_CITIES = [
-  'الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 
-  'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'
-];
-
-export const HALL_AMENITIES = [
-  'مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية'
-];
-
-export const SERVICE_CATEGORIES = [
-  'ضيافة وطعام', 'تصوير فوتوغرافي', 'تصوير فيديو', 'تنسيق زهور', 'كوشة وتصميم', 'توزيعات وهدايا', 'دي جي وصوت', 'زفة'
-];
-
+export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'];
+export const HALL_AMENITIES = ['مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية'];
+export const SERVICE_CATEGORIES = ['ضيافة وطعام', 'تصوير فوتوغرافي', 'تصوير فيديو', 'تنسيق زهور', 'كوشة وتصميم', 'توزيعات وهدايا', 'دي جي وصوت', 'زفة'];
 export const VAT_RATE = 0.15;
