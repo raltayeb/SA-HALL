@@ -16,7 +16,7 @@ import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Menu, Loader2, Bell, X, Building2 } from 'lucide-react';
+import { Menu, Loader2, Bell, X, Building2, RefreshCw } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
@@ -111,6 +111,11 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchSiteSettings();
     
+    // Safety timeout to ensure loading doesn't stick forever
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 8000);
+
     const checkInitialSession = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
@@ -133,6 +138,9 @@ const App: React.FC = () => {
       if (newSession?.user) {
         if (newSession.user.id !== lastFetchedUserId.current) {
           await fetchProfile(newSession.user.id);
+        } else {
+          // IMPORTANT: If user is already fetched, we must still clear loading!
+          setLoading(false);
         }
       } else {
         setUserProfile(null);
@@ -143,6 +151,7 @@ const App: React.FC = () => {
 
     window.addEventListener('settingsUpdated', fetchSiteSettings);
     return () => {
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
       window.removeEventListener('settingsUpdated', fetchSiteSettings);
     };
@@ -177,7 +186,7 @@ const App: React.FC = () => {
         )
         .subscribe((status) => {
           if (status === 'CHANNEL_ERROR') {
-            console.warn('Realtime channel could not be established. Falling back to polling.');
+            console.warn('Realtime channel could not be established. This is likely a server proxy issue.');
           }
         });
 
@@ -224,9 +233,27 @@ const App: React.FC = () => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (loading) return (
-    <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-4">
-      <Loader2 className="w-10 h-10 animate-spin" />
-      <p className="font-black text-xl animate-pulse">{siteSettings.site_name}...</p>
+    <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-6">
+      <div className="relative">
+        <Loader2 className="w-12 h-12 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Building2 className="w-4 h-4 opacity-50" />
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="font-black text-xl animate-pulse tracking-tighter">{siteSettings.site_name}...</p>
+        <p className="text-xs text-muted-foreground mt-2 font-bold">جاري تحميل البيانات الآمنة</p>
+      </div>
+      
+      {/* Fallback button if stuck */}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="mt-8 text-[10px] font-black opacity-30 hover:opacity-100 transition-opacity gap-2"
+        onClick={() => window.location.reload()}
+      >
+        <RefreshCw className="w-3 h-3" /> تعذر التحميل؟ اضغط لإعادة التشغيل
+      </Button>
     </div>
   );
 
