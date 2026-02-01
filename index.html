@@ -4,122 +4,73 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wedding Hall Saudi Arabia | SA Hall SaaS</title>
+    <title>قاعه | منصة حجز المناسبات الفاخرة</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Tailwind Play CDN for instant preview support -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              border: "oklch(0.92 0.004 286.32)",
-              input: "oklch(0.92 0.004 286.32)",
-              ring: "oklch(0.702 0.183 293.541)",
+              border: "oklch(0.92 0.01 285)",
+              input: "oklch(0.92 0.01 285)",
+              ring: "#4B0082",
               background: "oklch(1 0 0)",
-              foreground: "oklch(0.141 0.005 285.823)",
+              foreground: "oklch(0.14 0.01 285)",
               primary: {
-                DEFAULT: "oklch(0.541 0.281 293.009)",
-                foreground: "oklch(0.969 0.016 293.756)",
+                DEFAULT: "#4B0082",
+                foreground: "oklch(1 0 0)",
               },
               secondary: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.21 0.006 285.885)",
-              },
-              destructive: {
-                DEFAULT: "oklch(0.577 0.245 27.325)",
-                foreground: "oklch(0.969 0.016 293.756)",
+                DEFAULT: "#F3E8FF",
+                foreground: "#4B0082",
               },
               muted: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.552 0.016 285.938)",
-              },
-              accent: {
-                DEFAULT: "oklch(0.967 0.001 286.375)",
-                foreground: "oklch(0.21 0.006 285.885)",
-              },
-              popover: {
-                DEFAULT: "oklch(1 0 0)",
-                foreground: "oklch(0.141 0.005 285.823)",
+                DEFAULT: "oklch(0.97 0.01 285)",
+                foreground: "oklch(0.5 0.01 285)",
               },
               card: {
                 DEFAULT: "oklch(1 0 0)",
-                foreground: "oklch(0.141 0.005 285.823)",
+                foreground: "oklch(0.14 0.01 285)",
               },
             },
-            boxShadow: {
-              'sm': '0 2px 8px 0 oklch(0 0 0 / 0.01)',
-              'md': '0 4px 12px -2px oklch(0 0 0 / 0.03), 0 2px 6px -2px oklch(0 0 0 / 0.02)',
-              'lg': '0 12px 24px -6px oklch(0 0 0 / 0.04), 0 4px 12px -4px oklch(0 0 0 / 0.02)',
-              'xl': '0 20px 32px -8px oklch(0 0 0 / 0.05), 0 8px 16px -6px oklch(0 0 0 / 0.02)',
-              '2xl': '0 32px 48px -12px oklch(0 0 0 / 0.08), 0 16px 24px -8px oklch(0 0 0 / 0.04)',
-              'soft': '0 10px 40px -6px oklch(0 0 0 / 0.04)',
-              'soft-primary': '0 20px 40px -10px oklch(0.541 0.281 293.009 / 0.15)',
-              'inner-soft': 'inset 0 2px 4px 0 oklch(0 0 0 / 0.02)',
-            },
             borderRadius: {
-              lg: "0.65rem",
-              md: "calc(0.65rem - 2px)",
-              sm: "calc(0.65rem - 4px)",
+              '2xl': '1.5rem',
+              '3xl': '2rem',
+              '4xl': '2.5rem',
             },
             fontFamily: {
               sans: ['Cairo', 'sans-serif'],
+              ruqaa: ['Aref Ruqaa', 'serif'],
             }
           }
         }
       }
     </script>
-    
-    <!-- DayPicker Styles -->
-    <link rel="stylesheet" href="https://esm.sh/react-day-picker@8.10.0/dist/style.css">
-    
-    <style>
-      @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
-      .toast-slide-in {
-        animation: slideIn 0.3s ease-out forwards;
-      }
-      body {
-        direction: rtl;
-      }
-      /* Custom scrollbar for better SaaS look */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-    </style>
-
-    <script type="importmap">
+  <script type="importmap">
 {
   "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "react/": "https://esm.sh/react@^19.2.4/",
     "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.93.3",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "react-day-picker": "https://esm.sh/react-day-picker@^9.13.0",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.93.3",
     "vite": "https://esm.sh/vite@^7.3.1",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
     "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "date-fns/": "https://esm.sh/date-fns@^4.1.0/"
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "react-day-picker": "https://esm.sh/react-day-picker@^9.13.0"
   }
 }
 </script>
-  </head>
+</head>
   <body class="bg-background text-foreground antialiased min-h-screen font-sans">
     <div id="root"></div>
-    <!-- Use relative path to fix loading in subfolders/sandboxes -->
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>

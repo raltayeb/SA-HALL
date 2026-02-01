@@ -31,7 +31,7 @@ interface SidebarProps {
   platformLogo?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "SA Hall", platformLogo }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "قاعه", platformLogo }) => {
   if (!user) return null;
 
   const getMenuItems = () => {
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
                 <img src={logoToDisplay} alt="Logo" className="relative h-full w-full object-contain bg-card rounded-[1.125rem] border p-1" />
               ) : (
                 <div className="relative h-full w-full bg-primary/10 rounded-[1.125rem] flex items-center justify-center text-primary border border-primary/20">
-                  <Building2 className="w-5 h-5" />
+                   <span className="text-2xl font-ruqaa leading-none">ق</span>
                 </div>
               )}
             </div>
@@ -101,8 +101,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
             </Button>
           </div>
           <div className="text-right w-full">
-            <h1 className="text-sm font-black text-primary tracking-tight uppercase line-clamp-1">
-              {user.role === 'vendor' ? (user.business_name || siteName) : siteName}
+            <h1 className={`${user.role === 'vendor' ? 'text-sm font-black' : 'text-3xl font-ruqaa'} text-primary tracking-tight uppercase line-clamp-1`}>
+              {user.role === 'vendor' ? (user.business_name || siteName) : "قاعه"}
             </h1>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">بوابة الشركاء</p>
           </div>

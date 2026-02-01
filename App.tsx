@@ -32,7 +32,7 @@ const App: React.FC = () => {
   const lastFetchedUserId = useRef<string | null>(null);
   
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
-    site_name: 'SA Hall',
+    site_name: 'قاعه',
     commission_rate: 0.10,
     vat_enabled: true,
     platform_logo_url: ''
@@ -152,9 +152,9 @@ const App: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-6">
-      <Loader2 className="w-12 h-12 animate-spin" />
-      <p className="font-black text-xl animate-pulse tracking-tighter">{siteSettings.site_name}...</p>
+    <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-4">
+      <div className="text-7xl font-ruqaa animate-pulse">قاعه</div>
+      <Loader2 className="w-10 h-10 animate-spin opacity-20" />
     </div>
   );
 
@@ -176,27 +176,27 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Auth Modal Overlay */}
+      {/* Auth Modal Overlay - Dark Refinement */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-[1.125rem] p-12 shadow-2xl relative animate-in zoom-in-95">
-             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-black/5 rounded-full"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-[1000] bg-background/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-md bg-card border border-white/10 rounded-[1.125rem] p-12 shadow-2xl relative animate-in zoom-in-95 ring-1 ring-white/5">
+             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-white/5 rounded-full"><X className="w-5 h-5" /></button>
              <div className="text-center space-y-4 mb-8">
-                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto border border-primary/20"><LogIn className="w-8 h-8" /></div>
-                <h2 className="text-3xl font-black text-black">{isRegister ? 'انضم كشريك' : 'تسجيل الدخول'}</h2>
-                <p className="text-sm text-black/40 font-bold">ابدأ بإدارة قاعاتك وخدماتك باحترافية.</p>
+                <div className="text-6xl font-ruqaa text-primary mx-auto">قاعه</div>
+                <h2 className="text-3xl font-black text-foreground">{isRegister ? 'انضم كشريك' : 'تسجيل الدخول'}</h2>
+                <p className="text-sm text-muted-foreground font-bold">ابدأ بإدارة قاعاتك وخدماتك باحترافية.</p>
              </div>
              <form onSubmit={handleAuth} className="space-y-4 text-right">
-                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />}
-                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />
-                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />
+                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />}
+                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />
+                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-muted/20 border-white/5" />
                 {isRegister && (
-                  <div className="p-2 bg-black/5 rounded-xl flex gap-2">
-                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'user' ? 'bg-black text-white' : 'text-black/40'}`}>عميل</button>
-                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'vendor' ? 'bg-black text-white' : 'text-black/40'}`}>بائع</button>
+                  <div className="p-2 bg-muted/20 rounded-xl flex gap-2 border border-white/5">
+                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>عميل</button>
+                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>بائع</button>
                   </div>
                 )}
-                <Button type="submit" className="w-full h-16 rounded-xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
+                <Button type="submit" className="w-full h-16 rounded-xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
                   {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'دخول المنصة')}
                 </Button>
              </form>
@@ -211,7 +211,7 @@ const App: React.FC = () => {
           {/* Mobile Menu Trigger */}
           {!isMarketplace && userProfile && (
             <div className="lg:hidden flex justify-start mb-6">
-               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-[1.125rem] border-primary/20 bg-card">
+               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-[1.125rem] border-white/10 bg-card">
                   <Menu className="w-5 h-5 text-primary" />
                </Button>
             </div>

@@ -36,7 +36,7 @@ export const PriceTag: React.FC<PriceTagProps> = ({ amount, className = "", icon
   return (
     <div className={`flex items-center gap-1 font-black leading-none ${className}`}>
       <span>{formattedAmount}</span>
-      <SaudiRiyalIcon size={iconSize} className="text-primary/80" />
+      <SaudiRiyalIcon size={iconSize} className="text-primary opacity-80" />
     </div>
   );
 };
