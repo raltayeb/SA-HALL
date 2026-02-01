@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { UserProfile, SystemSettings as ISystemSettings } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -28,6 +28,9 @@ const App: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const lastFetchedUserId = useRef<string | null>(null);
+  const channelRef = useRef<any>(null);
+  
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
     site_name: 'SA Hall',
     commission_rate: 0.10,
@@ -60,36 +63,82 @@ const App: React.FC = () => {
   };
 
   const fetchNotifications = async (userId: string) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-    setNotifications(data || []);
+    try {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
   };
 
   const markAsRead = async (notifId: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
-    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
+    try {
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
+  const fetchProfile = async (userId: string) => {
+    if (lastFetchedUserId.current === userId && userProfile) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      if (data) {
+        setUserProfile(data as UserProfile);
+        lastFetchedUserId.current = userId;
+      }
+    } catch (err: any) { 
+      console.error('Profile fetch failed:', err);
+      if (err.code !== 'PGRST116') {
+        toast({ title: 'خطأ في الاتصال', description: 'فشل تحميل بيانات الملف الشخصي.', variant: 'destructive' });
+      }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   useEffect(() => {
     fetchSiteSettings();
+    
     const checkInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session?.user) await fetchProfile(session.user.id);
-      } catch (err) { console.error(err); }
-      finally { setLoading(false); }
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        setSession(initialSession);
+        if (initialSession?.user) {
+          await fetchProfile(initialSession.user.id);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) { 
+        console.error('Session check error:', err);
+        setLoading(false);
+      }
     };
+    
     checkInitialSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) await fetchProfile(session.user.id);
-      else { setUserProfile(null); setLoading(false); }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession);
+      if (newSession?.user) {
+        if (newSession.user.id !== lastFetchedUserId.current) {
+          await fetchProfile(newSession.user.id);
+        }
+      } else {
+        setUserProfile(null);
+        lastFetchedUserId.current = null;
+        setLoading(false);
+      }
     });
 
     window.addEventListener('settingsUpdated', fetchSiteSettings);
@@ -102,39 +151,74 @@ const App: React.FC = () => {
   useEffect(() => {
     if (userProfile?.id) {
       fetchNotifications(userProfile.id);
+      
+      // Cleanup existing channel if it exists
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+
       const channel = supabase
         .channel(`notifications:${userProfile.id}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userProfile.id}` }, (payload) => {
-          setNotifications(prev => [payload.new, ...prev]);
-          toast({ title: payload.new.title, description: payload.new.message, variant: 'default' });
-        })
-        .subscribe();
-      return () => { supabase.removeChannel(channel); };
+        .on('postgres_changes', 
+          { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'notifications', 
+            filter: `user_id=eq.${userProfile.id}` 
+          }, 
+          (payload) => {
+            setNotifications(prev => [payload.new, ...prev]);
+            toast({ 
+              title: payload.new.title, 
+              description: payload.new.message, 
+              variant: 'default' 
+            });
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR') {
+            console.warn('Realtime channel could not be established. Falling back to polling.');
+          }
+        });
+
+      channelRef.current = channel;
+
+      return () => { 
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+      };
     }
   }, [userProfile?.id]);
-
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (!error && data) setUserProfile(data as UserProfile);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
-  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
     try {
       if (isRegister) {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: fullName, role: role } } });
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password, 
+          options: { data: { full_name: fullName, role: role } } 
+        });
         if (error) throw error;
-        if (data.user && !data.session) toast({ title: 'تفعيل البريد', description: 'يرجى مراجعة بريدك الإلكتروني لتفعيل الحساب.', variant: 'default' });
+        if (data.user && !data.session) {
+          toast({ 
+            title: 'تفعيل البريد', 
+            description: 'يرجى مراجعة بريدك الإلكتروني لتفعيل الحساب.', 
+            variant: 'default' 
+          });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
-    } catch (error: any) { toast({ title: 'خطأ', description: error.message, variant: 'destructive' }); }
-    finally { setAuthLoading(false); }
+    } catch (error: any) { 
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' }); 
+    } finally { 
+      setAuthLoading(false); 
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -148,7 +232,7 @@ const App: React.FC = () => {
 
   if (!session || !userProfile) return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
-      <div className="w-full max-w-md space-y-6 rounded-[2.5rem] border bg-card p-10 shadow-2xl relative overflow-hidden">
+      <div className="w-full max-w-md space-y-6 rounded-[2.5rem] border bg-card p-10 shadow-2xl relative overflow-hidden text-right">
         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
         <div className="space-y-4 text-center relative z-10">
           <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto border border-primary/20 shadow-inner">
@@ -158,9 +242,9 @@ const App: React.FC = () => {
           <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">منصة حجز القاعات الذكية</p>
         </div>
         <form onSubmit={handleAuth} className="space-y-4 relative z-10">
-          {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-12 rounded-2xl" />}
-          <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-2xl" />
-          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-2xl" />
+          {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-12 rounded-2xl text-right" />}
+          <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-2xl text-right" />
+          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-2xl text-right" />
           {isRegister && (
             <div className="p-2 bg-muted/30 rounded-2xl flex gap-2">
               <button type="button" onClick={() => setRole('user')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>مستخدم</button>
@@ -171,7 +255,7 @@ const App: React.FC = () => {
             {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول')}
           </Button>
         </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="w-full text-xs font-black text-primary/80 hover:text-primary transition-colors tracking-widest uppercase">{isRegister ? 'لديك حساب؟ ادخل هنا' : 'لا تملك حساب؟ انضم للمنصة'}</button>
+        <button onClick={() => setIsRegister(!isRegister)} className="w-full text-xs font-black text-primary/80 hover:text-primary transition-colors tracking-widest uppercase text-center">{isRegister ? 'لديك حساب؟ ادخل هنا' : 'لا تملك حساب؟ انضم للمنصة'}</button>
       </div>
     </div>
   );
@@ -182,7 +266,11 @@ const App: React.FC = () => {
         user={userProfile} 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onLogout={() => supabase.auth.signOut()} 
+        onLogout={() => {
+          supabase.auth.signOut();
+          setUserProfile(null);
+          lastFetchedUserId.current = null;
+        }} 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
         siteName={siteSettings.site_name}
@@ -222,7 +310,11 @@ const App: React.FC = () => {
                   notifications.map((n) => (
                     <div 
                       key={n.id} 
-                      onClick={() => { markAsRead(n.id); if(n.action_url) setActiveTab(n.action_url); setShowNotifDropdown(false); }} 
+                      onClick={() => { 
+                        markAsRead(n.id); 
+                        if(n.action_url) setActiveTab(n.action_url); 
+                        setShowNotifDropdown(false); 
+                      }} 
                       className={`mx-2 my-1 p-4 rounded-2xl hover:bg-muted/50 transition-all cursor-pointer group relative ${!n.is_read ? 'bg-primary/5 border-r-4 border-primary' : 'bg-transparent opacity-70'}`}
                     >
                       <p className="text-[12px] font-black group-hover:text-primary transition-colors text-right">{n.title}</p>

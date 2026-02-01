@@ -3,9 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking, VAT_RATE, Hall } from '../types';
 import { PriceTag } from '../components/ui/PriceTag';
-// Added Button import to fix "Cannot find name 'Button'" error
 import { Button } from '../components/ui/Button';
-import { CalendarCheck, Banknote, Hourglass, Landmark, TrendingUp, Users, Building2, ArrowUpRight, ArrowDownRight, Award } from 'lucide-react';
+import { CalendarCheck, Banknote, Hourglass, Landmark, TrendingUp, Users, Building2, ArrowUpRight, ArrowDownRight, Award, Loader2 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend, AreaChart, Area
@@ -16,8 +15,12 @@ interface DashboardProps {
 }
 
 const getMonthName = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return new Intl.DateTimeFormat('ar-SA', { month: 'short' }).format(date);
+  try {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('ar-SA', { month: 'short' }).format(date);
+  } catch (e) {
+    return 'غير معروف';
+  }
 };
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
@@ -34,6 +37,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Safety timeout to ensure loading doesn't persist if fetch hangs
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
     const fetchStats = async () => {
       try {
         setLoading(true);
@@ -48,8 +56,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         const { data, error } = await query;
         if (error) throw error;
 
-        const bookings = data as Booking[] || [];
-        const total = bookings.filter(b => b.status !== 'cancelled').reduce((sum, b) => sum + (b.total_amount || 0), 0);
+        const bookings = (data as Booking[] || []).filter(Boolean);
+        const total = bookings.filter(b => b.status !== 'cancelled').reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
         
         setStats({
           totalBookings: bookings.length,
@@ -63,9 +71,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             // Chart Data Processing
             const revenueMap = new Map<string, number>();
             bookings.forEach(b => {
-                if (b.status !== 'cancelled') {
+                if (b.status !== 'cancelled' && b.booking_date) {
                     const month = getMonthName(b.booking_date);
-                    revenueMap.set(month, (revenueMap.get(month) || 0) + b.total_amount);
+                    revenueMap.set(month, (revenueMap.get(month) || 0) + (Number(b.total_amount) || 0));
                 }
             });
             const revData = Array.from(revenueMap, ([name, total]) => ({ name, total }));
@@ -76,7 +84,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             bookings.forEach(b => {
                 if (b.status === 'confirmed' && b.halls) {
                     const h = hallMap.get(b.halls.id) || { name: b.halls.name, total: 0, count: 0 };
-                    h.total += b.total_amount;
+                    h.total += (Number(b.total_amount) || 0);
                     h.count += 1;
                     hallMap.set(b.halls.id, h);
                 }
@@ -86,7 +94,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
             // Status Distribution
             const statusCount = { pending: 0, confirmed: 0, cancelled: 0 };
-            bookings.forEach(b => { if(statusCount[b.status] !== undefined) statusCount[b.status]++; });
+            bookings.forEach(b => { 
+                if(b.status && (statusCount as any)[b.status] !== undefined) (statusCount as any)[b.status]++; 
+            });
             setStatusData([
                 { name: 'قيد الانتظار', value: statusCount.pending, color: 'oklch(0.702 0.183 293.541)' },
                 { name: 'مؤكد', value: statusCount.confirmed, color: 'oklch(0.541 0.281 293.009)' },
@@ -98,68 +108,69 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         console.error('Error fetching dashboard stats:', error);
       } finally {
         setLoading(false);
+        clearTimeout(timer);
       }
     };
 
     fetchStats();
+    return () => clearTimeout(timer);
   }, [user]);
 
   if (loading) return (
     <div className="p-20 flex flex-col items-center justify-center gap-4">
       <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      <p className="font-bold text-muted-foreground animate-pulse">جاري تحليل البيانات...</p>
+      <p className="font-bold text-muted-foreground animate-pulse text-right">جاري تحليل البيانات...</p>
     </div>
   );
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
+      <div className="flex flex-col md:flex-row-reverse justify-between items-start md:items-center gap-4">
+        <div className="text-right">
           <h2 className="text-4xl font-black text-primary tracking-tighter">مرحباً، {user.full_name} 👋</h2>
           <p className="text-muted-foreground mt-1">إليك ملخص أداء {user.role === 'vendor' ? 'قاعاتك' : 'نشاطك'} اليوم.</p>
         </div>
-        <div className="bg-primary/5 px-4 py-2 rounded-2xl flex items-center gap-3 border border-primary/10">
+        <div className="bg-primary/5 px-4 py-2 rounded-2xl flex items-center gap-3 border border-primary/10 flex-row-reverse">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
             <Award className="w-6 h-6" />
           </div>
-          <div>
+          <div className="text-right">
             <p className="text-[10px] font-black uppercase tracking-widest text-primary/70">مستوى الأداء</p>
             <p className="text-sm font-black text-primary">بائع مميز (PRO)</p>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden">
+        <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden text-right">
           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl group-hover:bg-primary/10 transition-colors"></div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-row-reverse">
             <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">إجمالي الحجوزات</h3>
             <div className="bg-primary/10 p-2 rounded-xl text-primary"><CalendarCheck className="w-5 h-5" /></div>
           </div>
           <div className="text-4xl font-black tracking-tighter">{stats.totalBookings}</div>
-          <div className="mt-4 flex items-center gap-2 text-xs font-bold text-green-600">
-            <ArrowUpRight className="w-3.5 h-3.5" /> 12% نمو هذا الشهر
+          <div className="mt-4 flex items-center justify-end gap-2 text-xs font-bold text-green-600">
+            12% نمو هذا الشهر <ArrowUpRight className="w-3.5 h-3.5" />
           </div>
         </div>
 
         {(user.role === 'vendor' || user.role === 'super_admin') && (
-          <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden">
+          <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden text-right">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-row-reverse">
               <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">صافي الإيرادات</h3>
               <div className="bg-primary/10 p-2 rounded-xl text-primary"><Banknote className="w-5 h-5" /></div>
             </div>
-            <PriceTag amount={stats.totalRevenue} className="text-3xl" iconSize={24} />
-            <div className="mt-4 flex items-center gap-2 text-xs font-bold text-muted-foreground">
+            <PriceTag amount={stats.totalRevenue} className="text-3xl justify-end" iconSize={24} />
+            <div className="mt-4 flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground">
               متوسط الفاتورة: {Math.round(stats.avgBookingValue)} ر.س
             </div>
           </div>
         )}
 
-        <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden">
+        <div className="group rounded-[2rem] border bg-card p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden text-right">
           <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full -mr-12 -mt-12 blur-2xl"></div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-row-reverse">
             <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">قيد الانتظار</h3>
             <div className="bg-yellow-500/10 p-2 rounded-xl text-yellow-600"><Hourglass className="w-5 h-5" /></div>
           </div>
@@ -168,28 +179,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </div>
 
         {(user.role === 'vendor' || user.role === 'super_admin') && (
-          <div className="group rounded-[2rem] border bg-primary/5 border-primary/20 p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden">
+          <div className="group rounded-[2rem] border bg-primary/5 border-primary/20 p-8 shadow-sm hover:shadow-xl transition-all relative overflow-hidden text-right">
             <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full -mr-12 -mt-12 blur-2xl"></div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-row-reverse">
               <h3 className="text-xs font-black uppercase tracking-widest text-primary/70">تقدير الضريبة</h3>
               <div className="bg-primary/20 p-2 rounded-xl text-primary"><Landmark className="w-5 h-5" /></div>
             </div>
-            <PriceTag amount={stats.zatcaTax} className="text-3xl text-primary" iconSize={24} />
+            <PriceTag amount={stats.zatcaTax} className="text-3xl text-primary justify-end" iconSize={24} />
             <p className="mt-4 text-[10px] text-primary/60 font-bold uppercase tracking-widest">مستحقات هيئة الزكاة (VAT)</p>
           </div>
         )}
       </div>
 
-      {/* Analytics Section */}
       {(user.role === 'super_admin' || user.role === 'vendor') && (
         <div className="grid gap-8 lg:grid-cols-3">
-            {/* Revenue Trend Area Chart */}
             <div className="lg:col-span-2 rounded-[2.5rem] border bg-card shadow-sm p-8 flex flex-col">
-                <div className="flex items-center justify-between mb-8">
-                    <div>
-                        <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-primary" />
+                <div className="flex items-center justify-between mb-8 flex-row-reverse">
+                    <div className="text-right">
+                        <h3 className="text-xl font-black tracking-tight flex items-center justify-end gap-2">
                             اتجاه الإيرادات الشهرية
+                            <TrendingUp className="w-5 h-5 text-primary" />
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">تطور دخل المنصة بناءً على الحجوزات المؤكدة.</p>
                     </div>
@@ -234,10 +243,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 </div>
             </div>
 
-            {/* Status Breakdown & Top Halls */}
             <div className="space-y-8">
                 <div className="rounded-[2.5rem] border bg-card shadow-sm p-8 flex flex-col h-full">
-                    <h3 className="text-xl font-black tracking-tight mb-6">توزيع حالات الحجز</h3>
+                    <h3 className="text-xl font-black tracking-tight mb-6 text-right">توزيع حالات الحجز</h3>
                     <div className="h-[250px] w-full flex justify-center items-center" dir="ltr">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -260,10 +268,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 </div>
             </div>
 
-            {/* Top Halls Table */}
             <div className="lg:col-span-3 rounded-[2.5rem] border bg-card shadow-sm p-8">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
+                <div className="flex items-center justify-between mb-6 flex-row-reverse">
+                    <div className="text-right">
                         <h3 className="text-xl font-black tracking-tight">أفضل القاعات أداءً</h3>
                         <p className="text-xs text-muted-foreground mt-1">ترتيب القاعات بناءً على إجمالي الإيرادات المؤكدة.</p>
                     </div>
@@ -274,31 +281,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   <table className="w-full text-right">
                     <thead className="bg-muted/50 text-[10px] uppercase font-black tracking-widest text-muted-foreground">
                       <tr>
-                        <th className="p-4 rounded-r-2xl">القاعة</th>
-                        <th className="p-4">عدد الحجوزات</th>
-                        <th className="p-4">نسبة الإشغال</th>
-                        <th className="p-4 rounded-l-2xl">إجمالي الإيرادات</th>
+                        <th className="p-4 rounded-r-2xl text-right">القاعة</th>
+                        <th className="p-4 text-right">عدد الحجوزات</th>
+                        <th className="p-4 text-right">نسبة الإشغال</th>
+                        <th className="p-4 rounded-l-2xl text-left">إجمالي الإيرادات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
                       {topHalls.map((hall, idx) => (
                         <tr key={idx} className="hover:bg-muted/10 transition-colors group">
                           <td className="p-4">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 flex-row-reverse">
                               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center font-black text-primary group-hover:bg-primary group-hover:text-white transition-colors">{idx + 1}</div>
                               <span className="font-black text-sm">{hall.name}</span>
                             </div>
                           </td>
                           <td className="p-4 text-sm font-bold">{hall.count} حجز</td>
                           <td className="p-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-row-reverse">
                               <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                                 <div className="h-full bg-primary" style={{width: `${Math.min(100, (hall.count / 30) * 100)}%`}}></div>
                               </div>
                               <span className="text-[10px] font-black text-muted-foreground">{Math.round((hall.count / 30) * 100)}%</span>
                             </div>
                           </td>
-                          <td className="p-4 font-black text-primary">
+                          <td className="p-4 font-black text-primary text-left">
                             <PriceTag amount={hall.total} />
                           </td>
                         </tr>
@@ -315,8 +322,3 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     </div>
   );
 };
-
-// Helper for loading icon shim
-const Loader2 = (props: any) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
-);
