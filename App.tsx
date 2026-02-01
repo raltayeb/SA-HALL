@@ -14,22 +14,21 @@ import { SystemSettings } from './pages/SystemSettings';
 import { Favorites } from './pages/Favorites';
 import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
+import { Home } from './pages/Home';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Menu, Loader2, Bell, X, Building2, RefreshCw } from 'lucide-react';
+import { Menu, Loader2, Bell, X, Building2, RefreshCw, LogIn, User } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const lastFetchedUserId = useRef<string | null>(null);
-  const channelRef = useRef<any>(null);
   
   const [siteSettings, setSiteSettings] = useState<ISystemSettings>({
     site_name: 'SA Hall',
@@ -62,35 +61,11 @@ const App: React.FC = () => {
     } catch (err) { console.error(err); }
   };
 
-  const fetchNotifications = async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      setNotifications(data || []);
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    }
-  };
-
-  const markAsRead = async (notifId: string) => {
-    try {
-      await supabase.from('notifications').update({ is_read: true }).eq('id', notifId);
-      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
-  };
-
   const fetchProfile = async (userId: string) => {
     if (lastFetchedUserId.current === userId && userProfile) {
       setLoading(false);
       return;
     }
-    
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (error) throw error;
@@ -100,9 +75,6 @@ const App: React.FC = () => {
       }
     } catch (err: any) { 
       console.error('Profile fetch failed:', err);
-      if (err.code !== 'PGRST116') {
-        toast({ title: 'خطأ في الاتصال', description: 'فشل تحميل بيانات الملف الشخصي.', variant: 'destructive' });
-      }
     } finally { 
       setLoading(false); 
     }
@@ -110,11 +82,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     fetchSiteSettings();
-    
-    // Safety timeout to ensure loading doesn't stick forever
-    const safetyTimer = setTimeout(() => {
-      setLoading(false);
-    }, 8000);
+    const safetyTimer = setTimeout(() => setLoading(false), 5000);
 
     const checkInitialSession = async () => {
       try {
@@ -126,11 +94,9 @@ const App: React.FC = () => {
           setLoading(false);
         }
       } catch (err) { 
-        console.error('Session check error:', err);
         setLoading(false);
       }
     };
-    
     checkInitialSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -139,7 +105,6 @@ const App: React.FC = () => {
         if (newSession.user.id !== lastFetchedUserId.current) {
           await fetchProfile(newSession.user.id);
         } else {
-          // IMPORTANT: If user is already fetched, we must still clear loading!
           setLoading(false);
         }
       } else {
@@ -149,80 +114,29 @@ const App: React.FC = () => {
       }
     });
 
-    window.addEventListener('settingsUpdated', fetchSiteSettings);
     return () => {
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
-      window.removeEventListener('settingsUpdated', fetchSiteSettings);
     };
   }, []);
-
-  useEffect(() => {
-    if (userProfile?.id) {
-      fetchNotifications(userProfile.id);
-      
-      // Cleanup existing channel if it exists
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-
-      const channel = supabase
-        .channel(`notifications:${userProfile.id}`)
-        .on('postgres_changes', 
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
-            table: 'notifications', 
-            filter: `user_id=eq.${userProfile.id}` 
-          }, 
-          (payload) => {
-            setNotifications(prev => [payload.new, ...prev]);
-            toast({ 
-              title: payload.new.title, 
-              description: payload.new.message, 
-              variant: 'default' 
-            });
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'CHANNEL_ERROR') {
-            console.warn('Realtime channel could not be established. This is likely a server proxy issue.');
-          }
-        });
-
-      channelRef.current = channel;
-
-      return () => { 
-        if (channelRef.current) {
-          supabase.removeChannel(channelRef.current);
-          channelRef.current = null;
-        }
-      };
-    }
-  }, [userProfile?.id]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
     try {
       if (isRegister) {
-        const { data, error } = await supabase.auth.signUp({ 
+        const { error } = await supabase.auth.signUp({ 
           email, 
           password, 
           options: { data: { full_name: fullName, role: role } } 
         });
         if (error) throw error;
-        if (data.user && !data.session) {
-          toast({ 
-            title: 'تفعيل البريد', 
-            description: 'يرجى مراجعة بريدك الإلكتروني لتفعيل الحساب.', 
-            variant: 'default' 
-          });
-        }
+        toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني.', variant: 'default' });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
+      setShowAuthModal(false);
     } catch (error: any) { 
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' }); 
     } finally { 
@@ -230,150 +144,94 @@ const App: React.FC = () => {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
   if (loading) return (
     <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-6">
-      <div className="relative">
-        <Loader2 className="w-12 h-12 animate-spin" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Building2 className="w-4 h-4 opacity-50" />
-        </div>
-      </div>
-      <div className="text-center">
-        <p className="font-black text-xl animate-pulse tracking-tighter">{siteSettings.site_name}...</p>
-        <p className="text-xs text-muted-foreground mt-2 font-bold">جاري تحميل البيانات الآمنة</p>
-      </div>
-      
-      {/* Fallback button if stuck */}
-      <Button 
-        variant="ghost" 
-        size="sm" 
-        className="mt-8 text-[10px] font-black opacity-30 hover:opacity-100 transition-opacity gap-2"
-        onClick={() => window.location.reload()}
-      >
-        <RefreshCw className="w-3 h-3" /> تعذر التحميل؟ اضغط لإعادة التشغيل
-      </Button>
+      <Loader2 className="w-12 h-12 animate-spin" />
+      <p className="font-black text-xl animate-pulse tracking-tighter">{siteSettings.site_name}...</p>
     </div>
   );
 
-  if (!session || !userProfile) return (
-    <div className="flex min-h-screen items-center justify-center p-4 bg-muted/20">
-      <div className="w-full max-w-md space-y-6 rounded-[2.5rem] border bg-card p-10 shadow-2xl relative overflow-hidden text-right">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-        <div className="space-y-4 text-center relative z-10">
-          <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mx-auto border border-primary/20 shadow-inner">
-            <Building2 className="w-10 h-10" />
-          </div>
-          <h1 className="text-3xl font-black text-primary tracking-tighter">{siteSettings.site_name}</h1>
-          <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">منصة حجز القاعات الذكية</p>
-        </div>
-        <form onSubmit={handleAuth} className="space-y-4 relative z-10">
-          {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-12 rounded-2xl text-right" />}
-          <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-2xl text-right" />
-          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-2xl text-right" />
-          {isRegister && (
-            <div className="p-2 bg-muted/30 rounded-2xl flex gap-2">
-              <button type="button" onClick={() => setRole('user')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>مستخدم</button>
-              <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>بائع</button>
-            </div>
-          )}
-          <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
-            {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول')}
-          </Button>
-        </form>
-        <button onClick={() => setIsRegister(!isRegister)} className="w-full text-xs font-black text-primary/80 hover:text-primary transition-colors tracking-widest uppercase text-center">{isRegister ? 'لديك حساب؟ ادخل هنا' : 'لا تملك حساب؟ انضم للمنصة'}</button>
-      </div>
-    </div>
-  );
+  const isMarketplace = activeTab === 'home';
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans">
-      <Sidebar 
-        user={userProfile} 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onLogout={() => {
-          supabase.auth.signOut();
-          setUserProfile(null);
-          lastFetchedUserId.current = null;
-        }} 
-        isOpen={isSidebarOpen} 
-        setIsOpen={setIsSidebarOpen} 
-        siteName={siteSettings.site_name}
-        platformLogo={(siteSettings as any).platform_logo_url}
-      />
-      
-      <div className="fixed top-6 left-6 z-40 flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="lg:hidden bg-card border shadow-xl rounded-full w-12 h-12" onClick={() => setIsSidebarOpen(true)}>
-          <Menu className="w-5 h-5" />
-        </Button>
-        
-        <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className={`bg-card border shadow-xl rounded-full w-12 h-12 relative transition-all active:scale-95 ${showNotifDropdown ? 'ring-2 ring-primary border-primary' : ''}`} 
-            onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-          >
-            <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'text-primary' : 'text-muted-foreground'}`} />
-            {unreadCount > 0 && (
-              <span className="absolute top-0 right-0 bg-primary text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-card shadow-lg animate-pulse">
-                {unreadCount}
-              </span>
-            )}
-          </Button>
-          
-          {showNotifDropdown && (
-            <div className="absolute left-0 mt-4 w-80 bg-card border shadow-2xl rounded-[2.5rem] overflow-hidden z-50 animate-in fade-in zoom-in-95 origin-top-left p-2">
-              <div className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[1.5rem]">
-                <h4 className="font-black text-sm text-right w-full">التنبيهات</h4>
-                <button onClick={() => setShowNotifDropdown(false)} className="p-1 hover:bg-muted rounded-full transition-colors"><X className="w-4 h-4" /></button>
-              </div>
-              <div className="max-h-96 overflow-y-auto no-scrollbar py-2">
-                {notifications.length === 0 ? (
-                  <div className="p-10 text-center text-[11px] text-muted-foreground italic font-bold">هدوء تام.. لا يوجد تنبيهات</div>
-                ) : (
-                  notifications.map((n) => (
-                    <div 
-                      key={n.id} 
-                      onClick={() => { 
-                        markAsRead(n.id); 
-                        if(n.action_url) setActiveTab(n.action_url); 
-                        setShowNotifDropdown(false); 
-                      }} 
-                      className={`mx-2 my-1 p-4 rounded-2xl hover:bg-muted/50 transition-all cursor-pointer group relative ${!n.is_read ? 'bg-primary/5 border-r-4 border-primary' : 'bg-transparent opacity-70'}`}
-                    >
-                      <p className="text-[12px] font-black group-hover:text-primary transition-colors text-right">{n.title}</p>
-                      <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed text-right">{n.message}</p>
-                      <span className="text-[9px] text-muted-foreground mt-2 block opacity-40 font-bold text-right">{new Date(n.created_at).toLocaleTimeString('ar-SA')}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white">
+      {/* Sidebar (Admin/Vendor ONLY) */}
+      {!isMarketplace && (
+        <Sidebar 
+          user={userProfile} 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onLogout={() => {
+            supabase.auth.signOut();
+            setUserProfile(null);
+            setActiveTab('home');
+          }} 
+          isOpen={isSidebarOpen} 
+          setIsOpen={setIsSidebarOpen} 
+          siteName={siteSettings.site_name}
+          platformLogo={siteSettings.platform_logo_url}
+        />
+      )}
 
-      <main className="lg:mr-80 p-6 lg:p-10 min-h-screen">
-        <div className="mx-auto max-w-6xl">
-          {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
-          {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
-          {activeTab === 'my_halls' && <VendorHalls user={userProfile} />}
-          {activeTab === 'my_services' && <VendorServices user={userProfile} />}
-          {activeTab === 'browse' && <BrowseHalls user={userProfile} />}
-          {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
+      {/* Auth Modal Overlay */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-[3rem] p-12 shadow-2xl relative animate-in zoom-in-95">
+             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-black/5 rounded-full"><X className="w-5 h-5" /></button>
+             <div className="text-center space-y-4 mb-8">
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto border border-primary/20"><LogIn className="w-8 h-8" /></div>
+                <h2 className="text-3xl font-black text-black">{isRegister ? 'انضم كشريك' : 'تسجيل الدخول'}</h2>
+                <p className="text-sm text-black/40 font-bold">ابدأ بإدارة قاعاتك وخدماتك باحترافية.</p>
+             </div>
+             <form onSubmit={handleAuth} className="space-y-4 text-right">
+                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />}
+                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />
+                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />
+                {isRegister && (
+                  <div className="p-2 bg-black/5 rounded-2xl flex gap-2">
+                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-black text-white' : 'text-black/40'}`}>عميل</button>
+                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-black text-white' : 'text-black/40'}`}>بائع</button>
+                  </div>
+                )}
+                <Button type="submit" className="w-full h-16 rounded-2xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
+                  {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'دخول المنصة')}
+                </Button>
+             </form>
+             <button onClick={() => setIsRegister(!isRegister)} className="w-full mt-6 text-xs font-black text-primary hover:underline">{isRegister ? 'لديك حساب بالفعل؟ سجل دخول' : 'ليس لديك حساب؟ انضم كبائع الآن'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Viewport Rendering */}
+      <main className={`${!isMarketplace && userProfile ? 'lg:mr-80' : ''}`}>
+        <div className="mx-auto w-full">
+          {activeTab === 'home' && <Home user={userProfile} />}
+          {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
+          {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
+          {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
+          {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
+          {activeTab === 'browse' && <BrowseHalls user={userProfile || ({} as UserProfile)} />}
+          {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
           {activeTab === 'users' && <UsersManagement />}
           {activeTab === 'subscriptions' && <VendorSubscriptions />}
           {activeTab === 'settings' && <SystemSettings />}
-          {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={fetchProfile} />}
-          {['all_bookings', 'hall_bookings', 'my_bookings'].includes(activeTab) && <Bookings user={userProfile} />}
+          {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={fetchProfile} />}
+          {['all_bookings', 'hall_bookings', 'my_bookings'].includes(activeTab) && userProfile && <Bookings user={userProfile} />}
         </div>
       </main>
+
+      {/* Conditional Marketplace Login Trigger (Floating Button) */}
+      {isMarketplace && !session && (
+         <div className="fixed bottom-10 left-10 z-[100] group">
+            <Button onClick={() => setShowAuthModal(true)} className="w-20 h-20 rounded-full bg-black text-white shadow-2xl hover:bg-primary transition-all flex items-center justify-center p-0 overflow-hidden relative">
+               <LogIn className="w-8 h-8 relative z-10" />
+               <div className="absolute inset-0 bg-primary translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
+            </Button>
+            <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest shadow-xl">دخول الشركاء</span>
+         </div>
+      )}
     </div>
   );
 };
 
-// Added missing default export
 export default App;

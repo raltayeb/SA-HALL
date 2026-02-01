@@ -38,6 +38,8 @@ export interface SystemSettings {
   site_name: string;
   commission_rate: number;
   vat_enabled: boolean;
+  // Added missing field to match usage in App.tsx and SystemSettings.tsx
+  platform_logo_url?: string;
 }
 
 export interface Hall {
