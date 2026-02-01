@@ -278,7 +278,7 @@ const App: React.FC = () => {
               <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-muted-foreground'}`}>بائع</button>
             </div>
           )}
-          <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/25" disabled={authLoading}>
+          <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
             {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول')}
           </Button>
         </form>
@@ -375,4 +375,5 @@ const App: React.FC = () => {
   );
 };
 
+// Added missing default export
 export default App;
