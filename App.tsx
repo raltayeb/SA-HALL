@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('home');
+  const [browseMode, setBrowseMode] = useState<'halls' | 'services'>('halls');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
@@ -151,7 +152,7 @@ const App: React.FC = () => {
     </div>
   );
 
-  const isMarketplace = activeTab === 'home';
+  const isMarketplace = activeTab === 'home' || activeTab === 'browse';
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white">
@@ -205,12 +206,26 @@ const App: React.FC = () => {
       {/* Viewport Rendering */}
       <main className={`${!isMarketplace && userProfile ? 'lg:mr-80' : ''}`}>
         <div className="mx-auto w-full">
-          {activeTab === 'home' && <Home user={userProfile} />}
+          {activeTab === 'home' && (
+            <Home 
+              user={userProfile} 
+              onLoginClick={() => setShowAuthModal(true)} 
+              onBrowseHalls={() => { setActiveTab('browse'); setBrowseMode('halls'); }}
+              onBrowseServices={() => { setActiveTab('browse'); setBrowseMode('services'); }}
+            />
+          )}
+          {activeTab === 'browse' && (
+            <BrowseHalls 
+              user={userProfile} 
+              mode={browseMode} 
+              onBack={() => setActiveTab('home')}
+              onLoginClick={() => setShowAuthModal(true)}
+            />
+          )}
           {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
           {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
           {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
           {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
-          {activeTab === 'browse' && <BrowseHalls user={userProfile || ({} as UserProfile)} />}
           {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
           {activeTab === 'users' && <UsersManagement />}
           {activeTab === 'subscriptions' && <VendorSubscriptions />}
@@ -223,7 +238,7 @@ const App: React.FC = () => {
       {/* Conditional Marketplace Login Trigger (Floating Button) */}
       {isMarketplace && !session && (
          <div className="fixed bottom-10 left-10 z-[100] group">
-            <Button onClick={() => setShowAuthModal(true)} className="w-20 h-20 rounded-full bg-black text-white shadow-2xl hover:bg-primary transition-all flex items-center justify-center p-0 overflow-hidden relative">
+            <Button onClick={() => setShowAuthModal(true)} className="w-20 h-20 rounded-full bg-black text-white shadow-2xl hover:bg-primary transition-all flex items-center justify-center p-0 overflow-hidden relative border-white/10">
                <LogIn className="w-8 h-8 relative z-10" />
                <div className="absolute inset-0 bg-primary translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
             </Button>
