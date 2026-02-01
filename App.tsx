@@ -161,7 +161,7 @@ const App: React.FC = () => {
   const isMarketplace = activeTab === 'home' || activeTab === 'browse';
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary selection:text-white" dir="rtl">
       {/* Sidebar (Admin/Vendor ONLY) */}
       {!isMarketplace && (
         <Sidebar 
@@ -206,12 +206,12 @@ const App: React.FC = () => {
       )}
 
       {/* Main Viewport */}
-      <main className={`${!isMarketplace && userProfile ? 'lg:ps-64' : ''}`}>
+      <main className={`${!isMarketplace && userProfile ? 'lg:pr-64' : ''}`}>
         <div className={`mx-auto w-full ${!isMarketplace && userProfile ? 'p-6 lg:p-10' : ''}`}>
           {/* Mobile Menu Trigger */}
           {!isMarketplace && userProfile && (
-            <div className="lg:hidden flex justify-end mb-6">
-               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl border-primary/20 bg-card">
+            <div className="lg:hidden flex justify-start mb-6">
+               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-[1.125rem] border-primary/20 bg-card">
                   <Menu className="w-5 h-5 text-primary" />
                </Button>
             </div>
