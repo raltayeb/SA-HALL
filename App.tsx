@@ -145,6 +145,12 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUserProfile(null);
+    setActiveTab('home');
+  };
+
   if (loading) return (
     <div className="flex h-screen flex-col items-center justify-center bg-background text-primary gap-6">
       <Loader2 className="w-12 h-12 animate-spin" />
@@ -162,11 +168,7 @@ const App: React.FC = () => {
           user={userProfile} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
-          onLogout={() => {
-            supabase.auth.signOut();
-            setUserProfile(null);
-            setActiveTab('home');
-          }} 
+          onLogout={handleLogout} 
           isOpen={isSidebarOpen} 
           setIsOpen={setIsSidebarOpen} 
           siteName={siteSettings.site_name}
@@ -203,8 +205,8 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Viewport Rendering */}
-      <main className={`${!isMarketplace && userProfile ? 'lg:mr-80' : ''}`}>
+      {/* Viewport Rendering - Fixed logical margin for RTL sidebar */}
+      <main className={`${!isMarketplace && userProfile ? 'lg:ps-80' : ''}`}>
         <div className="mx-auto w-full">
           {activeTab === 'home' && (
             <Home 
@@ -212,6 +214,8 @@ const App: React.FC = () => {
               onLoginClick={() => setShowAuthModal(true)} 
               onBrowseHalls={() => { setActiveTab('browse'); setBrowseMode('halls'); }}
               onBrowseServices={() => { setActiveTab('browse'); setBrowseMode('services'); }}
+              onNavigate={setActiveTab}
+              onLogout={handleLogout}
             />
           )}
           {activeTab === 'browse' && (
@@ -220,6 +224,8 @@ const App: React.FC = () => {
               mode={browseMode} 
               onBack={() => setActiveTab('home')}
               onLoginClick={() => setShowAuthModal(true)}
+              onNavigate={setActiveTab}
+              onLogout={handleLogout}
             />
           )}
           {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
@@ -242,7 +248,7 @@ const App: React.FC = () => {
                <LogIn className="w-8 h-8 relative z-10" />
                <div className="absolute inset-0 bg-primary translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
             </Button>
-            <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest shadow-xl">دخول الشركاء</span>
+            <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest shadow-xl">دخول الشركاء</span>
          </div>
       )}
     </div>

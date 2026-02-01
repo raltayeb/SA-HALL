@@ -74,14 +74,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
       
       <aside className={`
-        fixed top-4 bottom-4 right-4 z-50 w-72 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
-        ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] opacity-0 lg:translate-x-0 lg:opacity-100'}
+        fixed top-4 bottom-4 inset-inline-start-4 z-50 w-72 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
+        ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] rtl:-translate-x-[120%] opacity-0 lg:translate-x-0 lg:opacity-100'}
       `}>
-        {/* Close button for mobile */}
+        {/* Close button for mobile - Positioned logically */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="absolute left-4 top-4 lg:hidden rounded-full" 
+          className="absolute inset-inline-end-4 top-4 lg:hidden rounded-full" 
           onClick={() => setIsOpen(false)}
         >
           <X className="w-5 h-5" />
@@ -111,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
               className={`
                 w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-[13px] font-black transition-all group
                 ${activeTab === item.id 
-                  ? 'bg-primary text-primary-foreground shadow-xl shadow-primary/25 translate-x-[-4px]' 
+                  ? 'bg-primary text-primary-foreground shadow-xl shadow-primary/25 translate-x-[-4px] rtl:translate-x-[4px]' 
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
               `}
             >
@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
               <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-xs shadow-lg">
                 {user.full_name?.[0] || <UserIcon className="w-4 h-4" />}
               </div>
-              <div className="text-right overflow-hidden">
+              <div className="text-start overflow-hidden">
                 <p className="text-[12px] font-black leading-none truncate">{user.full_name}</p>
                 <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">
                   {user.role === 'vendor' ? 'بائع' : user.role === 'super_admin' ? 'مدير' : 'عميل'}

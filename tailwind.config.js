@@ -11,13 +11,19 @@ export default {
       colors: {
         border: "oklch(0.92 0.004 286.32)",
         input: "oklch(0.92 0.004 286.32)",
-        ring: "oklch(0.702 0.183 293.541)",
+        ring: "#4B0082",
         background: "oklch(1 0 0)",
         foreground: "oklch(0.141 0.005 285.823)",
         primary: {
-          DEFAULT: "oklch(0.541 0.281 293.009)",
+          DEFAULT: "#4B0082", // Royal Purple from Design System
           foreground: "oklch(0.969 0.016 293.756)",
         },
+        gold: {
+          DEFAULT: "#D4AF37", // Regal Gold from Design System
+          muted: "#D4AF3722",
+        },
+        platinum: "#36454F",
+        ivory: "#FFFFF0",
         secondary: {
           DEFAULT: "oklch(0.967 0.001 286.375)",
           foreground: "oklch(0.21 0.006 285.885)",
@@ -50,7 +56,7 @@ export default {
         'xl': '0 20px 32px -8px oklch(0 0 0 / 0.05), 0 8px 16px -6px oklch(0 0 0 / 0.02)',
         '2xl': '0 32px 48px -12px oklch(0 0 0 / 0.08), 0 16px 24px -8px oklch(0 0 0 / 0.04)',
         'soft': '0 10px 40px -6px oklch(0 0 0 / 0.04)',
-        'soft-primary': '0 20px 40px -10px oklch(0.541 0.281 293.009 / 0.15)',
+        'soft-primary': '0 20px 40px -10px #4B008226',
         'inner-soft': 'inset 0 2px 4px 0 oklch(0 0 0 / 0.02)',
       },
       borderRadius: {
