@@ -18,31 +18,39 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- 3. وظيفة خاصة للتحقق من الدور (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION public.get_auth_role()
-RETURNS text AS $$
+RETURNS text 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = ''
+AS $$
 DECLARE
   user_role text;
 BEGIN
   SELECT role INTO user_role FROM public.profiles WHERE id = auth.uid();
   RETURN user_role;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$;
 
 -- 4. تريجر إنشاء الملف الشخصي
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = ''
+AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, full_name, role)
   VALUES (
     new.id, 
     new.email, 
-    COALESCE(new.raw_user_meta_data->>'full_name', ''), 
-    COALESCE(new.raw_user_meta_data->>'role', 'user')
+    pg_catalog.coalesce(new.raw_user_meta_data->>'full_name', ''), 
+    pg_catalog.coalesce(new.raw_user_meta_data->>'role', 'user')
   )
   ON CONFLICT (id) DO UPDATE SET
     email = EXCLUDED.email;
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

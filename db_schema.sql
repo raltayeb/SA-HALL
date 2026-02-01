@@ -85,24 +85,28 @@ FOR ALL USING (auth.uid() = vendor_id);
 
 -- Audit Trigger Function
 CREATE OR REPLACE FUNCTION public.process_audit_log()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = ''
+AS $$
 BEGIN
   IF (TG_OP = 'DELETE') THEN
     INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, old_data)
-    VALUES (TG_TABLE_NAME, TG_OP, OLD.id, auth.uid(), to_jsonb(OLD));
+    VALUES (TG_TABLE_NAME, TG_OP, OLD.id, auth.uid(), pg_catalog.to_jsonb(OLD));
     RETURN OLD;
   ELSIF (TG_OP = 'UPDATE') THEN
     INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, old_data, new_data)
-    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), to_jsonb(OLD), to_jsonb(NEW));
+    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), pg_catalog.to_jsonb(OLD), pg_catalog.to_jsonb(NEW));
     RETURN NEW;
   ELSIF (TG_OP = 'INSERT') THEN
     INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, new_data)
-    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), to_jsonb(NEW));
+    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), pg_catalog.to_jsonb(NEW));
     RETURN NEW;
   END IF;
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Apply Audit to Services
 CREATE TRIGGER audit_services_trigger
