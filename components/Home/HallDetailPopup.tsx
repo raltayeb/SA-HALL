@@ -96,7 +96,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     setIsBooking(true);
     const { total, vat } = calculateTotal();
     try {
-      const { error } = await supabase.from('bookings').insert([{
+      const { data: bookingData, error } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: isHall ? null : service!.id,
         user_id: user?.id || '00000000-0000-0000-0000-000000000000',
@@ -106,9 +106,21 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
         vat_amount: vat,
         status: 'pending',
         notes: `حجز ${isHall ? 'قاعة' : 'خدمة'} | العميل: ${guestName}`
-      }]);
+      }]).select().single();
+
       if (error) throw error;
-      toast({ title: 'تم الطلب', variant: 'success' });
+
+      // NOTIFY THE VENDOR
+      await supabase.from('notifications').insert([{
+        user_id: item.vendor_id,
+        title: 'طلب حجز جديد 🔔',
+        message: `وصلك طلب حجز جديد لـ ${item.name} من قبل ${guestName}.`,
+        type: 'booking_new',
+        link: 'hall_bookings',
+        is_read: false
+      }]);
+
+      toast({ title: 'تم إرسال الطلب', description: 'سيتواصل معك فريقنا قريباً لتأكيد الحجز.', variant: 'success' });
       setIsBookingModalOpen(false);
       onClose();
     } catch (err: any) {
@@ -136,12 +148,12 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       <div className="flex-1 overflow-y-auto ps-[env(safe-area-inset-left)] pe-[env(safe-area-inset-right)]">
         <section className="px-6 pt-6">
             <div className="max-w-6xl mx-auto">
-               <div className="relative aspect-[21/9] rounded-2xl overflow-hidden bg-white/5 shadow-2xl group">
+               <div className="relative aspect-[21/9] rounded-[1.125rem] overflow-hidden bg-white/5 shadow-2xl group">
                   <img src={allImages[activeImage]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Hero View" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0f0a14] via-transparent to-transparent opacity-60"></div>
                   <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 flex justify-between opacity-0 group-hover:opacity-100 transition-all duration-300">
-                     <button onClick={() => setActiveImage(prev => (prev + 1) % allImages.length)} className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-3xl border border-white/10 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black"><ChevronLeft className="w-6 h-6" /></button>
-                     <button onClick={() => setActiveImage(prev => (prev - 1 + allImages.length) % allImages.length)} className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-3xl border border-white/10 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black"><ChevronRight className="w-6 h-6" /></button>
+                     <button onClick={() => setActiveImage(prev => (prev + 1) % allImages.length)} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-3xl border border-white/10 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black"><ChevronLeft className="w-5 h-5" /></button>
+                     <button onClick={() => setActiveImage(prev => (prev - 1 + allImages.length) % allImages.length)} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-3xl border border-white/10 flex items-center justify-center text-white hover:bg-[#D4AF37] hover:text-black"><ChevronRight className="w-5 h-5" /></button>
                   </div>
                </div>
             </div>
@@ -157,7 +169,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                         <span className="bg-[#4B0082]/30 text-[#D4AF37] px-4 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-[#4B0082]/30">Elite Selection</span>
                         <div className="flex items-center gap-1.5 text-[#D4AF37]"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-bold">4.9 Excellence</span></div>
                      </div>
-                     <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase">{item.name}</h1>
+                     <h1 className="text-4xl font-black text-white tracking-tighter uppercase">{item.name}</h1>
                      <div className="flex flex-wrap items-center gap-6 text-xs font-bold text-white/30 uppercase">
                         {isHall && <span className="flex items-center gap-2"><Users className="w-4 h-4 text-[#D4AF37]" /> {hall?.capacity} ضيف</span>}
                         <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#D4AF37]" /> {isHall ? hall?.city : item.vendor?.business_name}</span>
@@ -179,7 +191,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                 </div>
 
                 <div className="pt-4">
-                   {activeTab === 'overview' && <p className="text-lg text-white/50 leading-relaxed font-medium">{item.description || "نقدم لكم تجربة استثنائية في عالم المناسبات الفاخرة، حيث تجتمع الدقة في التنفيذ مع روعة التصميم لخلق ذكريات لا تُنسى."}</p>}
+                   {activeTab === 'overview' && <p className="text-base text-white/50 leading-relaxed font-medium">{item.description || "نقدم لكم تجربة استثنائية في عالم المناسبات الفاخرة، حيث تجتمع الدقة في التنفيذ مع روعة التصميم لخلق ذكريات لا تُنسى."}</p>}
                    {activeTab === 'amenities' && (
                      <div className="grid sm:grid-cols-2 gap-4">
                         {isHall && hall?.amenities?.map((am, i) => (
@@ -196,7 +208,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
             <div className="lg:col-span-4 relative">
                <div className="sticky top-20 space-y-6">
-                  <div className="p-8 bg-white/5 border border-white/10 rounded-3xl shadow-2xl space-y-8 backdrop-blur-3xl">
+                  <div className="p-8 bg-white/5 border border-white/10 rounded-[1.125rem] shadow-2xl space-y-8 backdrop-blur-3xl">
                      <div className="flex justify-between items-center">
                         <div className="space-y-1">
                            <PriceTag amount={total} className="text-3xl text-white" />
@@ -215,7 +227,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
       {isBookingModalOpen && (
         <div className="fixed inset-0 z-[300] bg-[#0f0a14]/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in">
-           <div className="w-full max-w-lg bg-[#191022] rounded-3xl shadow-2xl relative border border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95">
+           <div className="w-full max-w-lg bg-[#191022] rounded-[1.125rem] shadow-2xl relative border border-white/10 overflow-hidden flex flex-col animate-in zoom-in-95">
               <button onClick={() => setIsBookingModalOpen(false)} className="absolute top-6 end-6 p-3 bg-white/5 hover:bg-white/10 rounded-full transition-all z-50"><X className="w-5 h-5" /></button>
               <div className="p-10 space-y-10 text-start">
                  <div className="space-y-4">

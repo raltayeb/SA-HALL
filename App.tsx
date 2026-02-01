@@ -51,7 +51,7 @@ const App: React.FC = () => {
       document.documentElement.style.setProperty('--primary', userProfile.theme_color);
       document.documentElement.style.setProperty('--primary-muted', `${userProfile.theme_color}22`);
     } else {
-      document.documentElement.style.setProperty('--primary', 'oklch(0.541 0.281 293.009)');
+      document.documentElement.style.setProperty('--primary', '#4B0082');
     }
   }, [userProfile?.theme_color]);
 
@@ -179,7 +179,7 @@ const App: React.FC = () => {
       {/* Auth Modal Overlay */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-md bg-white rounded-[3rem] p-12 shadow-2xl relative animate-in zoom-in-95">
+          <div className="w-full max-w-md bg-white rounded-[1.125rem] p-12 shadow-2xl relative animate-in zoom-in-95">
              <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-3 hover:bg-black/5 rounded-full"><X className="w-5 h-5" /></button>
              <div className="text-center space-y-4 mb-8">
                 <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto border border-primary/20"><LogIn className="w-8 h-8" /></div>
@@ -187,16 +187,16 @@ const App: React.FC = () => {
                 <p className="text-sm text-black/40 font-bold">ابدأ بإدارة قاعاتك وخدماتك باحترافية.</p>
              </div>
              <form onSubmit={handleAuth} className="space-y-4 text-right">
-                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />}
-                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />
-                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-black/5 border-none" />
+                {isRegister && <Input placeholder="الاسم الكامل" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />}
+                <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />
+                <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-xl text-right font-bold bg-black/5 border-none" />
                 {isRegister && (
-                  <div className="p-2 bg-black/5 rounded-2xl flex gap-2">
-                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-black text-white' : 'text-black/40'}`}>عميل</button>
-                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-black text-white' : 'text-black/40'}`}>بائع</button>
+                  <div className="p-2 bg-black/5 rounded-xl flex gap-2">
+                    <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'user' ? 'bg-black text-white' : 'text-black/40'}`}>عميل</button>
+                    <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-lg transition-all ${role === 'vendor' ? 'bg-black text-white' : 'text-black/40'}`}>بائع</button>
                   </div>
                 )}
-                <Button type="submit" className="w-full h-16 rounded-2xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
+                <Button type="submit" className="w-full h-16 rounded-xl font-black text-lg shadow-soft-primary" disabled={authLoading}>
                   {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'إنشاء حساب جديد' : 'دخول المنصة')}
                 </Button>
              </form>
@@ -205,9 +205,18 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Viewport Rendering - Fixed logical margin for RTL sidebar */}
-      <main className={`${!isMarketplace && userProfile ? 'lg:ps-80' : ''}`}>
-        <div className="mx-auto w-full">
+      {/* Main Viewport */}
+      <main className={`${!isMarketplace && userProfile ? 'lg:ps-64' : ''}`}>
+        <div className={`mx-auto w-full ${!isMarketplace && userProfile ? 'p-6 lg:p-10' : ''}`}>
+          {/* Mobile Menu Trigger */}
+          {!isMarketplace && userProfile && (
+            <div className="lg:hidden flex justify-end mb-6">
+               <Button variant="outline" size="icon" onClick={() => setIsSidebarOpen(true)} className="rounded-xl border-primary/20 bg-card">
+                  <Menu className="w-5 h-5 text-primary" />
+               </Button>
+            </div>
+          )}
+
           {activeTab === 'home' && (
             <Home 
               user={userProfile} 
@@ -240,17 +249,6 @@ const App: React.FC = () => {
           {['all_bookings', 'hall_bookings', 'my_bookings'].includes(activeTab) && userProfile && <Bookings user={userProfile} />}
         </div>
       </main>
-
-      {/* Conditional Marketplace Login Trigger (Floating Button) */}
-      {isMarketplace && !session && (
-         <div className="fixed bottom-10 left-10 z-[100] group">
-            <Button onClick={() => setShowAuthModal(true)} className="w-20 h-20 rounded-full bg-black text-white shadow-2xl hover:bg-primary transition-all flex items-center justify-center p-0 overflow-hidden relative border-white/10">
-               <LogIn className="w-8 h-8 relative z-10" />
-               <div className="absolute inset-0 bg-primary translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
-            </Button>
-            <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 bg-black text-white px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest shadow-xl">دخول الشركاء</span>
-         </div>
-      )}
     </div>
   );
 };

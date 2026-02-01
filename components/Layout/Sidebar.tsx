@@ -35,33 +35,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
   if (!user) return null;
 
   const getMenuItems = () => {
-    const common = [{ id: 'dashboard', label: 'الرئيسية', icon: <LayoutDashboard className="w-5 h-5" /> }];
+    const common = [{ id: 'dashboard', label: 'الرئيسية', icon: <LayoutDashboard className="w-4 h-4" /> }];
     
     if (user.role === 'super_admin') {
       return [
         ...common,
-        { id: 'subscriptions', label: 'الاشتراكات', icon: <ShieldCheck className="w-5 h-5" /> },
-        { id: 'users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
-        { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-5 h-5" /> },
+        { id: 'subscriptions', label: 'الاشتراكات', icon: <ShieldCheck className="w-4 h-4" /> },
+        { id: 'users', label: 'المستخدمين', icon: <Users className="w-4 h-4" /> },
+        { id: 'settings', label: 'الإعدادات', icon: <Settings className="w-4 h-4" /> },
       ];
     }
     
     if (user.role === 'vendor') {
       return [
         ...common,
-        { id: 'calendar', label: 'التقويم', icon: <CalendarDays className="w-5 h-5" /> },
-        { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-5 h-5" /> },
-        { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-5 h-5" /> },
-        { id: 'hall_bookings', label: 'الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
-        { id: 'brand_settings', label: 'هوية المتجر', icon: <Palette className="w-5 h-5" /> },
+        { id: 'calendar', label: 'التقويم', icon: <CalendarDays className="w-4 h-4" /> },
+        { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-4 h-4" /> },
+        { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-4 h-4" /> },
+        { id: 'hall_bookings', label: 'الحجوزات', icon: <ClipboardList className="w-4 h-4" /> },
+        { id: 'brand_settings', label: 'هوية المتجر', icon: <Palette className="w-4 h-4" /> },
       ];
     }
     
     return [
       ...common,
-      { id: 'browse', label: 'تصفح القاعات', icon: <Search className="w-5 h-5" /> },
-      { id: 'my_favorites', label: 'المفضلة', icon: <Heart className="w-5 h-5" /> },
-      { id: 'my_bookings', label: 'حجوزاتي', icon: <Ticket className="w-5 h-5" /> },
+      { id: 'browse', label: 'تصفح القاعات', icon: <Search className="w-4 h-4" /> },
+      { id: 'my_favorites', label: 'المفضلة', icon: <Heart className="w-4 h-4" /> },
+      { id: 'my_bookings', label: 'حجوزاتي', icon: <Ticket className="w-4 h-4" /> },
     ];
   };
 
@@ -71,76 +71,83 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
   return (
     <>
       {/* Mobile Overlay */}
-      {isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
+      {isOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
       
       <aside className={`
-        fixed top-4 bottom-4 inset-inline-start-4 z-50 w-72 bg-card border shadow-2xl rounded-[2.5rem] flex flex-col transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]
-        ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-[120%] rtl:-translate-x-[120%] opacity-0 lg:translate-x-0 lg:opacity-100'}
+        fixed inset-y-0 inset-inline-start-0 z-50 w-64 bg-card border-e shadow-2xl flex flex-col transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
       `}>
-        {/* Close button for mobile - Positioned logically */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="absolute inset-inline-end-4 top-4 lg:hidden rounded-full" 
-          onClick={() => setIsOpen(false)}
-        >
-          <X className="w-5 h-5" />
-        </Button>
-
-        <div className="p-8 flex flex-col items-center text-center">
-          <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-primary to-purple-400 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            {logoToDisplay ? (
-              <img src={logoToDisplay} alt="Logo" className="relative w-20 h-20 object-contain rounded-2xl bg-card border p-2 shadow-sm" />
-            ) : (
-              <div className="relative w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20">
-                <Building2 className="w-10 h-10" />
-              </div>
-            )}
+        {/* Header/Logo Area */}
+        <div className="p-6 flex flex-col items-end gap-4 border-b border-border/50">
+          <div className="flex items-center justify-between w-full lg:justify-end">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="lg:hidden rounded-full h-8 w-8" 
+              onClick={() => setIsOpen(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+            
+            <div className="relative h-10 w-10 shrink-0">
+              <div className="absolute -inset-1 bg-primary/20 rounded-[1.125rem] blur-sm"></div>
+              {logoToDisplay ? (
+                <img src={logoToDisplay} alt="Logo" className="relative h-full w-full object-contain bg-card rounded-lg border p-1" />
+              ) : (
+                <div className="relative h-full w-full bg-primary/10 rounded-lg flex items-center justify-center text-primary border border-primary/20">
+                  <Building2 className="w-5 h-5" />
+                </div>
+              )}
+            </div>
           </div>
-          <h1 className="mt-4 text-sm font-black text-primary tracking-tighter line-clamp-1">
-            {user.role === 'vendor' ? (user.business_name || siteName) : siteName}
-          </h1>
+          <div className="text-right">
+            <h1 className="text-sm font-black text-primary tracking-tight uppercase line-clamp-1">
+              {user.role === 'vendor' ? (user.business_name || siteName) : siteName}
+            </h1>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">بوابة الشركاء</p>
+          </div>
         </div>
         
-        <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto no-scrollbar">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto no-scrollbar">
           {items.map((item) => (
             <button 
               key={item.id} 
               onClick={() => { setActiveTab(item.id); setIsOpen(false); }} 
               className={`
-                w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl text-[13px] font-black transition-all group
+                w-full flex items-center justify-end gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all group
                 ${activeTab === item.id 
-                  ? 'bg-primary text-primary-foreground shadow-xl shadow-primary/25 translate-x-[-4px] rtl:translate-x-[4px]' 
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
+                  ? 'bg-primary text-white shadow-md' 
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-primary'}
               `}
             >
+              <span>{item.label}</span>
               <span className={`shrink-0 transition-transform duration-300 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110'}`}>
                 {item.icon}
               </span>
-              {item.label}
             </button>
           ))}
         </nav>
         
-        <div className="p-4 mt-auto">
-          <div className="bg-muted/30 p-4 rounded-[2.5rem] border border-border/40 flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black text-xs shadow-lg">
-                {user.full_name?.[0] || <UserIcon className="w-4 h-4" />}
-              </div>
-              <div className="text-start overflow-hidden">
-                <p className="text-[12px] font-black leading-none truncate">{user.full_name}</p>
-                <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">
+        {/* Footer Info Section */}
+        <div className="p-4 border-t border-border/50">
+          <div className="bg-muted/30 p-4 rounded-[1.125rem] border border-border/40 space-y-4">
+            <div className="flex items-center justify-end gap-3">
+              <div className="text-right overflow-hidden">
+                <p className="text-xs font-bold leading-none truncate">{user.full_name}</p>
+                <p className="text-[9px] text-muted-foreground font-black uppercase tracking-widest mt-1 opacity-60">
                   {user.role === 'vendor' ? 'بائع' : user.role === 'super_admin' ? 'مدير' : 'عميل'}
                 </p>
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs border border-primary/10">
+                {user.full_name?.[0] || <UserIcon className="w-4 h-4" />}
               </div>
             </div>
             <button 
               onClick={onLogout} 
-              className="w-full flex items-center justify-center gap-2 py-3 text-[11px] font-black text-destructive hover:bg-destructive/10 rounded-2xl transition-all active:scale-95 border border-destructive/10"
+              className="w-full flex items-center justify-center gap-2 py-2 text-[10px] font-black text-destructive hover:bg-destructive/10 rounded-lg transition-all border border-destructive/20"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
               <span>تسجيل الخروج</span>
             </button>
           </div>
