@@ -4,7 +4,10 @@ import { supabase } from '../supabaseClient';
 import { UserProfile } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Palette, Upload, Loader2, Save, MessageCircle, Mail, Phone, Globe, Trash2, Building2 } from 'lucide-react';
+import { 
+  Palette, Upload, Loader2, Save, MessageCircle, Mail, Phone, Globe, Trash2, Building2,
+  Facebook, Instagram, Twitter, Link as LinkIcon
+} from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface VendorBrandSettingsProps {
@@ -21,7 +24,10 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
     whatsapp_number: user.whatsapp_number || '',
     business_email: user.business_email || '',
     phone_number: user.phone_number || '',
-    custom_logo_url: user.custom_logo_url || ''
+    custom_logo_url: user.custom_logo_url || '',
+    facebook_url: user.facebook_url || '',
+    instagram_url: user.instagram_url || '',
+    twitter_url: user.twitter_url || ''
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +66,10 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
           whatsapp_number: formData.whatsapp_number,
           business_email: formData.business_email,
           phone_number: formData.phone_number,
-          custom_logo_url: formData.custom_logo_url
+          custom_logo_url: formData.custom_logo_url,
+          facebook_url: formData.facebook_url,
+          instagram_url: formData.instagram_url,
+          twitter_url: formData.twitter_url
         })
         .eq('id', user.id);
 
@@ -80,49 +89,50 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
         <h2 className="text-3xl font-black tracking-tighter flex items-center gap-2">
           <Palette className="w-8 h-8 text-primary" /> إعدادات الهوية والتواصل
         </h2>
-        <p className="text-muted-foreground mt-1">خصص مظهر بوابتك وتفاصيل التواصل الخاصة بك مع العملاء.</p>
+        <p className="text-muted-foreground mt-1 text-right">خصص مظهر بوابتك وتفاصيل التواصل الخاصة بك مع العملاء.</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Visual Identity */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-card border rounded-[2.5rem] p-8 shadow-sm space-y-8">
-            <h3 className="text-xl font-black flex items-center gap-2">
-              <Globe className="w-5 h-5 text-primary" /> الهوية البصرية
+            <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
+               الهوية البصرية <Globe className="w-5 h-5 text-primary" />
             </h3>
             
             <div className="grid md:grid-cols-2 gap-8">
                <div className="space-y-4">
-                  <label className="text-sm font-bold block">لون العلامة التجارية</label>
-                  <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border">
+                  <label className="text-sm font-bold block text-right">لون العلامة التجارية</label>
+                  <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border flex-row-reverse">
                     <input 
                       type="color" 
                       className="w-12 h-12 rounded-xl border-none cursor-pointer bg-transparent" 
                       value={formData.theme_color} 
                       onChange={e => setFormData({...formData, theme_color: e.target.value})}
                     />
-                    <div className="flex-1">
+                    <div className="flex-1 text-right">
                       <p className="text-xs font-black uppercase tracking-widest">{formData.theme_color}</p>
                       <p className="text-[10px] text-muted-foreground">سيطبق هذا اللون على الأزرار والروابط.</p>
                     </div>
                   </div>
                </div>
 
-               <div className="space-y-4">
+               <div className="space-y-4 text-right">
                   <label className="text-sm font-bold block">اسم النشاط التجاري</label>
                   <Input 
                     placeholder="مثال: قاعات السمو الملكي" 
                     value={formData.business_name} 
                     onChange={e => setFormData({...formData, business_name: e.target.value})}
+                    className="text-right"
                   />
                </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 text-right">
               <label className="text-sm font-bold block">شعار النشاط</label>
               <div 
                 onClick={() => fileInputRef.current?.click()}
-                className="aspect-video max-w-sm border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-muted/30 transition-all overflow-hidden relative group"
+                className="aspect-video max-w-sm border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center cursor-pointer hover:bg-muted/30 transition-all overflow-hidden relative group mx-auto md:mr-0 md:ml-auto"
               >
                 {uploading ? (
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -147,50 +157,86 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
 
           {/* Contact Details */}
           <div className="bg-card border rounded-[2.5rem] p-8 shadow-sm space-y-8">
-            <h3 className="text-xl font-black flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-primary" /> تفاصيل التواصل للعملاء
+            <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
+               تفاصيل التواصل للعملاء <MessageCircle className="w-5 h-5 text-primary" />
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
-               <div className="space-y-2">
-                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                   <MessageCircle className="w-3.5 h-3.5" /> رقم الواتساب
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   رقم الواتساب <MessageCircle className="w-3.5 h-3.5" />
                  </label>
                  <Input 
                    placeholder="9665xxxxxxxx" 
                    value={formData.whatsapp_number} 
                    onChange={e => setFormData({...formData, whatsapp_number: e.target.value})}
+                   className="text-right"
                  />
                </div>
-               <div className="space-y-2">
-                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                   <Mail className="w-3.5 h-3.5" /> بريد المبيعات
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   بريد المبيعات <Mail className="w-3.5 h-3.5" />
                  </label>
                  <Input 
                    type="email" 
                    placeholder="sales@example.com" 
                    value={formData.business_email} 
                    onChange={e => setFormData({...formData, business_email: e.target.value})}
+                   className="text-right"
                  />
                </div>
-               <div className="space-y-2">
-                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                   <Phone className="w-3.5 h-3.5" /> رقم الجوال الرئيسي
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   رقم الجوال الرئيسي <Phone className="w-3.5 h-3.5" />
                  </label>
                  <Input 
                    placeholder="05xxxxxxxx" 
                    value={formData.phone_number} 
                    onChange={e => setFormData({...formData, phone_number: e.target.value})}
+                   className="text-right"
                  />
                </div>
             </div>
-            <div className="bg-primary/5 p-6 rounded-3xl border border-primary/10 flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary shrink-0">
-                <Save className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-primary mb-1">ظهور البيانات</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">تظهر هذه البيانات للعملاء في صفحة عرض القاعة وفي الفواتير الإلكترونية لتسهيل التواصل.</p>
-              </div>
+          </div>
+
+          {/* Social Media Presence */}
+          <div className="bg-card border rounded-[2.5rem] p-8 shadow-sm space-y-8">
+            <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
+               حسابات التواصل الاجتماعي <LinkIcon className="w-5 h-5 text-primary" />
+            </h3>
+            <div className="grid md:grid-cols-3 gap-6">
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   فيسبوك <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                 </label>
+                 <Input 
+                   placeholder="https://facebook.com/..." 
+                   value={formData.facebook_url} 
+                   onChange={e => setFormData({...formData, facebook_url: e.target.value})}
+                   className="text-right text-xs"
+                 />
+               </div>
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   إنستجرام <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                 </label>
+                 <Input 
+                   placeholder="https://instagram.com/..." 
+                   value={formData.instagram_url} 
+                   onChange={e => setFormData({...formData, instagram_url: e.target.value})}
+                   className="text-right text-xs"
+                 />
+               </div>
+               <div className="space-y-2 text-right">
+                 <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2">
+                   تويتر / X <Twitter className="w-3.5 h-3.5 text-black" />
+                 </label>
+                 <Input 
+                   placeholder="https://twitter.com/..." 
+                   value={formData.twitter_url} 
+                   onChange={e => setFormData({...formData, twitter_url: e.target.value})}
+                   className="text-right text-xs"
+                 />
+               </div>
             </div>
           </div>
         </div>
@@ -198,7 +244,7 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
         {/* Preview Card */}
         <div className="space-y-6">
           <div className="sticky top-24 space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">معاينة العلامة</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground text-right">معاينة العلامة</h3>
             <div className="bg-card border rounded-[2.5rem] p-8 shadow-xl space-y-6 text-center">
                <div className="w-24 h-24 bg-muted rounded-[2rem] mx-auto overflow-hidden shadow-inner flex items-center justify-center">
                  {formData.custom_logo_url ? <img src={formData.custom_logo_url} className="w-full h-full object-contain p-2" /> : <Building2 className="w-10 h-10 text-muted-foreground/30" />}
@@ -207,7 +253,15 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
                  <h4 className="text-2xl font-black">{formData.business_name || 'اسم النشاط'}</h4>
                  <p className="text-xs text-muted-foreground">بائع معتمد لدى {user.email}</p>
                </div>
+               
+               {/* Social Icons Preview */}
                <div className="flex justify-center gap-4">
+                  {formData.facebook_url && <Facebook className="w-5 h-5 text-blue-600" />}
+                  {formData.instagram_url && <Instagram className="w-5 h-5 text-pink-600" />}
+                  {formData.twitter_url && <Twitter className="w-5 h-5 text-black" />}
+               </div>
+
+               <div className="flex justify-center gap-4 border-t pt-4">
                   <div className="w-8 h-8 rounded-full border" style={{ backgroundColor: formData.theme_color }}></div>
                   <div className="w-8 h-8 rounded-full border bg-white"></div>
                   <div className="w-8 h-8 rounded-full border bg-card"></div>

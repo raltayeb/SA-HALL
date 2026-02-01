@@ -1,4 +1,5 @@
 
+
 export type Role = 'super_admin' | 'vendor' | 'user';
 
 export interface UserProfile {
@@ -16,6 +17,10 @@ export interface UserProfile {
   whatsapp_number?: string;
   business_email?: string;
   theme_color?: string;
+  // Social media links
+  facebook_url?: string;
+  instagram_url?: string;
+  twitter_url?: string;
 }
 
 export interface Subscription {
@@ -65,6 +70,11 @@ export interface Service {
   created_at?: string;
 }
 
+/**
+ * Booking interface with support for joined profiles.
+ * 'client' is an alias for the user profile associated with user_id.
+ * 'vendor' is an alias for the user profile associated with vendor_id.
+ */
 export interface Booking {
   id: string;
   hall_id?: string;
@@ -81,6 +91,8 @@ export interface Booking {
   halls?: Hall;
   profiles?: UserProfile;
   services?: Service;
+  client?: UserProfile;
+  vendor?: UserProfile;
 }
 
 export const SAUDI_CITIES = [

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Hall, UserProfile, VAT_RATE, Service } from '../types';
 import { Button } from '../components/ui/Button';
@@ -7,13 +7,12 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { Input } from '../components/ui/Input';
 import { 
   ImageOff, MapPin, CheckCircle2, Search, Users, Eye, Heart, Sparkles, 
-  Calendar as CalendarIcon, Loader2, Info, Star, MessageCircle, 
-  Mail, Phone, Building2, Share2, ShieldCheck, ArrowRight, User as UserIcon,
-  X, MessageSquare
+  Calendar as CalendarIcon, Loader2, Star, MessageCircle, 
+  Mail, Phone, Building2, Share2, ArrowRight,
+  MessageSquare, Facebook, Instagram, Twitter
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format } from 'date-fns';
-import { formatCurrency } from '../utils/currency';
 
 interface BrowseHallsProps {
   user: UserProfile;
@@ -41,16 +40,27 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   const fetchHalls = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
-      if (data) setHalls(data as any);
+      // Fetch halls and join with vendor profile
+      const { data, error } = await supabase
+        .from('halls')
+        .select('*, vendor:vendor_id(*)')
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      setHalls(data as any[] || []);
+    } catch (err: any) {
+      console.error('Error fetching halls:', err);
+      toast({ title: 'خطأ', description: 'فشل في تحميل القاعات المتاحة.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   const fetchFavorites = useCallback(async () => {
-    const { data } = await supabase.from('user_favorites').select('hall_id').eq('user_id', user.id);
-    if (data) setFavorites(data.map(f => f.hall_id));
+    try {
+      const { data } = await supabase.from('user_favorites').select('hall_id').eq('user_id', user.id);
+      if (data) setFavorites(data.map(f => f.hall_id));
+    } catch (e) { console.error(e); }
   }, [user.id]);
 
   const fetchVendorServices = async (vendorId: string) => {
@@ -61,9 +71,12 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
   useEffect(() => { 
     fetchHalls(); 
     fetchFavorites();
+    
     const handleOpen = (e: any) => {
       setViewingHall(e.detail);
-      fetchVendorServices(e.detail.vendor_id);
+      if (e.detail?.vendor_id) {
+        fetchVendorServices(e.detail.vendor_id);
+      }
       setActiveImageIndex(0);
       setIsAvailable(null);
     };
@@ -76,11 +89,13 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
     setIsAvailable(null);
     setIsCheckingAvailability(true);
     try {
-      const [bookings, blocks] = await Promise.all([
+      const [bookingsRes, blocksRes] = await Promise.all([
         supabase.from('bookings').select('id').eq('hall_id', hallId).eq('booking_date', date).neq('status', 'cancelled').maybeSingle(),
         supabase.from('availability_blocks').select('id').eq('hall_id', hallId).eq('block_date', date).maybeSingle()
       ]);
-      setIsAvailable(!bookings.data && !blocks.data);
+      setIsAvailable(!bookingsRes.data && !blocksRes.data);
+    } catch (e) {
+      console.error(e);
     } finally {
       setIsCheckingAvailability(false);
     }
@@ -120,9 +135,11 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
       bookingPayload.service_id = selectedService.id;
     }
 
-    const { error: bookingError } = await supabase.from('bookings').insert([bookingPayload]).select().single();
+    try {
+      const { error: bookingError } = await supabase.from('bookings').insert([bookingPayload]).select().single();
 
-    if (!bookingError) {
+      if (bookingError) throw bookingError;
+
       await supabase.from('notifications').insert([{
         user_id: viewingHall.vendor_id,
         title: 'طلب حجز جديد',
@@ -130,41 +147,37 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         type: 'booking_new',
         action_url: 'hall_bookings'
       }]);
+
       toast({ title: 'نجاح', description: 'تم إرسال طلب الحجز، سيقوم البائع بالتواصل معك قريباً.', variant: 'success' });
       setViewingHall(null);
       setSelectedService(null);
-    } else {
-      toast({ title: 'خطأ', description: bookingError.message, variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     }
   };
 
   const toggleFavorite = async (e: React.MouseEvent, hallId: string) => {
     e.stopPropagation();
     const isFav = favorites.includes(hallId);
-    if (isFav) {
-      await supabase.from('user_favorites').delete().eq('user_id', user.id).eq('hall_id', hallId);
-      setFavorites(prev => prev.filter(id => id !== hallId));
-    } else {
-      await supabase.from('user_favorites').insert([{ user_id: user.id, hall_id: hallId }]);
-      setFavorites(prev => [...prev, hallId]);
-    }
+    try {
+      if (isFav) {
+        await supabase.from('user_favorites').delete().eq('user_id', user.id).eq('hall_id', hallId);
+        setFavorites(prev => prev.filter(id => id !== hallId));
+      } else {
+        await supabase.from('user_favorites').insert([{ user_id: user.id, hall_id: hallId }]);
+        setFavorites(prev => [...prev, hallId]);
+      }
+    } catch (e) { console.error(e); }
   };
 
   const allImages = viewingHall ? (viewingHall.images && viewingHall.images.length > 0 ? viewingHall.images : [viewingHall.image_url].filter(Boolean)) : [];
-
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center p-20 gap-4">
-      <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      <p className="font-bold text-muted-foreground animate-pulse text-right">جاري استكشاف القاعات المتاحة...</p>
-    </div>
-  );
 
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row-reverse justify-between items-start md:items-center gap-4">
         <div className="text-right">
           <h2 className="text-4xl font-black text-primary tracking-tighter">قاعات الأفراح</h2>
-          <p className="text-muted-foreground mt-1">تصفح القاعات المتاحة واحجز مناسبتك القادمة.</p>
+          <p className="text-muted-foreground mt-1 text-right">تصفح القاعات المتاحة واحجز مناسبتك القادمة.</p>
         </div>
         <div className="relative w-full md:w-80 group">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -176,61 +189,75 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
         </div>
       </div>
 
-      <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-        {halls.map(hall => (
-          <div key={hall.id} className="group rounded-[2.5rem] border bg-card shadow-sm hover:shadow-2xl transition-all flex flex-col relative overflow-hidden h-full">
-             <button 
-               onClick={(e) => toggleFavorite(e, hall.id)} 
-               className="absolute top-5 left-5 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-full shadow-lg hover:scale-110 transition-transform active:scale-95"
-             >
-                <Heart className={`w-5 h-5 ${favorites.includes(hall.id) ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
-             </button>
-             
-             <div className="aspect-[1.2/1] w-full bg-muted relative cursor-pointer overflow-hidden" onClick={() => { setViewingHall(hall); fetchVendorServices(hall.vendor_id); }}>
-              {(hall.images && hall.images[0]) || hall.image_url ? (
-                <img src={hall.images?.[0] || hall.image_url} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt={hall.name} />
-              ) : (
-                <div className="flex h-full items-center justify-center opacity-20"><ImageOff className="h-12 w-12" /></div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6 justify-center">
-                <span className="text-white text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                   استعراض القاعة <Eye className="w-4 h-4" />
-                </span>
-              </div>
-             </div>
-
-             <div className="p-8 flex flex-col flex-1 text-right">
-                <div className="flex justify-between items-start mb-2 flex-row-reverse">
-                  <h3 className="font-black text-2xl tracking-tight leading-none">{hall.name}</h3>
-                  <div className="bg-primary/10 px-3 py-1 rounded-full flex items-center gap-1">
-                    <Star className="w-3 h-3 text-primary fill-primary" />
-                    <span className="text-[10px] font-black text-primary">4.9</span>
-                  </div>
-                </div>
+      {loading ? (
+        <div className="flex flex-col items-center justify-center p-20 gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="font-bold text-muted-foreground animate-pulse text-right">جاري استكشاف القاعات المتاحة...</p>
+        </div>
+      ) : (
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {halls.length === 0 ? (
+            <div className="col-span-full py-32 text-center border-2 border-dashed rounded-[3rem] opacity-50">
+              <Building2 className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+              <p className="font-black text-xl text-muted-foreground">لا توجد قاعات متاحة في منطقتك حالياً.</p>
+            </div>
+          ) : (
+            halls.map(hall => (
+              <div key={hall.id} className="group rounded-[2.5rem] border bg-card shadow-sm hover:shadow-2xl transition-all flex flex-col relative overflow-hidden h-full">
+                <button 
+                  onClick={(e) => toggleFavorite(e, hall.id)} 
+                  className="absolute top-5 left-5 z-20 bg-white/95 backdrop-blur-md p-2.5 rounded-full shadow-lg hover:scale-110 transition-transform active:scale-95"
+                >
+                    <Heart className={`w-5 h-5 ${favorites.includes(hall.id) ? 'fill-destructive text-destructive' : 'text-muted-foreground'}`} />
+                </button>
                 
-                <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground mb-6">
-                  {hall.capacity} ضيف <Users className="w-4 h-4 text-primary" />
-                  <span className="w-1 h-1 rounded-full bg-muted-foreground/30 mx-1"></span>
-                  {hall.city} <MapPin className="w-4 h-4 text-primary" />
+                <div className="aspect-[1.2/1] w-full bg-muted relative cursor-pointer overflow-hidden" onClick={() => { setViewingHall(hall); fetchVendorServices(hall.vendor_id); }}>
+                  {(hall.images && hall.images[0]) || hall.image_url ? (
+                    <img src={hall.images?.[0] || hall.image_url} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" alt={hall.name} />
+                  ) : (
+                    <div className="flex h-full items-center justify-center opacity-20"><ImageOff className="h-12 w-12" /></div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6 justify-center">
+                    <span className="text-white text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                      استعراض القاعة <Eye className="w-4 h-4" />
+                    </span>
+                  </div>
                 </div>
 
-                <div className="mt-auto pt-6 border-t flex items-center justify-between flex-row-reverse">
-                  <div className="flex flex-col items-end">
-                    <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">التكلفة لليلة</span>
-                    <PriceTag amount={hall.price_per_night} className="text-primary text-2xl" />
-                  </div>
-                  <Button 
-                    variant="outline"
-                    className="rounded-2xl h-12 px-6 font-black border-2"
-                    onClick={() => { setViewingHall(hall); fetchVendorServices(hall.vendor_id); }}
-                  >
-                    عرض التفاصيل
-                  </Button>
+                <div className="p-8 flex flex-col flex-1 text-right">
+                    <div className="flex justify-between items-start mb-2 flex-row-reverse">
+                      <h3 className="font-black text-2xl tracking-tight leading-none">{hall.name}</h3>
+                      <div className="bg-primary/10 px-3 py-1 rounded-full flex items-center gap-1">
+                        <Star className="w-3 h-3 text-primary fill-primary" />
+                        <span className="text-[10px] font-black text-primary">4.9</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground mb-6">
+                      {hall.capacity} ضيف <Users className="w-4 h-4 text-primary" />
+                      <span className="w-1 h-1 rounded-full bg-muted-foreground/30 mx-1"></span>
+                      {hall.city} <MapPin className="w-4 h-4 text-primary" />
+                    </div>
+
+                    <div className="mt-auto pt-6 border-t flex items-center justify-between flex-row-reverse">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">التكلفة لليلة</span>
+                        <PriceTag amount={hall.price_per_night} className="text-primary text-2xl" />
+                      </div>
+                      <Button 
+                        variant="outline"
+                        className="rounded-2xl h-12 px-6 font-black border-2"
+                        onClick={() => { setViewingHall(hall); fetchVendorServices(hall.vendor_id); }}
+                      >
+                        عرض التفاصيل
+                      </Button>
+                    </div>
                 </div>
-             </div>
-          </div>
-        ))}
-      </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {viewingHall && (
         <div className="fixed inset-0 z-[100] bg-background flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500">
@@ -276,14 +303,33 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                     <p className="text-muted-foreground leading-loose text-lg opacity-80">{viewingHall.description || "تتميز هذه القاعة بتصميم عصري وفريد يجمع بين الرقي والفخامة."}</p>
                   </div>
 
+                  {/* Vendor Info */}
                   <div className="p-8 bg-card border rounded-[3rem] shadow-xl flex flex-col md:flex-row-reverse justify-between items-center gap-8">
                      <div className="flex items-center flex-row-reverse gap-6">
-                        <div className="w-24 h-24 rounded-[1.5rem] bg-muted border flex items-center justify-center overflow-hidden">
+                        <div className="w-24 h-24 rounded-[1.5rem] bg-muted border flex items-center justify-center overflow-hidden shrink-0">
                            {viewingHall.vendor?.custom_logo_url ? <img src={viewingHall.vendor.custom_logo_url} className="w-full h-full object-contain p-2" /> : <Building2 className="w-12 h-12 text-primary" />}
                         </div>
                         <div className="text-right">
                            <h4 className="text-2xl font-black">{viewingHall.vendor?.business_name || viewingHall.vendor?.full_name}</h4>
                            <p className="text-sm text-muted-foreground mt-1">تواصل مباشرة مع إدارة القاعة.</p>
+                           
+                           <div className="flex justify-end gap-3 mt-4">
+                             {viewingHall.vendor?.facebook_url && (
+                               <a href={viewingHall.vendor.facebook_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-muted/50 rounded-lg hover:bg-blue-100 hover:text-blue-600 transition-all">
+                                 <Facebook className="w-5 h-5" />
+                               </a>
+                             )}
+                             {viewingHall.vendor?.instagram_url && (
+                               <a href={viewingHall.vendor.instagram_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-muted/50 rounded-lg hover:bg-pink-100 hover:text-pink-600 transition-all">
+                                 <Instagram className="w-5 h-5" />
+                               </a>
+                             )}
+                             {viewingHall.vendor?.twitter_url && (
+                               <a href={viewingHall.vendor.twitter_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-muted/50 rounded-lg hover:bg-blue-50 hover:text-black transition-all">
+                                 <Twitter className="w-5 h-5" />
+                               </a>
+                             )}
+                           </div>
                         </div>
                      </div>
                      <div className="flex gap-4">
@@ -304,17 +350,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user }) => {
                   <div className="sticky top-12 space-y-6 text-right">
                     <div className="bg-card border rounded-[3.5rem] p-10 shadow-2xl space-y-8 relative overflow-hidden">
                       <div className="space-y-2">
-                        <h4 className="text-xl font-black">طلب حجز القاعة</h4>
+                        <h4 className="text-xl font-black text-right">طلب حجز القاعة</h4>
                         <PriceTag amount={(viewingHall.price_per_night || 0) + (selectedService?.price || 0)} className="text-5xl text-primary" iconSize={36} />
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">شامل الرسوم التقديرية</p>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest text-right">شامل الرسوم التقديرية</p>
                       </div>
 
                       <div className="space-y-6">
                         <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center justify-end gap-2">تاريخ الموعد <CalendarIcon className="w-3.5 h-3.5" /></label>
+                          <label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center justify-end gap-2 text-right">تاريخ الموعد <CalendarIcon className="w-3.5 h-3.5" /></label>
                           <input type="date" className="w-full h-16 bg-muted/30 border rounded-2xl px-6 outline-none font-black text-lg text-right" value={bookingDate} onChange={e => setBookingDate(e.target.value)} />
                           {isCheckingAvailability ? (
-                            <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-end gap-2 animate-pulse">جاري التحقق... <Loader2 className="w-3 h-3 animate-spin" /></div>
+                            <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-end gap-2 animate-pulse text-right">جاري التحقق... <Loader2 className="w-3 h-3 animate-spin" /></div>
                           ) : isAvailable === true ? (
                             <div className="text-[11px] text-green-600 font-black mt-1 text-right">التاريخ متاح للحجز ✓</div>
                           ) : isAvailable === false ? (

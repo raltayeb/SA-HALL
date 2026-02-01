@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Booking, UserProfile } from '../types';
@@ -7,8 +8,8 @@ import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
   Calendar, Receipt, CheckCircle, XCircle, Clock, Search, 
-  ShieldAlert, AlertCircle, Sparkles, Loader2, User as UserIcon, 
-  Phone, MessageSquare, StickyNote, Mail
+  AlertCircle, Sparkles, Loader2, User as UserIcon, 
+  Phone, Building2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
@@ -34,28 +35,36 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
+      // Joins: 
+      // halls - to get hall info
+      // user_profile:user_id - to get client info (for vendor)
+      // vendor_profile:vendor_id - to get vendor info (for client)
+      // services - for extra service info
       let query = supabase
         .from('bookings')
         .select(`
           *,
           halls:hall_id (*),
-          profiles:user_id (*),
+          client:user_id (*),
+          vendor:vendor_id (*),
           services:service_id (*)
         `);
 
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
-      } else {
+      } else if (user.role === 'user') {
         query = query.eq('user_id', user.id);
       }
+      // Admins see all by default
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-      setBookings(data as any[] || []);
+      // Use Booking[] instead of any[] as the interface now contains aliased join properties
+      setBookings(data as Booking[] || []);
     } catch (err: any) {
       console.error('Error fetching bookings:', err);
-      toast({ title: 'خطأ', description: 'فشل في تحميل الحجوزات', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'فشل في تحميل الحجوزات. تأكد من اتصالك بالإنترنت.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -67,7 +76,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   const updateStatus = async (booking: Booking, status: 'confirmed' | 'cancelled') => {
     try {
-      // 1. Perform the update
       const { data, error } = await supabase
         .from('bookings')
         .update({ status })
@@ -80,9 +88,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         throw new Error('فشل تحديث الحالة في قاعدة البيانات. تأكد من صلاحيات الوصول.');
       }
 
-      // 2. Insert the notification for the client
       const statusAr = status === 'confirmed' ? 'تأكيد' : 'إلغاء';
-      const { error: notifError } = await supabase.from('notifications').insert([{
+      await supabase.from('notifications').insert([{
         user_id: booking.user_id,
         title: `تحديث حجز: ${statusAr}`,
         message: `تم ${statusAr} حجزك لقاعة ${booking.halls?.name || 'المختارة'} من قبل الإدارة.`,
@@ -91,9 +98,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         is_read: false
       }]);
 
-      if (notifError) console.error('Notification failed but status updated:', notifError);
-
-      // 3. Update UI
       toast({ 
         title: status === 'confirmed' ? 'تم التأكيد بنجاح' : 'تم الإلغاء', 
         description: `تم تحديث حالة الحجز وإرسال تنبيه للعميل.`, 
@@ -101,7 +105,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       });
       
       setBookingToCancel(null);
-      await fetchBookings(); // Force refresh to move item to the correct list
+      await fetchBookings();
     } catch (err: any) {
       console.error('Status update error:', err);
       toast({ title: 'خطأ في التحديث', description: err.message, variant: 'destructive' });
@@ -117,9 +121,17 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   };
 
   const filteredBookings = bookings.filter(b => {
+    const hallName = (b.halls?.name || '').toLowerCase();
+    // Using vendor and client properties from Booking interface
+    const vendorName = (b.vendor?.business_name || b.vendor?.full_name || '').toLowerCase();
+    const clientName = (b.client?.full_name || '').toLowerCase();
+    const searchLower = search.toLowerCase();
+    
     const matchesSearch = 
-      (b.halls?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (b.profiles?.full_name || '').toLowerCase().includes(search.toLowerCase());
+      hallName.includes(searchLower) ||
+      vendorName.includes(searchLower) ||
+      clientName.includes(searchLower);
+      
     const matchesFilter = filter === 'all' || b.status === filter;
     return matchesSearch && matchesFilter;
   });
@@ -154,7 +166,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
           <Search className="w-4 h-4 text-muted-foreground group-focus-within:text-primary" />
           <input 
             type="text" 
-            placeholder="بحث بالعميل أو القاعة..." 
+            placeholder="بحث..." 
             className="bg-transparent border-none focus:outline-none text-sm w-full font-bold text-right"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -189,17 +201,25 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                         {getStatusBadge(b.status)}
                       </div>
                     </div>
-                    {user.role === 'vendor' && (
-                      <div className="flex flex-col items-center md:items-end bg-primary/5 p-4 rounded-2xl border border-primary/10 w-full md:w-auto">
-                          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1 flex items-center gap-1 flex-row-reverse">
-                            <UserIcon className="w-3 h-3" /> بيانات العميل
-                          </p>
-                          <p className="text-sm font-black">{b.profiles?.full_name || 'عميل مجهول'}</p>
-                          <p className="text-xs font-bold text-muted-foreground mt-1 flex items-center gap-1.5 flex-row-reverse">
-                            <Phone className="w-3 h-3" /> {b.profiles?.phone_number || 'بدون هاتف'}
-                          </p>
-                      </div>
-                    )}
+                    
+                    {/* Role-based info display */}
+                    <div className="flex flex-col items-center md:items-end bg-primary/5 p-4 rounded-2xl border border-primary/10 w-full md:w-auto">
+                        <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1 flex items-center gap-1 flex-row-reverse">
+                          {user.role === 'vendor' ? <UserIcon className="w-3 h-3" /> : <Building2 className="w-3 h-3" />}
+                          {user.role === 'vendor' ? 'بيانات العميل' : 'إدارة القاعة'}
+                        </p>
+                        <p className="text-sm font-black">
+                          {user.role === 'vendor' 
+                            ? (b.client?.full_name || 'عميل مجهول')
+                            : (b.vendor?.business_name || b.vendor?.full_name || 'إدارة القاعة')}
+                        </p>
+                        <p className="text-xs font-bold text-muted-foreground mt-1 flex items-center gap-1.5 flex-row-reverse">
+                          <Phone className="w-3 h-3" /> 
+                          {user.role === 'vendor' 
+                            ? (b.client?.phone_number || 'بدون هاتف') 
+                            : (b.vendor?.phone_number || 'تواصل معنا')}
+                        </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap justify-center md:justify-end items-center gap-4 text-xs font-bold text-muted-foreground">
@@ -253,7 +273,15 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         </div>
       </Modal>
 
-      <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} booking={selectedBooking} />
+      {/* Map client/vendor to profiles property for the InvoiceModal expectation */}
+      <InvoiceModal 
+        isOpen={isInvoiceOpen} 
+        onClose={() => setIsInvoiceOpen(false)} 
+        booking={selectedBooking ? {
+          ...selectedBooking,
+          profiles: user.role === 'vendor' ? selectedBooking.client : selectedBooking.vendor
+        } : null} 
+      />
     </div>
   );
 };
