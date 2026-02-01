@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Hall, UserProfile, Service } from '../types';
 import { Button } from '../components/ui/Button';
-import { PriceTag } from '../components/ui/PriceTag';
+import { PriceTag, SaudiRiyalIcon } from '../components/ui/PriceTag';
 import { 
   Search, MapPin, Users, Star, 
   Sparkles, Building2, 
@@ -189,52 +189,88 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
       </section>
 
-      {/* Popular Listing - Marketplace Grid */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24 space-y-12">
-        <div className="flex flex-col md:flex-row justify-between items-end gap-6 text-right">
-          <div className="space-y-3">
-            <h2 className="text-4xl font-black tracking-tight">قاعات شائعة</h2>
-            <div className="flex items-center gap-2 text-gray-400 font-bold">
-              <MapPin className="w-4 h-4" /> <span>المملكة العربية السعودية</span> <ChevronDown className="w-3 h-3" />
+      {/* Popular Listing - Redesigned Section */}
+      <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24 space-y-16">
+        {/* Header matching screenshot */}
+        <div className="flex flex-col md:flex-row-reverse justify-between items-end gap-6 text-right">
+          <div className="space-y-2">
+            <h2 className="text-6xl font-black tracking-tight text-[#111827]">قاعات شائعة</h2>
+            <div className="flex items-center gap-2 text-gray-400 font-bold justify-end group cursor-pointer">
+              <ChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
+              <span className="text-lg">المملكة العربية السعودية</span>
+              <MapPin className="w-5 h-5 text-primary" />
             </div>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-            {['الكل', 'فنادق', 'فيلات', 'منتجعات'].map((cat, i) => (
-              <button key={i} className={`px-6 py-2.5 rounded-full text-[10px] font-black border transition-all whitespace-nowrap ${i === 0 ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-white border-gray-200 text-gray-500 hover:border-primary'}`}>
+          
+          {/* Filters on the left */}
+          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar w-full md:w-auto">
+            {['منتجات', 'فيلات', 'فنادق', 'الكل'].map((cat, i) => (
+              <button 
+                key={i} 
+                className={`px-10 py-3 rounded-full text-sm font-black border transition-all whitespace-nowrap shadow-sm ${
+                  cat === 'الكل' 
+                    ? 'bg-primary border-primary text-white' 
+                    : 'bg-white border-gray-100 text-gray-500 hover:border-primary hover:text-primary'
+                }`}
+              >
                 {cat}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Listings Grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-12">
           {loadingHalls ? (
-            Array.from({length: 3}).map((_, i) => <div key={i} className="aspect-[4/5] bg-gray-100 animate-pulse rounded-[2rem]"></div>)
+            Array.from({length: 2}).map((_, i) => <div key={i} className="aspect-[16/10] bg-gray-100 animate-pulse rounded-[3rem]"></div>)
           ) : (
-            halls.map((hall) => (
-              <div key={hall.id} onClick={() => setSelectedEntity({ item: hall, type: 'hall' })} className="realeast-card group overflow-hidden cursor-pointer text-right">
-                <div className="relative aspect-video overflow-hidden">
-                  <img src={hall.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={hall.name} />
-                  <div className="absolute top-4 right-4 bg-primary text-white px-3 py-1 rounded-lg text-[10px] font-black shadow-lg">مميز</div>
+            halls.slice(0, 2).map((hall) => (
+              <div 
+                key={hall.id} 
+                onClick={() => setSelectedEntity({ item: hall, type: 'hall' })} 
+                className="group cursor-pointer text-right transition-all"
+              >
+                {/* Image Section */}
+                <div className="relative aspect-[16/10] rounded-[3rem] overflow-hidden bg-gray-100 border border-gray-100 shadow-sm">
+                  <img 
+                    src={hall.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                    alt={hall.name} 
+                  />
+                  <div className="absolute top-6 right-6 bg-primary text-white px-5 py-1.5 rounded-xl text-xs font-black shadow-lg">مميز</div>
                 </div>
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-center flex-row-reverse">
-                    <PriceTag amount={hall.price_per_night} className="text-2xl text-primary font-black" />
-                    <Button variant="outline" className="rounded-xl h-8 px-4 text-[10px] font-bold">التفاصيل</Button>
-                  </div>
-                  <h3 className="text-xl font-black text-gray-900 group-hover:text-primary transition-colors truncate">{hall.name}</h3>
-                  <p className="text-[10px] font-bold text-gray-400">{hall.city}, السعودية</p>
+
+                {/* Info Row: Price & Details */}
+                <div className="mt-8 flex justify-between items-center px-4">
+                  {/* Button on the right (RTL logic) */}
+                  <Button variant="outline" className="rounded-2xl h-12 px-8 text-sm font-black border-gray-200 hover:bg-gray-50">التفاصيل</Button>
                   
-                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-50">
-                    <div className="flex flex-col items-center gap-1 text-[9px] font-black uppercase text-gray-400">
-                      <Users className="w-3.5 h-3.5 text-primary" /> {hall.capacity} ضيف
-                    </div>
-                    <div className="flex flex-col items-center gap-1 text-[9px] font-black uppercase text-gray-400 border-x border-gray-50">
-                      <Star className="w-3.5 h-3.5 text-primary" /> 4.9 تقييم
-                    </div>
-                    <div className="flex flex-col items-center gap-1 text-[9px] font-black uppercase text-gray-400">
-                      <MapPin className="w-3.5 h-3.5 text-primary" /> {hall.city}
-                    </div>
+                  {/* Price on the left */}
+                  <div className="flex items-center gap-2 text-3xl font-black text-primary">
+                    <span>{new Intl.NumberFormat('en-US').format(hall.price_per_night)}</span>
+                    <SaudiRiyalIcon size={24} className="text-primary" />
+                  </div>
+                </div>
+
+                {/* Title & City */}
+                <div className="mt-4 space-y-2 px-4">
+                  <h3 className="text-3xl font-black text-[#111827] group-hover:text-primary transition-colors">{hall.name}</h3>
+                  <p className="text-sm font-bold text-gray-400">{hall.city}, السعودية</p>
+                </div>
+
+                {/* Stats Footer Icons matching screenshot */}
+                <div className="mt-8 flex items-center justify-between px-8 py-6 border-t border-gray-50">
+                  <div className="flex flex-col items-center gap-2 text-gray-400 font-bold">
+                    <Users className="w-6 h-6 text-primary/80" />
+                    <span className="text-xs uppercase">{hall.capacity} ضيف</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 text-gray-400 font-bold">
+                    <Star className="w-6 h-6 text-primary/80" />
+                    <span className="text-xs uppercase">4.9 تقييم</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-2 text-gray-400 font-bold">
+                    <MapPin className="w-6 h-6 text-primary/80" />
+                    <span className="text-xs uppercase">{hall.city}</span>
                   </div>
                 </div>
               </div>
@@ -243,11 +279,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
         
         <div className="text-center pt-8">
-          <Button onClick={onBrowseHalls} variant="outline" className="rounded-2xl px-12 h-14 font-black border-[#111827] hover:bg-[#111827] hover:text-white transition-all text-lg">مشاهدة الكل</Button>
+          <Button onClick={onBrowseHalls} variant="outline" className="rounded-full px-16 h-16 font-black border-[#111827] hover:bg-[#111827] hover:text-white transition-all text-xl">مشاهدة كافة القاعات</Button>
         </div>
       </section>
 
-      {/* Video Highlight */}
+      {/* Rest of sections... Video Highlight, etc. */}
       <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24">
         <div className="relative aspect-video rounded-[3rem] overflow-hidden shadow-2xl group border border-gray-100">
           <img 
@@ -264,7 +300,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
       </section>
 
-      {/* How it Works - Split Section */}
+      {/* How it Works... */}
       <section className="bg-white border-y border-gray-100 py-32 overflow-hidden text-right">
         <div className="max-w-7xl mx-auto px-6 lg:px-20 space-y-24">
           <div className="text-center space-y-4">
@@ -316,7 +352,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
       </section>
 
-      {/* Why Choose Us - Comparison Table style */}
+      {/* Why Choose Us... */}
       <section className="max-w-4xl mx-auto px-6 lg:px-20 py-32 space-y-16 text-right">
         <div className="text-center space-y-4">
           <h2 className="text-4xl font-black tracking-tight">لماذا تختار رويال فينيوز؟</h2>
@@ -356,12 +392,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
             </tbody>
           </table>
         </div>
-        <div className="text-center">
-           <Button className="rounded-full px-12 h-14 bg-[#111827] text-white hover:bg-black font-black text-lg">اكتشف قاعتك الآن</Button>
-        </div>
       </section>
 
-      {/* Best Service Provider - Vendors Section */}
+      {/* Best Service Provider... */}
       <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24 space-y-12 text-right">
         <div className="flex justify-between items-end">
            <h2 className="text-4xl font-black tracking-tight">أفضل مزودي الخدمات <span className="text-primary text-xl font-bold">هذا الشهر</span></h2>
@@ -383,7 +416,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
       </section>
 
-      {/* Testimonials - Card Section */}
+      {/* Testimonials... */}
       <section className="bg-gray-50 py-32 border-y border-gray-100 text-right">
         <div className="max-w-7xl mx-auto px-6 lg:px-20 space-y-16">
           <div className="text-center space-y-4">
@@ -413,7 +446,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
         </div>
       </section>
 
-      {/* Final CTA Footer */}
+      {/* Footer... */}
       <footer className="px-6 lg:px-20 py-32 bg-white border-t border-gray-100 text-right relative overflow-hidden">
         <div className="max-w-7xl mx-auto relative z-10 space-y-24">
           <div className="text-center space-y-12 max-w-4xl mx-auto">
@@ -422,9 +455,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
                 <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-[10px] font-black border-4 border-white -ml-4 shadow-sm text-white">+10K</div>
              </div>
              <h2 className="text-5xl md:text-7xl font-black tracking-tighter leading-tight">جاهز للحجز، البيع، أو التأجير؟ <br /> نحن هنا لإرشادك في كل خطوة!</h2>
-             <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-               <Button onClick={onBrowseHalls} className="rounded-full px-12 h-16 bg-[#111827] text-white hover:bg-black font-black text-xl shadow-2xl">استكشف القاعات الآن</Button>
-             </div>
+             <Button onClick={onBrowseHalls} className="rounded-full px-12 h-16 bg-[#111827] text-white hover:bg-black font-black text-xl shadow-2xl">استكشف القاعات الآن</Button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12 border-t border-gray-100 pt-20">
@@ -434,11 +465,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onBrowseHalls, o
                    <h2 className="text-4xl font-ruqaa text-primary leading-none mt-1">قاعه</h2>
                 </div>
                 <p className="text-sm text-gray-500 font-medium leading-relaxed max-w-xs">نحن نعيد تعريف مفهوم الفخامة في حجز وإدارة المناسبات الكبرى في المملكة العربية السعودية، لنخلق ذكريات خالدة تليق بتطلعاتك.</p>
-                <div className="flex gap-4">
-                   {[Globe, User, Share2].map((Icon, i) => (
-                     <button key={i} className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-primary hover:text-white transition-all"><Icon className="w-5 h-5" /></button>
-                   ))}
-                </div>
              </div>
 
              {[
