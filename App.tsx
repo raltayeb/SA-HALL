@@ -56,7 +56,7 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isRegister, setIsRegister] = useState(false);
-  const [role, setRole] = useState('user');
+  const [role, setRole] = useState('vendor');
 
   const fetchSiteSettings = async () => {
     try {
@@ -71,8 +71,8 @@ const App: React.FC = () => {
       if (data) {
         setUserProfile(data as UserProfile);
         lastFetchedUserId.current = userId;
-        // If logged in as vendor or admin, go to dashboard
-        if (data.role !== 'user' && activeTab === 'home') {
+        // If logged in, go to dashboard
+        if (activeTab === 'home') {
           setActiveTab('dashboard');
         }
       }
@@ -109,7 +109,7 @@ const App: React.FC = () => {
       if (isRegister) {
         const { error } = await supabase.auth.signUp({ 
           email, password, 
-          options: { data: { full_name: fullName, role: role, is_enabled: true } } 
+          options: { data: { full_name: fullName, role: 'vendor', is_enabled: true } } 
         });
         if (error) throw error;
         toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني.', variant: 'default' });
@@ -136,7 +136,7 @@ const App: React.FC = () => {
     setActiveTab('browse');
   };
 
-  const openAuth = (mode: 'login' | 'register', targetRole: string = 'user') => {
+  const openAuth = (mode: 'login' | 'register', targetRole: string = 'vendor') => {
     setIsRegister(mode === 'register');
     setRole(targetRole);
     setRegStep(1);
@@ -175,7 +175,7 @@ const App: React.FC = () => {
                   {isRegister ? (regStep === 1 ? 'انضم كشريك نجاح' : 'اختر خطة الاشتراك') : 'بوابة الشركاء'}
                 </h2>
                 <p className="text-sm text-gray-400 font-bold">
-                  {isRegister ? (regStep === 1 ? 'ابدأ رحلتك معنا اليوم' : 'خصص سعتك التشغيلية على المنصة') : 'مرحباً بك مجدداً في مساحتك الخاصة'}
+                  {isRegister ? (regStep === 1 ? 'ابدأ رحلتك معنا اليوم كبائع معتمد' : 'خصص سعتك التشغيلية على المنصة') : 'مرحباً بك مجدداً في مساحتك الخاصة'}
                 </p>
              </div>
 
@@ -186,19 +186,11 @@ const App: React.FC = () => {
                     <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none shadow-inner" />
                     <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none shadow-inner" />
                     
-                    {isRegister && (
-                      <div className="p-1.5 bg-gray-50 rounded-2xl flex gap-2 border border-gray-100 shadow-inner">
-                        <button type="button" onClick={() => setRole('user')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'user' ? 'bg-primary text-white shadow-lg' : 'text-gray-400'}`}>عميل</button>
-                        <button type="button" onClick={() => setRole('vendor')} className={`flex-1 py-3 text-xs font-black rounded-xl transition-all ${role === 'vendor' ? 'bg-primary text-white shadow-lg' : 'text-gray-400'}`}>بائع (شريك)</button>
-                      </div>
-                    )}
-
                     <Button type="submit" className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
-                      {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? (role === 'vendor' ? 'التالي: اختيار الخطة' : 'إنشاء حساب جديد') : 'دخول المنصة')}
+                      {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'التالي: اختيار الخطة' : 'دخول المنصة')}
                     </Button>
                   </>
                 ) : (
-                  /* Plan Selection Step for Vendors */
                   <div className="space-y-8 animate-in slide-in-from-left-4">
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-3">
