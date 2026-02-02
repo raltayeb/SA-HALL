@@ -89,13 +89,11 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const itemPrice = item.price_per_night || item.price;
     const matchesPrice = itemPrice <= priceRange;
-    const matchesType = selectedType === 'all' || (item.hall_type && item.hall_type === selectedType) || (mode === 'halls' && selectedType !== 'all'); // Basic type matching if it exists
-    return matchesSearch && matchesPrice && (selectedType === 'all' ? true : true); // Simplified for now since Hall type column isn't strictly in DB yet
+    return matchesSearch && matchesPrice;
   });
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-[#111827]">
-      {/* Header Search - Realeast style */}
       <header className="sticky top-0 z-[100] w-full border-b border-gray-100 bg-white/95 backdrop-blur-md px-6 lg:px-20 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-12">
           <div className="flex items-center gap-10">
@@ -143,7 +141,6 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
       </header>
 
       <main className="max-w-7xl mx-auto px-6 lg:px-20 py-16 flex flex-col lg:flex-row gap-16">
-          {/* Sidebar Filters */}
           <aside className="w-full lg:w-72 shrink-0 space-y-12 text-right">
              <div className="space-y-4">
                 <h2 className="text-3xl font-black tracking-tight text-gray-900">قائمة القاعات</h2>
@@ -205,7 +202,6 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
              </div>
           </aside>
 
-          {/* Results Grid */}
           <section className="flex-1 space-y-10">
              <div className="flex justify-between items-center text-right">
                 <p className="text-xs font-bold text-gray-400">تم العثور على <span className="text-primary font-black">{filteredData.length}</span> نتيجة مطابقة</p>
@@ -227,11 +223,12 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                          <div className="p-8 space-y-6 flex-1 flex flex-col">
                             <div className="flex justify-between items-start flex-row-reverse">
                                <div className="space-y-1">
-                                  <h3 className="text-2xl font-black leading-tight tracking-tight text-gray-900 group-hover:text-primary transition-colors">{item.name}</h3>
+                                  {/* REFINED: Normalized hall name font size to base */}
+                                  <h3 className="text-base font-bold leading-tight tracking-tight text-gray-900 group-hover:text-primary transition-colors">{item.name}</h3>
                                   <p className="text-[10px] text-gray-400 font-bold">{item.city}, السعودية</p>
                                </div>
                                <div className="text-left">
-                                  <PriceTag amount={mode === 'halls' ? item.price_per_night : item.price} className="text-2xl text-gray-900 font-black" />
+                                  <PriceTag amount={mode === 'halls' ? item.price_per_night : item.price} className="text-xl text-gray-900 font-black" />
                                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">/{mode === 'halls' ? 'الليلة' : 'الخدمة'}</p>
                                </div>
                             </div>

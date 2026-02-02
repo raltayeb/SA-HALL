@@ -453,7 +453,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
       {/* Footer & Refined CTA - Corrected with wedding theme and logical colors */}
       <footer className="px-6 lg:px-20 py-32 bg-[#111827] text-white text-right relative overflow-hidden">
-        {/* CORRECTED: Wedding background instead of gym */}
+        {/* CORRECTED: High quality wedding background overlay */}
         <div className="absolute inset-0 opacity-20">
            <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000" className="w-full h-full object-cover" alt="Wedding Background" />
         </div>
@@ -462,26 +462,26 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           <div className="text-center space-y-12 max-w-4xl mx-auto">
              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-6 py-2 rounded-full border border-white/10">
                 <div className="flex -space-x-2 flex-row-reverse space-x-reverse">
-                   {[1,2,3,4].map(i => <img key={i} src={`https://i.pravatar.cc/100?u=${i+20}`} className="w-8 h-8 rounded-full border-2 border-[#111827]" />)}
+                   {[1,2,3,4].map(i => <img key={i} src={`https://i.pravatar.cc/100?u=${i+30}`} className="w-8 h-8 rounded-full border-2 border-[#111827]" />)}
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-white/80">انضم لأكثر من 10,000 عميل سعيد</span>
              </div>
              
-             {/* CORRECTED: Removed italic from the second part of the title */}
-             <h2 className="text-5xl md:text-7xl font-black tracking-tighter leading-tight">
+             {/* CORRECTED: Normal font style, clean size */}
+             <h2 className="text-4xl md:text-5xl font-black tracking-tighter leading-tight text-white">
                 حول مناسبتك القادمة <br />
-                <span className="text-primary">إلى ذكرى ملكية</span>
+                إلى ذكرى ملكية
              </h2>
              
              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                {/* CORRECTED: High-contrast white button with dark text for visibility */}
+                {/* CORRECTED: Button is now Primary Color with White Text */}
                 <Button 
                   onClick={() => onBrowseHalls()} 
-                  className="rounded-full px-16 h-20 bg-white text-[#111827] hover:bg-gray-100 font-black text-2xl shadow-2xl transition-all hover:scale-105 border-none"
+                  className="rounded-full px-16 h-20 bg-primary text-white hover:bg-primary/90 font-black text-2xl shadow-2xl shadow-primary/40 transition-all hover:scale-105 border-none"
                 >
                   استكشف القاعات الآن
                 </Button>
-                <button onClick={onRegisterClick} className="text-lg font-black border-b-2 border-white/20 hover:border-white transition-all py-2">كن شريكاً في النجاح</button>
+                <button onClick={onRegisterClick} className="text-lg font-black border-b-2 border-white/20 hover:border-white text-white transition-all py-2">كن شريكاً في النجاح</button>
              </div>
           </div>
 
@@ -511,7 +511,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
              ))}
           </div>
 
-          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-white/5 gap-6 text-[9px] text-gray-600 font-black uppercase tracking-widest">
+          <div className="flex flex-col md:flex-row justify-between items-center pt-12 border-t border-white/5 gap-6 text-[9px] text-gray-400 font-black uppercase tracking-widest">
              <p>© 2025 ROYAL VENUES SAUDI. THE PLATINUM EXPERIENCE.</p>
              <div className="flex gap-10">
                 <a href="#" className="hover:text-white">الخصوصية</a>
