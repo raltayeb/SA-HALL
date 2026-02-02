@@ -95,7 +95,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
   const handleBooking = async () => {
     if (!guestName || !guestPhone) {
-      toast({ title: 'تنبيه', description: 'يرجى إدخل الاسم ورقم الهاتف.', variant: 'destructive' });
+      toast({ title: 'تنبيه', description: 'يرجى إدخال الاسم ورقم الهاتف.', variant: 'destructive' });
       return;
     }
     if (!bookingDate) {
@@ -110,24 +110,37 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     const { total, vat } = calculateTotal();
     const dateStr = format(bookingDate, 'yyyy-MM-dd');
     try {
-      const { error } = await supabase.from('bookings').insert([{
+      // Create the booking
+      const { data: bookingData, error: bookingError } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: !isHall ? service!.id : null,
-        user_id: user?.id || '00000000-0000-0000-0000-000000000000',
+        // Since no client portal, we use the vendor's ID as owner to satisfy foreign key NOT NULL
+        user_id: user?.id || item.vendor_id, 
         vendor_id: item.vendor_id,
         booking_date: dateStr,
         total_amount: total,
         vat_amount: vat,
         status: 'pending',
-        notes: `حجز ${isHall ? 'قاعة' : 'خدمة'} مع الإضافات المختارة | العميل: ${guestName}`
+        notes: `حجز لعميل خارجي: ${guestName} | رقم التواصل: ${guestPhone}`
+      }]).select().single();
+
+      if (bookingError) throw bookingError;
+
+      // Send notification to the vendor
+      await supabase.from('notifications').insert([{
+        user_id: item.vendor_id,
+        title: 'حجز جديد وارد 🆕',
+        message: `لديك طلب حجز جديد لـ ${item.name} من العميل ${guestName}.`,
+        type: 'booking_new',
+        link: 'hall_bookings'
       }]);
 
-      if (error) throw error;
       toast({ title: 'تم إرسال الطلب', description: 'سيتواصل معك فريقنا قريباً لتأكيد الحجز.', variant: 'success' });
       setIsBookingModalOpen(false);
       onClose();
     } catch (err: any) {
-      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+      console.error(err);
+      toast({ title: 'خطأ في الحجز', description: 'فشل إتمام العملية، يرجى المحاولة لاحقاً.', variant: 'destructive' });
     } finally { setIsBooking(false); }
   };
 
@@ -251,7 +264,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                                  <span className="text-red-500 font-bold text-[10px]">غير متاح</span>
                                ) : null}
                             </h5>
-                            <div className="flex justify-center">
+                            <div className="flex justify-center rounded-[2rem] overflow-hidden">
                               <Calendar 
                                 mode="single" 
                                 selected={bookingDate} 
@@ -260,7 +273,6 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                                 locale={arSA}
                                 dir="rtl"
                                 className="w-full"
-                                captionLayout="dropdown"
                               />
                             </div>
                           </div>
