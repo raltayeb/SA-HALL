@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { PriceTag } from '../ui/PriceTag';
 import { Badge } from '../ui/Badge';
-import { Calendar } from '../ui/Calendar';
+import { DatePicker } from '../ui/DatePicker';
 import { 
   X, MapPin, Users, Star, Share2, 
   Calendar as CalendarIcon, CheckCircle2, 
@@ -87,7 +87,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     const basePrice = isHall ? Number(hall!.price_per_night) : Number(service!.price);
     const addonsPrice = vendorServices
       .filter(s => selectedServices.includes(s.id))
-      .reduce((sum, s) => sum + Number(s.price), 0);
+      .reduce((sum, sumS) => sum + Number(sumS.price), 0);
     const subtotal = basePrice + addonsPrice;
     const vat = subtotal * VAT_RATE;
     return { subtotal, vat, total: subtotal + vat };
@@ -110,41 +110,38 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     const { total, vat } = calculateTotal();
     const dateStr = format(bookingDate, 'yyyy-MM-dd');
     try {
-      // Create the booking
-      const { data: bookingData, error: bookingError } = await supabase.from('bookings').insert([{
+      const { error: bookingError } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: !isHall ? service!.id : null,
-        // Since no client portal, we use the vendor's ID as owner to satisfy foreign key NOT NULL
         user_id: user?.id || item.vendor_id, 
         vendor_id: item.vendor_id,
         booking_date: dateStr,
         total_amount: total,
         vat_amount: vat,
         status: 'pending',
-        notes: `حجز لعميل خارجي: ${guestName} | رقم التواصل: ${guestPhone}`
-      }]).select().single();
+        notes: `حجز ليد خارجي: ${guestName} | هاتف: ${guestPhone}`
+      }]);
 
       if (bookingError) throw bookingError;
 
-      // Send notification to the vendor
       await supabase.from('notifications').insert([{
         user_id: item.vendor_id,
-        title: 'حجز جديد وارد 🆕',
-        message: `لديك طلب حجز جديد لـ ${item.name} من العميل ${guestName}.`,
+        title: 'طلب حجز جديد 👑',
+        message: `وصلك طلب حجز جديد لـ ${item.name} من العميل ${guestName}.`,
         type: 'booking_new',
         link: 'hall_bookings'
       }]);
 
-      toast({ title: 'تم إرسال الطلب', description: 'سيتواصل معك فريقنا قريباً لتأكيد الحجز.', variant: 'success' });
+      toast({ title: 'تم إرسال الطلب', description: 'تم تسجيل طلبك بنجاح، سيتواصل معك فريقنا قريباً.', variant: 'success' });
       setIsBookingModalOpen(false);
       onClose();
     } catch (err: any) {
       console.error(err);
-      toast({ title: 'خطأ في الحجز', description: 'فشل إتمام العملية، يرجى المحاولة لاحقاً.', variant: 'destructive' });
+      toast({ title: 'فشل الحجز', description: 'حدث خطأ تقني، يرجى المحاولة لاحقاً.', variant: 'destructive' });
     } finally { setIsBooking(false); }
   };
 
-  const { total, subtotal, vat } = calculateTotal();
+  const { total, vat } = calculateTotal();
 
   return (
     <div className="fixed inset-0 z-[200] bg-background flex flex-col overflow-hidden animate-in fade-in duration-700 font-sans text-foreground">
@@ -192,7 +189,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                   <span className="bg-primary/5 text-primary px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border border-primary/10 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> قاعة ملكية</span>
                   <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10"><Star className="w-4 h-4 fill-current" /><span className="text-[10px] font-bold tracking-widest uppercase">4.9 تقييم</span></div>
                 </div>
-                <h1 className="text-xl font-bold text-gray-900 leading-tight">{item.name}</h1>
+                <h1 className="text-2xl font-bold text-gray-900 leading-tight">{item.name}</h1>
                 <div className="flex flex-wrap items-center gap-8 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                   <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-primary/60" /> {isHall ? hall?.city : item.vendor?.business_name}</span>
                   {isHall && <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary/60" /> {hall?.capacity} ضيف</span>}
@@ -264,24 +261,19 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                                  <span className="text-red-500 font-bold text-[10px]">غير متاح</span>
                                ) : null}
                             </h5>
-                            <div className="flex justify-center rounded-[2rem] overflow-hidden">
-                              <Calendar 
-                                mode="single" 
-                                selected={bookingDate} 
-                                onSelect={setBookingDate} 
-                                disabled={(date) => date < new Date() || blockedDates.includes(format(date, 'yyyy-MM-dd'))}
-                                locale={arSA}
-                                dir="rtl"
-                                className="w-full"
-                              />
-                            </div>
+                            <DatePicker 
+                              date={bookingDate} 
+                              setDate={setBookingDate}
+                              placeholder="اختر تاريخ الحفل"
+                              disabledDays={(date) => date < new Date() || blockedDates.includes(format(date, 'yyyy-MM-dd'))}
+                            />
                           </div>
                         )}
 
                         <div className="space-y-3 text-[11px] font-bold text-gray-500">
                            <div className="flex justify-between flex-row-reverse"><span>سعر {isHall ? 'القاعة' : 'الخدمة'}</span> <PriceTag amount={isHall ? hall!.price_per_night : service!.price} className="text-gray-900" iconSize={12} /></div>
                            {selectedServices.length > 0 && (
-                             <div className="flex justify-between flex-row-reverse"><span>الخدمات الإضافية</span> <PriceTag amount={vendorServices.filter(s => selectedServices.includes(s.id)).reduce((sum, s) => sum + Number(s.price), 0)} className="text-gray-900" iconSize={12} /></div>
+                             <div className="flex justify-between flex-row-reverse"><span>الخدمات الإضافية</span> <PriceTag amount={vendorServices.filter(s => selectedServices.includes(s.id)).reduce((sum, sumS) => sum + Number(sumS.price), 0)} className="text-gray-900" iconSize={12} /></div>
                            )}
                            <div className="flex justify-between flex-row-reverse text-gray-400"><span>ضريبة القيمة المضافة (15%)</span> <PriceTag amount={vat} className="text-gray-400 font-bold" iconSize={12} /></div>
                         </div>
