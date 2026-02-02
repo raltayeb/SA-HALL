@@ -32,7 +32,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
   const [guestName, setGuestName] = useState(user?.full_name || '');
   const [guestPhone, setGuestPhone] = useState(user?.phone_number || '');
   const [isChecking, setIsChecking] = useState(false);
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(true);
   const [isBooking, setIsBooking] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -59,13 +59,26 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
   const checkAvailability = useCallback(async () => {
     if (!bookingDate || !isHall) return;
     const dateStr = format(bookingDate, 'yyyy-MM-dd');
+    
+    if (blockedDates.includes(dateStr)) {
+        setIsAvailable(false);
+        return;
+    }
+
     setIsChecking(true);
     try {
-      const { data: existingBooking } = await supabase.from('bookings').select('id').eq('hall_id', item.id).eq('booking_date', dateStr).neq('status', 'cancelled').maybeSingle();
-      const isBlocked = blockedDates.includes(dateStr);
-      setIsAvailable(!existingBooking && !isBlocked);
+      const { data: existingBooking } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('hall_id', item.id)
+        .eq('booking_date', dateStr)
+        .neq('status', 'cancelled')
+        .maybeSingle();
+
+      setIsAvailable(!existingBooking);
     } catch (e) {
       console.error(e);
+      setIsAvailable(true); 
     } finally {
       setIsChecking(false);
     }
@@ -93,31 +106,34 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     return { subtotal, vat, total: subtotal + vat };
   };
 
-  const handleBookingClick = () => {
+  const handleBookingClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
     if (!user) {
       toast({ 
         title: 'يجب تسجيل الدخول', 
-        description: 'يرجى تسجيل الدخول أو إنشاء حساب لإتمام عملية الحجز.', 
+        description: 'يرجى تسجيل الدخول أولاً لإتمام عملية الحجز.', 
         variant: 'destructive' 
       });
-      // In a real app, you might trigger onLoginClick() passed via props
       return;
     }
+    
+    if (isAvailable === false) {
+        toast({ title: 'عذراً', description: 'هذا التاريخ محجوز بالفعل.', variant: 'destructive' });
+        return;
+    }
+
     setIsBookingModalOpen(true);
   };
 
   const handleBookingSubmission = async () => {
     if (!user) return;
     if (!guestName || !guestPhone) {
-      toast({ title: 'تنبيه', description: 'يرجى إدخال الاسم ورقم الهاتف.', variant: 'destructive' });
+      toast({ title: 'تنبيه', description: 'يرجى إدخال كافة البيانات المطلوبة.', variant: 'destructive' });
       return;
     }
     if (!bookingDate) {
-      toast({ title: 'تنبيه', description: 'يرجى اختيار تاريخ الحجز.', variant: 'destructive' });
-      return;
-    }
-    if (isAvailable === false) {
-      toast({ title: 'عذراً', description: 'هذا التاريخ غير متاح للحجز.', variant: 'destructive' });
+      toast({ title: 'تنبيه', description: 'يرجى اختيار تاريخ المناسبة.', variant: 'destructive' });
       return;
     }
 
@@ -129,18 +145,17 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       const { error: bookingError } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: !isHall ? service!.id : null,
-        user_id: user.id, // Must be the authenticated user's ID to pass RLS
+        user_id: user.id,
         vendor_id: item.vendor_id,
         booking_date: dateStr,
         total_amount: total,
         vat_amount: vat,
         status: 'pending',
-        notes: `العميل: ${guestName} | هاتف: ${guestPhone}`
+        notes: `الاسم: ${guestName} | الجوال: ${guestPhone}`
       }]);
 
       if (bookingError) throw bookingError;
 
-      // Notify Vendor
       await supabase.from('notifications').insert([{
         user_id: item.vendor_id,
         title: 'حجز ملكي جديد 👑',
@@ -151,7 +166,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
       toast({ 
         title: 'تم إرسال الطلب', 
-        description: 'تم تسجيل حجزك بنجاح، سيقوم فريقنا بالتواصل معك قريباً.', 
+        description: 'تم تسجيل طلب حجزك بنجاح، سيقوم البائع بالتواصل معك.', 
         variant: 'success' 
       });
       setIsBookingModalOpen(false);
@@ -160,7 +175,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       console.error('Booking Error:', err);
       toast({ 
         title: 'خطأ في الحجز', 
-        description: err.message || 'حدث خطأ أثناء معالجة طلبك.', 
+        description: err.message || 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.', 
         variant: 'destructive' 
       });
     } finally {
@@ -292,7 +307,6 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                               date={bookingDate} 
                               setDate={setBookingDate}
                               placeholder="اختر تاريخ الحفل"
-                              disabledDays={(date) => date < new Date() || blockedDates.includes(format(date, 'yyyy-MM-dd'))}
                             />
                           </div>
                         )}
@@ -331,9 +345,9 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       </div>
 
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-[300] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
+        <div className="fixed inset-0 z-[500] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
            <div className="w-full max-w-xl bg-white rounded-[3rem] shadow-2xl relative border border-gray-100 overflow-hidden flex flex-col animate-in zoom-in-95">
-              <button onClick={() => setIsBookingModalOpen(false)} className="absolute top-10 end-10 p-4 hover:bg-gray-50 rounded-2xl transition-all z-50 text-gray-400"><X className="w-6 h-6" /></button>
+              <button onClick={() => setIsBookingModalOpen(false)} className="absolute top-10 end-10 p-4 hover:bg-gray-50 rounded-2xl transition-all z-[550] text-gray-400"><X className="w-6 h-6" /></button>
               <div className="p-12 space-y-12 text-right">
                  <div className="space-y-4">
                     <div className="w-16 h-16 bg-primary/5 rounded-[1.5rem] flex items-center justify-center text-primary border border-primary/10">
