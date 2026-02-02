@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, POSItem, Hall } from '../types';
@@ -6,7 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Search, PlusCircle, Building2, Loader2, Inventory, Receipt } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, Package, Search, PlusCircle, Building2, Loader2, Receipt } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {

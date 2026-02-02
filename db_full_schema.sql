@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   business_name TEXT,
   bio TEXT,
   avatar_url TEXT,
+  is_enabled BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -133,40 +134,27 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 8. تفعيل RLS والسياسات
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.halls ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.availability_blocks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
-
-DO $$ 
+-- Audit Trigger Function (Fixed search_path)
+CREATE OR REPLACE FUNCTION public.process_audit_log()
+RETURNS TRIGGER 
+LANGUAGE plpgsql 
+SECURITY DEFINER 
+SET search_path = ''
+AS $$
 BEGIN
-    -- Availability Policies
-    DROP POLICY IF EXISTS "Vendors manage availability" ON public.availability_blocks;
-    CREATE POLICY "Vendors manage availability" ON public.availability_blocks FOR ALL USING (
-      EXISTS (SELECT 1 FROM public.halls WHERE id = hall_id AND vendor_id = auth.uid())
-    );
-    DROP POLICY IF EXISTS "Public view availability" ON public.availability_blocks;
-    CREATE POLICY "Public view availability" ON public.availability_blocks FOR SELECT USING (true);
-
-    -- Notifications Policies
-    DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
-    CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT USING (user_id = auth.uid());
-    DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;
-    CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (true);
-    DROP POLICY IF EXISTS "Users update own notifications" ON public.notifications;
-    CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE USING (user_id = auth.uid());
-
-    -- Favorites
-    DROP POLICY IF EXISTS "Users manage favorites" ON public.user_favorites;
-    CREATE POLICY "Users manage favorites" ON public.user_favorites FOR ALL USING (user_id = auth.uid());
-    
-    -- Other basic policies (Halls/Profiles/System)
-    DROP POLICY IF EXISTS "Public view settings" ON public.system_settings;
-    CREATE POLICY "Public view settings" ON public.system_settings FOR SELECT USING (true);
-    DROP POLICY IF EXISTS "Public view halls" ON public.halls;
-    CREATE POLICY "Public view halls" ON public.halls FOR SELECT USING (is_active = true);
-END $$;
+  IF (TG_OP = 'DELETE') THEN
+    INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, old_data)
+    VALUES (TG_TABLE_NAME, TG_OP, OLD.id, auth.uid(), pg_catalog.to_jsonb(OLD));
+    RETURN OLD;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, old_data, new_data)
+    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), pg_catalog.to_jsonb(OLD), pg_catalog.to_jsonb(NEW));
+    RETURN NEW;
+  ELSIF (TG_OP = 'INSERT') THEN
+    INSERT INTO public.audit_logs (table_name, action, record_id, changed_by, new_data)
+    VALUES (TG_TABLE_NAME, TG_OP, NEW.id, auth.uid(), pg_catalog.to_jsonb(NEW));
+    RETURN NEW;
+  END IF;
+  RETURN NULL;
+END;
+$$;

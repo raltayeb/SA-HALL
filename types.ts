@@ -1,4 +1,3 @@
-
 export type Role = 'super_admin' | 'vendor' | 'user';
 
 export interface UserProfile {
@@ -96,6 +95,7 @@ export interface Booking {
   profiles?: UserProfile;
   services?: Service;
   client?: UserProfile;
+  vendor?: UserProfile;
 }
 
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'];
