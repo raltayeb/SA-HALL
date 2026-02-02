@@ -35,7 +35,6 @@ const App: React.FC = () => {
   const [regStep, setRegStep] = useState(1);
   const lastFetchedUserId = useRef<string | null>(null);
 
-  // Vendor Plan State
   const [plannedHalls, setPlannedHalls] = useState(1);
   const [plannedServices, setPlannedServices] = useState(0);
   
@@ -56,7 +55,6 @@ const App: React.FC = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [isRegister, setIsRegister] = useState(false);
-  const [role, setRole] = useState('vendor');
 
   const fetchSiteSettings = async () => {
     try {
@@ -71,7 +69,6 @@ const App: React.FC = () => {
       if (data) {
         setUserProfile(data as UserProfile);
         lastFetchedUserId.current = userId;
-        // If logged in, go to dashboard
         if (activeTab === 'home') {
           setActiveTab('dashboard');
         }
@@ -99,7 +96,7 @@ const App: React.FC = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isRegister && role === 'vendor' && regStep === 1) {
+    if (isRegister && regStep === 1) {
       setRegStep(2);
       return;
     }
@@ -112,7 +109,7 @@ const App: React.FC = () => {
           options: { data: { full_name: fullName, role: 'vendor', is_enabled: true } } 
         });
         if (error) throw error;
-        toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني.', variant: 'default' });
+        toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني لتنشيط حسابك كبائع.', variant: 'default' });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -136,9 +133,8 @@ const App: React.FC = () => {
     setActiveTab('browse');
   };
 
-  const openAuth = (mode: 'login' | 'register', targetRole: string = 'vendor') => {
+  const openAuth = (mode: 'login' | 'register') => {
     setIsRegister(mode === 'register');
-    setRole(targetRole);
     setRegStep(1);
     setShowAuthModal(true);
   };
@@ -171,7 +167,7 @@ const App: React.FC = () => {
              
              <div className="text-center space-y-4 mb-8">
                 <div className="text-6xl font-ruqaa text-primary mx-auto">القاعة</div>
-                <h2 className="text-3xl font-black text-gray-900">
+                <h2 className="text-3xl font-bold text-gray-900">
                   {isRegister ? (regStep === 1 ? 'انضم كشريك نجاح' : 'اختر خطة الاشتراك') : 'بوابة الشركاء'}
                 </h2>
                 <p className="text-sm text-gray-400 font-bold">
@@ -186,7 +182,7 @@ const App: React.FC = () => {
                     <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none shadow-inner" />
                     <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none shadow-inner" />
                     
-                    <Button type="submit" className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
+                    <Button type="submit" className="w-full h-16 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
                       {authLoading ? <Loader2 className="animate-spin" /> : (isRegister ? 'التالي: اختيار الخطة' : 'دخول المنصة')}
                     </Button>
                   </>
@@ -194,20 +190,20 @@ const App: React.FC = () => {
                   <div className="space-y-8 animate-in slide-in-from-left-4">
                     <div className="grid grid-cols-2 gap-4">
                        <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-2 justify-end">عدد القاعات <Building2 className="w-3.5 h-3.5" /></label>
+                          <label className="text-[10px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end">عدد القاعات <Building2 className="w-3.5 h-3.5" /></label>
                           <div className="flex items-center bg-gray-50 rounded-2xl p-2 border border-gray-100 shadow-inner">
-                             <button type="button" onClick={() => setPlannedHalls(Math.max(1, plannedHalls-1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-black">-</button>
-                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-xl" value={plannedHalls} />
-                             <button type="button" onClick={() => setPlannedHalls(plannedHalls+1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-black">+</button>
+                             <button type="button" onClick={() => setPlannedHalls(Math.max(1, plannedHalls-1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-bold">-</button>
+                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-bold text-xl" value={plannedHalls} />
+                             <button type="button" onClick={() => setPlannedHalls(plannedHalls+1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-bold">+</button>
                           </div>
                           <p className="text-[9px] text-center text-gray-400 font-bold">500 ر.س / لكل قاعة</p>
                        </div>
                        <div className="space-y-3">
-                          <label className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-2 justify-end">عدد الخدمات <Sparkles className="w-3.5 h-3.5" /></label>
+                          <label className="text-[10px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end">عدد الخدمات <Sparkles className="w-3.5 h-3.5" /></label>
                           <div className="flex items-center bg-gray-50 rounded-2xl p-2 border border-gray-100 shadow-inner">
-                             <button type="button" onClick={() => setPlannedServices(Math.max(0, plannedServices-1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-black">-</button>
-                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-xl" value={plannedServices} />
-                             <button type="button" onClick={() => setPlannedServices(plannedServices+1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-black">+</button>
+                             <button type="button" onClick={() => setPlannedServices(Math.max(0, plannedServices-1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-bold">-</button>
+                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-bold text-xl" value={plannedServices} />
+                             <button type="button" onClick={() => setPlannedServices(plannedServices+1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center font-bold">+</button>
                           </div>
                           <p className="text-[9px] text-center text-gray-400 font-bold">300 ر.س / لكل خدمة</p>
                        </div>
@@ -215,21 +211,17 @@ const App: React.FC = () => {
 
                     <div className="bg-primary/5 p-8 rounded-[2rem] border border-primary/10 space-y-6">
                        <div className="flex justify-between items-center flex-row-reverse">
-                          <span className="text-xs font-black text-gray-500 uppercase tracking-widest">إجمالي التكلفة</span>
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">إجمالي التكلفة</span>
                           <div className="flex items-center gap-2">
-                             <span className="text-4xl font-black text-primary">{planTotal}</span>
+                             <span className="text-4xl font-bold text-primary">{planTotal}</span>
                              <span className="text-xs font-bold text-primary">ر.س</span>
                           </div>
                        </div>
-                       <ul className="space-y-3">
-                          <li className="flex items-center justify-end gap-2 text-[10px] font-bold text-primary/70"><CheckCircle2 className="w-3 h-3" /> دفع لمرة واحدة</li>
-                          <li className="flex items-center justify-end gap-2 text-[10px] font-bold text-primary/70"><CheckCircle2 className="w-3 h-3" /> لوحة تحكم بائع متكاملة</li>
-                       </ul>
                     </div>
 
                     <div className="flex gap-4">
-                      <Button type="button" variant="outline" onClick={() => setRegStep(1)} className="flex-1 h-14 rounded-2xl font-black border-gray-100">رجوع</Button>
-                      <Button type="submit" className="flex-[2] h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
+                      <Button type="button" variant="outline" onClick={() => setRegStep(1)} className="flex-1 h-14 rounded-2xl font-bold border-gray-100">رجوع</Button>
+                      <Button type="submit" className="flex-[2] h-14 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
                         {authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}
                       </Button>
                     </div>
@@ -239,7 +231,7 @@ const App: React.FC = () => {
 
              <button 
                 onClick={() => { setIsRegister(!isRegister); setRegStep(1); }} 
-                className="w-full mt-8 text-[11px] font-black text-primary hover:underline uppercase tracking-widest flex items-center justify-center gap-2"
+                className="w-full mt-8 text-[11px] font-bold text-primary hover:underline uppercase tracking-widest flex items-center justify-center gap-2"
              >
                 {isRegister ? 'لديك حساب بائع؟ سجل دخول' : 'ليس لديك حساب؟ انضم كشريك الآن'}
                 <ChevronRight className="w-3.5 h-3.5 rotate-180" />
@@ -260,8 +252,8 @@ const App: React.FC = () => {
 
           {activeTab === 'home' && (
             <Home 
-              user={userProfile} onLoginClick={() => openAuth('login', 'vendor')} 
-              onRegisterClick={() => openAuth('register', 'vendor')}
+              user={userProfile} onLoginClick={() => openAuth('login')} 
+              onRegisterClick={() => openAuth('register')}
               onBrowseHalls={handleBrowseHalls}
               onBrowseServices={() => { setActiveTab('browse'); setBrowseMode('services'); }}
               onNavigate={setActiveTab} onLogout={handleLogout}

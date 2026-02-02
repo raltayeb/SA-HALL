@@ -123,7 +123,6 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       }]);
 
       if (error) throw error;
-
       toast({ title: 'تم إرسال الطلب', description: 'سيتواصل معك فريقنا قريباً لتأكيد الحجز.', variant: 'success' });
       setIsBookingModalOpen(false);
       onClose();
@@ -148,7 +147,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
          </div>
          <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" className="rounded-2xl w-12 h-12 border-gray-100"><Share2 className="w-5 h-5 text-muted-foreground" /></Button>
-            <Button onClick={() => setIsBookingModalOpen(true)} className="rounded-2xl px-10 h-12 font-black shadow-xl shadow-primary/20 text-lg">احجز الآن</Button>
+            <Button onClick={() => setIsBookingModalOpen(true)} className="rounded-2xl px-10 h-12 font-bold shadow-xl shadow-primary/20 text-lg">احجز الآن</Button>
          </div>
       </header>
 
@@ -177,11 +176,10 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
             <div className="lg:col-span-7 space-y-12 text-start">
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center gap-4">
-                  <span className="bg-primary/5 text-primary px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-primary/10 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> قاعة ملكية</span>
-                  <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10"><Star className="w-4 h-4 fill-current" /><span className="text-[10px] font-black tracking-widest uppercase">4.9 تقييم</span></div>
+                  <span className="bg-primary/5 text-primary px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border border-primary/10 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> قاعة ملكية</span>
+                  <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10"><Star className="w-4 h-4 fill-current" /><span className="text-[10px] font-bold tracking-widest uppercase">4.9 تقييم</span></div>
                 </div>
-                {/* Normalized font size for hall name */}
-                <h1 className="text-2xl font-bold text-gray-900 leading-tight">{item.name}</h1>
+                <h1 className="text-xl font-bold text-gray-900 leading-tight">{item.name}</h1>
                 <div className="flex flex-wrap items-center gap-8 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                   <span className="flex items-center gap-2"><MapPin className="w-4 h-4 text-primary/60" /> {isHall ? hall?.city : item.vendor?.business_name}</span>
                   {isHall && <span className="flex items-center gap-2"><Users className="w-4 h-4 text-primary/60" /> {hall?.capacity} ضيف</span>}
@@ -190,12 +188,12 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
               <div className="space-y-10 text-right">
                 <div>
-                  <h3 className="text-lg font-bold mb-4">وصف المكان</h3>
+                  <h3 className="text-lg font-bold mb-4 text-gray-900">وصف المكان</h3>
                   <p className="text-base text-gray-500 leading-relaxed font-medium">{item.description || "نقدم لكم تجربة استثنائية في عالم المناسبات الفاخرة."}</p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-bold mb-4">المميزات والمرافق</h3>
+                  <h3 className="text-lg font-bold mb-4 text-gray-900">المميزات والمرافق</h3>
                   <div className="flex flex-wrap gap-3">
                     {(isHall ? (hall?.amenities?.length ? hall.amenities : HALL_AMENITIES) : ['جودة عالية', 'فريق محترف']).map((amenity, i) => (
                       <Badge key={i} variant="default" className="px-4 py-2 rounded-xl text-[11px] font-bold bg-primary/5 border-primary/10 text-primary">{amenity}</Badge>
@@ -205,7 +203,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
                 {isHall && (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-bold">خدمات إضافية متاحة</h3>
+                    <h3 className="text-lg font-bold text-gray-900">خدمات إضافية متاحة</h3>
                     <div className="grid sm:grid-cols-2 gap-4">
                       {vendorServices.length === 0 ? (
                         <p className="text-sm text-gray-400 italic">لا توجد خدمات إضافية حالياً.</p>
@@ -216,7 +214,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                                  {selectedServices.includes(s.id) && <Check className="w-3.5 h-3.5 text-white" />}
                               </div>
                               <div className="text-right">
-                                 <p className="text-sm font-bold">{s.name}</p>
+                                 <p className="text-sm font-bold text-gray-900">{s.name}</p>
                                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{s.category}</p>
                               </div>
                            </div>
@@ -235,25 +233,25 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                      <div className="space-y-6 text-right">
                         <div className="flex justify-between items-center border-b border-gray-50 pb-6 flex-row-reverse">
                            <div className="space-y-1">
-                              <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">إجمالي الحجز</h5>
+                              <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">إجمالي الحجز</h5>
                               <PriceTag amount={total} className="text-3xl text-gray-900 justify-end" />
                            </div>
-                           <div className="bg-primary/5 text-primary px-3 py-1.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 border border-primary/10">متاح الآن</div>
+                           <div className="bg-primary/5 text-primary px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase flex items-center gap-2 border border-primary/10">متاح الآن</div>
                         </div>
 
                         {isHall && (
-                          <div className="space-y-3">
-                            <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center justify-between flex-row-reverse">
+                          <div className="space-y-4">
+                            <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] flex items-center justify-between flex-row-reverse">
                                <span>تاريخ المناسبة</span>
                                {isChecking ? (
-                                 <span className="flex items-center gap-1 text-primary animate-pulse flex-row-reverse"><Loader2 className="w-3 h-3 animate-spin" /> جاري التحقق...</span>
+                                 <span className="flex items-center gap-1 text-primary animate-pulse flex-row-reverse text-[10px]"><Loader2 className="w-3 h-3 animate-spin" /> جاري التحقق...</span>
                                ) : isAvailable === true ? (
-                                 <span className="text-green-600 flex items-center gap-1 flex-row-reverse"><CheckCircle2 className="w-3 h-3" /> متاح للحجز</span>
+                                 <span className="text-green-600 flex items-center gap-1 flex-row-reverse text-[10px]"><CheckCircle2 className="w-3 h-3" /> متاح للحجز</span>
                                ) : isAvailable === false ? (
                                  <span className="text-red-500 font-bold text-[10px]">غير متاح</span>
                                ) : null}
                             </h5>
-                            <div className="bg-gray-50 p-2 rounded-2xl border border-gray-100 shadow-inner flex justify-center scale-90 origin-top">
+                            <div className="flex justify-center">
                               <Calendar 
                                 mode="single" 
                                 selected={bookingDate} 
@@ -261,6 +259,8 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                                 disabled={(date) => date < new Date() || blockedDates.includes(format(date, 'yyyy-MM-dd'))}
                                 locale={arSA}
                                 dir="rtl"
+                                className="w-full"
+                                captionLayout="dropdown"
                               />
                             </div>
                           </div>
@@ -278,17 +278,16 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                      <div className="space-y-4">
                         <Button 
                           onClick={() => setIsBookingModalOpen(true)} 
-                          className={`w-full h-16 rounded-2xl font-black text-xl transition-all ${isAvailable === false ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-2xl shadow-primary/20 hover:scale-[1.02]'}`}
+                          className={`w-full h-16 rounded-2xl font-bold text-xl transition-all ${isAvailable === false ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-2xl shadow-primary/20 hover:scale-[1.02]'}`}
                           disabled={isHall && isAvailable === false}
                         >
                           {isHall && isAvailable === false ? 'التاريخ محجوز' : 'تأكيد طلب الحجز'} <Zap className="w-5 h-5 ms-3 fill-current" />
                         </Button>
-                        <p className="text-[9px] text-center text-gray-400 font-bold px-4 leading-relaxed tracking-wider uppercase">سيتواصل معك مدير القاعة قريباً لتأكيد موعدك.</p>
                      </div>
 
                      <div className="bg-gray-50 border border-gray-100 p-5 rounded-2xl space-y-2">
                         <div className="flex items-center gap-2 justify-end">
-                           <h5 className="text-[10px] font-black text-gray-900 uppercase">نظام حماية الحجوزات</h5>
+                           <h5 className="text-[10px] font-bold text-gray-900 uppercase">نظام حماية الحجوزات</h5>
                            <ShieldCheck className="w-4 h-4 text-primary" />
                         </div>
                         <p className="text-[10px] font-bold text-gray-400 text-right leading-tight">نضمن لك أفضل جودة وخدمة متكاملة لمناسبتك الخاصة.</p>
@@ -310,14 +309,14 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                        <CalendarIcon className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase leading-none">تفاصيل الحجز</h2>
+                      <h2 className="text-3xl font-bold text-gray-900 tracking-tighter uppercase leading-none">تفاصيل الحجز</h2>
                       <p className="text-gray-400 font-bold text-sm mt-2">أكمل بياناتك لنقوم بتخصيص التجربة المثالية لمناسبتك.</p>
                     </div>
                  </div>
                  <div className="space-y-8">
                     <div className="space-y-3">
-                       <label className="text-[11px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-3 justify-end">التاريخ المستهدف <Sparkles className="w-4 h-4 text-primary" /></label>
-                       <div className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-8 flex items-center justify-end font-black text-xl text-gray-900">
+                       <label className="text-[11px] font-bold uppercase text-gray-400 tracking-widest flex items-center gap-3 justify-end">التاريخ المستهدف <Sparkles className="w-4 h-4 text-primary" /></label>
+                       <div className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-8 flex items-center justify-end font-bold text-xl text-gray-900">
                          {bookingDate ? format(bookingDate, 'dd MMMM yyyy', { locale: arSA }) : 'لم يتم اختيار تاريخ'}
                        </div>
                     </div>
@@ -325,7 +324,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                        <Input placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestName} onChange={e => setGuestName(e.target.value)} />
                        <Input placeholder="رقم الجوال" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} />
                     </div>
-                    <Button onClick={handleBooking} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-black text-xl shadow-xl shadow-primary/20">
+                    <Button onClick={handleBooking} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-bold text-xl shadow-xl shadow-primary/20">
                       {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : 'إرسال طلب الحجز الملكي'}
                     </Button>
                  </div>
