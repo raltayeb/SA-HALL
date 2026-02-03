@@ -129,7 +129,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       </header>
 
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden px-6 lg:px-20">
+      <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden px-6 lg:px-20 w-full">
         <div className="absolute inset-0 z-0">
           <img 
             src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=2000" 
@@ -223,104 +223,108 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       </section>
 
       {/* Popular Listing - 3x3 Grid Section */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24 space-y-16 overflow-hidden">
-        <div className="flex flex-col items-center text-center space-y-3">
-          <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-            <Sparkles className="w-4 h-4 fill-current" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">مختاراتنا لك</span>
+      <section className="w-full py-24 space-y-16 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 lg:px-20">
+          <div className="flex flex-col items-center text-center space-y-3 mb-16">
+            <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
+              <Sparkles className="w-4 h-4 fill-current" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">مختاراتنا لك</span>
+            </div>
+            <h2 className="text-4xl font-black tracking-tight text-[#111827]">أبرز القاعات المتاحة</h2>
+            <div className="w-16 h-1 bg-primary rounded-full"></div>
           </div>
-          <h2 className="text-4xl font-black tracking-tight text-[#111827]">أبرز القاعات المتاحة</h2>
-          <div className="w-16 h-1 bg-primary rounded-full"></div>
-        </div>
 
-        {/* Listings Grid - 3 columns, 3 rows */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {loadingHalls ? (
-            Array.from({length: 9}).map((_, i) => (
-              <div key={i} className="aspect-[4/5] bg-gray-100 animate-pulse rounded-[2.5rem]"></div>
-            ))
-          ) : (
-            halls.map((hall) => (
-              <div 
-                key={hall.id} 
-                onClick={() => setSelectedEntity({ item: hall, type: 'hall' })} 
-                className="group relative cursor-pointer text-right transition-all duration-500 hover:-translate-y-2"
-              >
-                {/* Clean Creative Card */}
-                <div className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all">
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <img 
-                      src={hall.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                      alt={hall.name} 
-                    />
-                    <div className="absolute top-4 right-4 bg-primary text-white px-4 py-1 rounded-xl text-[10px] font-black shadow-lg">مميز</div>
-                    <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-lg text-[9px] font-black text-primary border border-white/50 shadow-sm">متاح للحجز</div>
-                  </div>
-
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-start flex-row-reverse">
-                       <div className="space-y-0.5 text-right">
-                          <h3 className="text-xl font-black text-[#111827] group-hover:text-primary transition-colors truncate max-w-[180px]">{hall.name}</h3>
-                          <div className="flex items-center justify-end gap-1 text-gray-400 font-bold text-xs">
-                             <span>{hall.city}, السعودية</span>
-                             <MapPin className="w-3 h-3 text-primary/60" />
-                          </div>
-                       </div>
-                       <div className="text-left shrink-0">
-                          <div className="flex items-center gap-1 text-primary text-xl font-black">
-                            <span>{new Intl.NumberFormat('en-US').format(hall.price_per_night)}</span>
-                            <SaudiRiyalIcon size={16} />
-                          </div>
-                       </div>
+          {/* Listings Grid - 3 columns, 3 rows */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {loadingHalls ? (
+              Array.from({length: 9}).map((_, i) => (
+                <div key={i} className="aspect-[4/5] bg-gray-100 animate-pulse rounded-[2.5rem]"></div>
+              ))
+            ) : (
+              halls.map((hall) => (
+                <div 
+                  key={hall.id} 
+                  onClick={() => setSelectedEntity({ item: hall, type: 'hall' })} 
+                  className="group relative cursor-pointer text-right transition-all duration-500 hover:-translate-y-2"
+                >
+                  {/* Clean Creative Card */}
+                  <div className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all">
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <img 
+                        src={hall.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                        alt={hall.name} 
+                      />
+                      <div className="absolute top-4 right-4 bg-primary text-white px-4 py-1 rounded-xl text-[10px] font-black shadow-lg">مميز</div>
+                      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-lg text-[9px] font-black text-primary border border-white/50 shadow-sm">متاح للحجز</div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50">
-                       <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                          <span>{hall.capacity} ضيف</span>
-                          <Users className="w-4 h-4 text-primary/70" />
-                       </div>
-                       <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-r border-gray-50 pr-3">
-                          <span>4.9 تقييم</span>
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                       </div>
+                    <div className="p-6 space-y-4">
+                      <div className="flex justify-between items-start flex-row-reverse">
+                         <div className="space-y-0.5 text-right">
+                            <h3 className="text-xl font-black text-[#111827] group-hover:text-primary transition-colors truncate max-w-[180px]">{hall.name}</h3>
+                            <div className="flex items-center justify-end gap-1 text-gray-400 font-bold text-xs">
+                               <span>{hall.city}, السعودية</span>
+                               <MapPin className="w-3 h-3 text-primary/60" />
+                            </div>
+                         </div>
+                         <div className="text-left shrink-0">
+                            <div className="flex items-center gap-1 text-primary text-xl font-black">
+                              <span>{new Intl.NumberFormat('en-US').format(hall.price_per_night)}</span>
+                              <SaudiRiyalIcon size={16} />
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-50">
+                         <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                            <span>{hall.capacity} ضيف</span>
+                            <Users className="w-4 h-4 text-primary/70" />
+                         </div>
+                         <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-r border-gray-50 pr-3">
+                            <span>4.9 تقييم</span>
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                         </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        <div className="text-center pt-10">
-          <Button 
-            onClick={() => onBrowseHalls()} 
-            className="rounded-full px-12 h-14 font-black bg-[#111827] text-white hover:bg-black transition-all text-lg shadow-xl"
-          >
-            استكشف كافة القاعات <ArrowLeft className="ms-2 w-5 h-5" />
-          </Button>
+              ))
+            )}
+          </div>
+          
+          <div className="text-center pt-10">
+            <Button 
+              onClick={() => onBrowseHalls()} 
+              className="rounded-full px-12 h-14 font-black bg-[#111827] text-white hover:bg-black transition-all text-lg shadow-xl"
+            >
+              استكشف كافة القاعات <ArrowLeft className="ms-2 w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </section>
 
       {/* Video Highlight Section */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-20 py-24">
-        <div className="relative aspect-video rounded-[3rem] overflow-hidden shadow-2xl group border border-gray-100">
-          <img 
-            src="https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=2000" 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2000ms]" 
-            alt="Wedding Highlights" 
-          />
-          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-            <button className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-2xl border border-white/40 flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-all active:scale-95 group">
-              <Play className="w-10 h-10 fill-current ms-1" />
-              <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
-            </button>
+      <section className="w-full py-24">
+        <div className="max-w-7xl mx-auto px-6 lg:px-20">
+          <div className="relative aspect-video rounded-[3rem] overflow-hidden shadow-2xl group border border-gray-100">
+            <img 
+              src="https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=2000" 
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[2000ms]" 
+              alt="Wedding Highlights" 
+            />
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+              <button className="w-24 h-24 rounded-full bg-white/20 backdrop-blur-2xl border border-white/40 flex items-center justify-center text-white shadow-2xl hover:scale-110 transition-all active:scale-95 group">
+                <Play className="w-10 h-10 fill-current ms-1" />
+                <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* How it Works - Refined */}
-      <section className="bg-white border-y border-gray-100 py-32 overflow-hidden text-right">
+      <section className="w-full bg-white border-y border-gray-100 py-32 overflow-hidden text-right">
         <div className="max-w-7xl mx-auto px-6 lg:px-20 space-y-24">
           <div className="text-center space-y-4">
             <h2 className="text-4xl font-black tracking-tighter">كيف تعمل المنصة؟</h2>
@@ -372,7 +376,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       </section>
 
       {/* Simplified Why Choose Us Section */}
-      <section className="bg-gray-50 py-32 overflow-hidden text-right">
+      <section className="w-full bg-gray-50 py-32 overflow-hidden text-right">
         <div className="max-w-7xl mx-auto px-6 lg:px-20">
           <div className="flex flex-col md:flex-row-reverse justify-between items-start gap-20">
             <div className="space-y-12 max-w-xl">
@@ -422,7 +426,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       </section>
 
       {/* Testimonials */}
-      <section className="bg-white py-32 border-y border-gray-100 text-right">
+      <section className="w-full bg-white py-32 border-y border-gray-100 text-right">
         <div className="max-w-7xl mx-auto px-6 lg:px-20 space-y-16">
           <div className="text-center space-y-4">
             <span className="text-primary text-[10px] font-black uppercase tracking-[0.4em]">Testimonials</span>
@@ -452,7 +456,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       </section>
 
       {/* Footer & Refined CTA - Corrected with wedding theme and logical colors */}
-      <footer className="px-6 lg:px-20 py-32 bg-[#111827] text-white text-right relative overflow-hidden">
+      <footer className="w-full px-6 lg:px-20 py-32 bg-[#111827] text-white text-right relative overflow-hidden">
         {/* CORRECTED: High quality wedding background overlay */}
         <div className="absolute inset-0 opacity-20">
            <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000" className="w-full h-full object-cover" alt="Wedding Background" />

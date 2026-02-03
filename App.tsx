@@ -296,21 +296,24 @@ const App: React.FC = () => {
       )}
 
       <main className={`${!isMarketplace && userProfile ? 'lg:pr-[280px]' : ''}`}>
-        <div className="mx-auto w-full p-6 lg:p-10">
-          {activeTab === 'home' && (
+        {activeTab === 'home' ? (
+          <div className="w-full">
             <Home 
               user={userProfile} onLoginClick={() => openAuth('login')} 
               onRegisterClick={() => openAuth('register')}
               onBrowseHalls={() => {}} onBrowseServices={() => {}}
               onNavigate={setActiveTab} onLogout={() => supabase.auth.signOut()}
             />
-          )}
-          {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
-          {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
-          {activeTab === 'all_bookings' && userProfile && <Bookings user={userProfile} />}
-          {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
-          {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
-        </div>
+          </div>
+        ) : (
+          <div className="mx-auto w-full p-6 lg:p-10">
+            {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
+            {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
+            {activeTab === 'all_bookings' && userProfile && <Bookings user={userProfile} />}
+            {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
+            {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
+          </div>
+        )}
       </main>
     </div>
   );
