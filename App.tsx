@@ -104,7 +104,8 @@ const App: React.FC = () => {
     setAuthLoading(true);
     try {
       if (isRegister) {
-        const { error } = await supabase.auth.signUp({ 
+        // IMPORTANT: Data must match what handle_new_user trigger expects
+        const { error, data } = await supabase.auth.signUp({ 
           email, password, 
           options: { 
             data: { 
@@ -114,8 +115,14 @@ const App: React.FC = () => {
             } 
           } 
         });
+        
         if (error) throw error;
-        toast({ title: 'تفعيل الحساب', description: 'يرجى مراجعة بريدك الإلكتروني لتنشيط حسابك كبائع.', variant: 'default' });
+        
+        toast({ 
+          title: 'تفعيل الحساب', 
+          description: 'يرجى مراجعة بريدك الإلكتروني لتنشيط حسابك كبائع.', 
+          variant: 'default' 
+        });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -123,7 +130,11 @@ const App: React.FC = () => {
       setShowAuthModal(false);
       setRegStep(1);
     } catch (error: any) { 
-      toast({ title: 'خطأ في التسجيل', description: error.message || 'حدث خطأ غير متوقع في قاعدة البيانات', variant: 'destructive' }); 
+      toast({ 
+        title: 'فشل العملية', 
+        description: error.message || 'حدث خطأ في قاعدة البيانات، يرجى المحاولة لاحقاً', 
+        variant: 'destructive' 
+      }); 
     } finally { setAuthLoading(false); }
   };
 
@@ -169,16 +180,16 @@ const App: React.FC = () => {
       )}
 
       {showAuthModal && (
-        <div className="fixed inset-0 z-[1000] bg-black/5 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
-          <div className="w-full max-w-sm bg-white border border-gray-100 rounded-[3rem] p-8 shadow-[0_40px_80px_-20px_rgba(75,0,130,0.12)] relative animate-in zoom-in-95">
-             <button onClick={() => setShowAuthModal(false)} className="absolute top-6 left-6 p-2 hover:bg-gray-50 rounded-full transition-all text-gray-400"><X className="w-4 h-4" /></button>
+        <div className="fixed inset-0 z-[1000] bg-black/10 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in">
+          <div className="w-full max-w-[420px] bg-white border border-gray-100 rounded-[3rem] p-10 shadow-[0_50px_100px_-20px_rgba(75,0,130,0.15)] relative animate-in zoom-in-95">
+             <button onClick={() => setShowAuthModal(false)} className="absolute top-8 left-8 p-2 hover:bg-gray-50 rounded-full transition-all text-gray-300"><X className="w-5 h-5" /></button>
              
-             <div className="text-center space-y-1 mb-8">
-                <div className="text-5xl font-ruqaa text-primary mx-auto mb-2">القاعة</div>
+             <div className="text-center space-y-2 mb-10">
+                <div className="text-6xl font-ruqaa text-primary mx-auto mb-4">القاعة</div>
                 <h2 className="text-2xl font-black text-gray-900 leading-tight">
                   {isRegister ? (regStep === 1 ? 'انضم كشريك نجاح' : 'اختر خطة الاشتراك') : 'بوابة الشركاء'}
                 </h2>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
                   {isRegister ? (regStep === 1 ? 'ابدأ رحلتك معنا اليوم كبائع معتمد' : 'خصص سعتك التشغيلية على المنصة') : 'مرحباً بك مجدداً'}
                 </p>
              </div>
@@ -186,50 +197,55 @@ const App: React.FC = () => {
              <form onSubmit={handleAuth} className="space-y-6 text-right">
                 {regStep === 1 ? (
                   <div className="space-y-4">
-                    {isRegister && <Input placeholder="اسم النشاط التجاري" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-12 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />}
-                    <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />
-                    <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />
+                    {isRegister && <Input placeholder="اسم النشاط التجاري" value={fullName} onChange={e => setFullName(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />}
+                    <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />
+                    <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-14 rounded-2xl text-right font-bold bg-gray-50 border-none px-6" />
                     
-                    <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/10" disabled={authLoading}>
+                    <Button type="submit" className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/10" disabled={authLoading}>
                       {authLoading ? <Loader2 className="animate-spin w-5 h-5" /> : (isRegister ? 'التالي: اختيار الخطة' : 'دخول المنصة')}
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-8 animate-in slide-in-from-left-4">
-                    <div className="grid grid-cols-1 gap-6">
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end px-1">عدد القاعات <Building2 className="w-3 h-3" /></label>
-                          <div className="flex items-center bg-gray-50 rounded-2xl p-2 border border-gray-100 shadow-inner overflow-hidden group">
-                             <button type="button" onClick={() => setPlannedHalls(plannedHalls + 1)} className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Plus className="w-3 h-3" /></button>
-                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-xl text-gray-900 focus:ring-0" value={plannedHalls} />
-                             <button type="button" onClick={() => setPlannedHalls(Math.max(1, plannedHalls - 1))} className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Minus className="w-3 h-3" /></button>
+                  <div className="space-y-10 animate-in slide-in-from-left-4">
+                    <div className="grid grid-cols-2 gap-6">
+                       {/* Hall Counter */}
+                       <div className="space-y-3">
+                          <label className="text-[11px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end px-1">عدد القاعات <Building2 className="w-3 h-3" /></label>
+                          <div className="flex items-center bg-gray-50 rounded-[1.5rem] p-1 border border-gray-100 shadow-inner group">
+                             <button type="button" onClick={() => setPlannedHalls(plannedHalls + 1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Plus className="w-4 h-4" /></button>
+                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-2xl text-gray-900 focus:ring-0" value={plannedHalls} />
+                             <button type="button" onClick={() => setPlannedHalls(Math.max(1, plannedHalls - 1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Minus className="w-4 h-4" /></button>
                           </div>
-                          <p className="text-[9px] text-center text-gray-400 font-bold">{hallFee} ر.س / لكل قاعة</p>
+                          <p className="text-[10px] text-center text-gray-400 font-bold">{hallFee} ر.س / لكل قاعة</p>
                        </div>
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end px-1">عدد الخدمات <Sparkles className="w-3 h-3" /></label>
-                          <div className="flex items-center bg-gray-50 rounded-2xl p-2 border border-gray-100 shadow-inner overflow-hidden group">
-                             <button type="button" onClick={() => setPlannedServices(plannedServices + 1)} className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Plus className="w-3 h-3" /></button>
-                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-xl text-gray-900 focus:ring-0" value={plannedServices} />
-                             <button type="button" onClick={() => setPlannedServices(Math.max(0, plannedServices - 1))} className="w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Minus className="w-3 h-3" /></button>
+
+                       {/* Service Counter */}
+                       <div className="space-y-3">
+                          <label className="text-[11px] font-bold uppercase text-gray-400 flex items-center gap-2 justify-end px-1">عدد الخدمات <Sparkles className="w-3 h-3" /></label>
+                          <div className="flex items-center bg-gray-50 rounded-[1.5rem] p-1 border border-gray-100 shadow-inner group">
+                             <button type="button" onClick={() => setPlannedServices(plannedServices + 1)} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Plus className="w-4 h-4" /></button>
+                             <input type="number" readOnly className="flex-1 bg-transparent border-none text-center font-black text-2xl text-gray-900 focus:ring-0" value={plannedServices} />
+                             <button type="button" onClick={() => setPlannedServices(Math.max(0, plannedServices - 1))} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-primary border border-gray-100 hover:bg-primary hover:text-white transition-all"><Minus className="w-4 h-4" /></button>
                           </div>
-                          <p className="text-[9px] text-center text-gray-400 font-bold">{serviceFee} ر.س / لكل خدمة</p>
+                          <p className="text-[10px] text-center text-gray-400 font-bold">{serviceFee} ر.س / لكل خدمة</p>
                        </div>
                     </div>
 
-                    <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/5 space-y-1 text-center">
-                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي التكلفة</span>
+                    {/* Total Price Box */}
+                    <div className="bg-[#F8F4FF] p-8 rounded-[2.5rem] border border-primary/5 space-y-1 text-center shadow-inner">
+                       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">إجمالي التكلفة</span>
                        <div className="flex items-center gap-2 justify-center">
-                          <span className="text-3xl font-black text-primary leading-none">{planTotal}</span>
-                          <span className="text-sm font-bold text-primary mt-1">ر.س</span>
+                          <span className="text-4xl font-black text-primary leading-none">{planTotal}</span>
+                          <span className="text-lg font-bold text-primary mt-1">ر.س</span>
                        </div>
                     </div>
 
-                    <div className="flex gap-3">
-                      <Button type="submit" className="flex-[2] h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 text-white" disabled={authLoading}>
-                        {authLoading ? <Loader2 className="animate-spin w-5 h-5" /> : 'تأكيد ودفع'}
+                    {/* Action Buttons */}
+                    <div className="flex gap-4">
+                      <Button type="submit" className="flex-[2] h-16 rounded-2xl font-black text-xl shadow-[0_20px_40px_-10px_rgba(75,0,130,0.3)] bg-primary hover:bg-primary/90 text-white" disabled={authLoading}>
+                        {authLoading ? <Loader2 className="animate-spin w-6 h-6" /> : 'تأكيد ودفع'}
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => setRegStep(1)} className="flex-1 h-14 rounded-2xl font-bold border-gray-200 text-gray-600">رجوع</Button>
+                      <Button type="button" variant="outline" onClick={() => setRegStep(1)} className="flex-1 h-16 rounded-2xl font-black text-lg border-gray-100 text-gray-400 hover:bg-gray-50">رجوع</Button>
                     </div>
                   </div>
                 )}
@@ -237,9 +253,9 @@ const App: React.FC = () => {
 
              <button 
                 onClick={() => { setIsRegister(!isRegister); setRegStep(1); }} 
-                className="w-full mt-8 text-[10px] font-black text-primary hover:underline uppercase tracking-[0.2em] flex items-center justify-center gap-2 group"
+                className="w-full mt-10 text-[10px] font-black text-primary hover:underline uppercase tracking-[0.3em] flex items-center justify-center gap-2 group"
              >
-                <ChevronLeft className="w-3 h-3 transition-transform group-hover:-translate-x-1" />
+                <ChevronLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
                 {isRegister ? 'لديك حساب بائع؟ سجل دخول' : 'ليس لديك حساب؟ انضم كشريك الآن'}
              </button>
           </div>
