@@ -35,15 +35,16 @@ function Calendar({
         day_outside: "text-gray-300 opacity-50 pointer-events-none",
         day_disabled: "text-gray-200 opacity-30 cursor-not-allowed",
         day_hidden: "invisible",
-        // Styles for dropdown layout
         caption_dropdowns: "flex gap-2 items-center mx-auto",
         dropdown: "bg-transparent border-none text-[11px] font-bold text-gray-900 focus:ring-0 cursor-pointer p-1 hover:bg-gray-50 rounded transition-colors",
         vhidden: "hidden",
         ...classNames,
       }}
       components={{
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        Chevron: (props) => {
+          if (props.orientation === 'left') return <ChevronLeft className="h-4 w-4" />;
+          return <ChevronRight className="h-4 w-4" />;
+        }
       }}
       {...props}
     />

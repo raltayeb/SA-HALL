@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, POSItem, Hall } from '../types';
@@ -77,7 +78,6 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Inventory Section */}
         <div className="lg:col-span-2 space-y-6">
           <div className="flex justify-between items-center flex-row-reverse">
              <h3 className="font-black text-xl flex items-center gap-2">المخزون المتوفر <Package className="w-5 h-5 text-primary" /></h3>
@@ -104,7 +104,6 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Cart / Checkout Section */}
         <div className="space-y-6">
           <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-xl sticky top-24 space-y-8 ring-1 ring-black/5">
              <h3 className="text-xl font-black border-b pb-4 flex items-center justify-end gap-2">فاتورة البيع <Receipt className="w-5 h-5 text-primary" /></h3>

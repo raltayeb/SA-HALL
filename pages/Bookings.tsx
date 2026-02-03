@@ -27,7 +27,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<BookingFilter>('all');
-  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
   
   const { toast } = useToast();
 
@@ -77,7 +76,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       }]);
 
       toast({ title: 'تم التحديث', variant: 'success' });
-      setBookingToCancel(null);
       fetchBookings();
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
@@ -144,14 +142,16 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         )}
       </div>
 
-      <InvoiceModal 
-        isOpen={isInvoiceOpen} 
-        onClose={() => setIsInvoiceOpen(false)} 
-        booking={selectedBooking ? {
-          ...selectedBooking,
-          profiles: user.role === 'vendor' ? selectedBooking.client : selectedBooking.vendor
-        } : null} 
-      />
+      {selectedBooking && (
+        <InvoiceModal 
+          isOpen={isInvoiceOpen} 
+          onClose={() => setIsInvoiceOpen(false)} 
+          booking={{
+            ...selectedBooking,
+            profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)
+          }} 
+        />
+      )}
     </div>
   );
 };

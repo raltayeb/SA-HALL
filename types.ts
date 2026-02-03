@@ -1,3 +1,4 @@
+
 export type Role = 'super_admin' | 'vendor' | 'user';
 
 export interface UserProfile {
@@ -9,12 +10,18 @@ export interface UserProfile {
   bio?: string;
   avatar_url?: string;
   role: Role;
-  is_enabled: boolean; // Super admin control
+  status?: 'pending' | 'approved' | 'rejected';
+  is_enabled: boolean;
   created_at?: string;
-  custom_logo_url?: string;
+  hall_limit: number;
+  service_limit: number;
+  subscription_plan?: string;
+  payment_status?: 'paid' | 'unpaid';
+  // Fix for VendorBrandSettings: Add branding and social media properties
+  theme_color?: string;
   whatsapp_number?: string;
   business_email?: string;
-  theme_color?: string;
+  custom_logo_url?: string;
   facebook_url?: string;
   instagram_url?: string;
   twitter_url?: string;
@@ -25,31 +32,14 @@ export interface SystemSettings {
   commission_rate: number;
   vat_enabled: boolean;
   platform_logo_url?: string;
-  hall_listing_fee: number; // Price per hall
-  service_listing_fee: number; // Price per service
-}
-
-export interface POSItem {
-  id: string;
-  vendor_id: string;
-  hall_id: string; // POS items can be hall-specific
-  name: string;
-  price: number;
-  stock: number;
-  image_url?: string;
-}
-
-export interface Coupon {
-  id: string;
-  vendor_id: string;
-  code: string;
-  discount_type: 'percentage' | 'fixed';
-  discount_value: number;
-  start_date: string;
-  end_date: string;
-  applicable_to: 'halls' | 'services' | 'both';
-  target_ids: string[]; // Specific IDs of halls or services
-  is_active: boolean;
+  hall_listing_fee: number;
+  service_listing_fee: number;
+  payment_gateways: {
+    visa_enabled: boolean;
+    cash_enabled: boolean;
+    visa_merchant_id?: string;
+    visa_secret_key?: string;
+  };
 }
 
 export interface Hall {
@@ -96,6 +86,32 @@ export interface Booking {
   services?: Service;
   client?: UserProfile;
   vendor?: UserProfile;
+}
+
+// Fix for VendorPOS: Define POSItem interface
+export interface POSItem {
+  id: string;
+  vendor_id: string;
+  hall_id: string;
+  name: string;
+  price: number;
+  stock: number;
+  created_at?: string;
+}
+
+// Fix for VendorCoupons: Define Coupon interface
+export interface Coupon {
+  id: string;
+  vendor_id: string;
+  code: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
+  applicable_to: 'halls' | 'services' | 'both';
+  target_ids?: string[];
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  created_at?: string;
 }
 
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك'];
