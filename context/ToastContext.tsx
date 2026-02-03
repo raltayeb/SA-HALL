@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Toast, ToastVariant } from '../components/ui/Toast';
 
@@ -29,7 +30,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 left-4 z-[100] flex flex-col gap-2 w-full max-w-sm pointer-events-none">
+      <div className="fixed bottom-4 left-4 z-[1000] flex flex-col gap-2 w-full max-w-sm pointer-events-none">
         {toasts.map((t) => (
           <Toast key={t.id} {...t} onDismiss={removeToast} />
         ))}

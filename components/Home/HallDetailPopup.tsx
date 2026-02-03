@@ -108,16 +108,9 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
   const handleBookingClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    if (!user) {
-      toast({ 
-        title: 'يجب تسجيل الدخول', 
-        description: 'يرجى تسجيل الدخول أولاً لإتمام عملية الحجز.', 
-        variant: 'destructive' 
-      });
-      return;
-    }
-    
+    // GUEST BOOKING: No user check here anymore
     if (isAvailable === false) {
         toast({ title: 'عذراً', description: 'هذا التاريخ محجوز بالفعل.', variant: 'destructive' });
         return;
@@ -127,9 +120,8 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
   };
 
   const handleBookingSubmission = async () => {
-    if (!user) return;
     if (!guestName || !guestPhone) {
-      toast({ title: 'تنبيه', description: 'يرجى إدخال كافة البيانات المطلوبة.', variant: 'destructive' });
+      toast({ title: 'تنبيه', description: 'يرجى إدخال كافة البيانات المطلوبة لمتابعة الحجز.', variant: 'destructive' });
       return;
     }
     if (!bookingDate) {
@@ -142,40 +134,42 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     const dateStr = format(bookingDate, 'yyyy-MM-dd');
 
     try {
+      // Create a new GoogleGenAI or equivalent if needed, but here we just insert to Supabase
       const { error: bookingError } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: !isHall ? service!.id : null,
-        user_id: user.id,
+        user_id: user?.id || null, // Allow NULL for guests
         vendor_id: item.vendor_id,
         booking_date: dateStr,
         total_amount: total,
         vat_amount: vat,
         status: 'pending',
-        notes: `الاسم: ${guestName} | الجوال: ${guestPhone}`
+        notes: `الاسم: ${guestName} | الجوال: ${guestPhone} ${!user ? '(حجز زائر)' : ''}`
       }]);
 
       if (bookingError) throw bookingError;
 
+      // Notify vendor
       await supabase.from('notifications').insert([{
         user_id: item.vendor_id,
-        title: 'حجز ملكي جديد 👑',
+        title: 'حجز جديد (زائر) 👑',
         message: `لديك طلب حجز جديد لـ ${item.name} من ${guestName}.`,
         type: 'booking_new',
         link: 'hall_bookings'
       }]);
 
       toast({ 
-        title: 'تم إرسال الطلب', 
-        description: 'تم تسجيل طلب حجزك بنجاح، سيقوم البائع بالتواصل معك.', 
+        title: 'تم إرسال طلبك بنجاح', 
+        description: 'سيقوم فريق القاعة بالتواصل معك قريباً لتأكيد التفاصيل.', 
         variant: 'success' 
       });
       setIsBookingModalOpen(false);
       onClose();
     } catch (err: any) {
-      console.error('Booking Error:', err);
+      console.error('Booking Submission Error:', err);
       toast({ 
-        title: 'خطأ في الحجز', 
-        description: err.message || 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.', 
+        title: 'خطأ في معالجة الطلب', 
+        description: err.message || 'حدث خطأ غير متوقع، يرجى المحاولة مرة أخرى.', 
         variant: 'destructive' 
       });
     } finally {
@@ -199,7 +193,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
          </div>
          <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" className="rounded-2xl w-12 h-12 border-gray-100"><Share2 className="w-5 h-5 text-muted-foreground" /></Button>
-            <Button onClick={handleBookingClick} className="rounded-2xl px-10 h-12 font-bold shadow-xl shadow-primary/20 text-lg">احجز الآن</Button>
+            <Button type="button" onClick={handleBookingClick} className="rounded-2xl px-10 h-12 font-bold shadow-xl shadow-primary/20 text-lg">احجز الآن</Button>
          </div>
       </header>
 
@@ -322,6 +316,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                      
                      <div className="space-y-4">
                         <Button 
+                          type="button"
                           onClick={handleBookingClick} 
                           className={`w-full h-16 rounded-2xl font-bold text-xl transition-all ${isAvailable === false ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-2xl shadow-primary/20 hover:scale-[1.02]'}`}
                           disabled={isHall && isAvailable === false}
@@ -345,9 +340,9 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       </div>
 
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-[500] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
            <div className="w-full max-w-xl bg-white rounded-[3rem] shadow-2xl relative border border-gray-100 overflow-hidden flex flex-col animate-in zoom-in-95">
-              <button onClick={() => setIsBookingModalOpen(false)} className="absolute top-10 end-10 p-4 hover:bg-gray-50 rounded-2xl transition-all z-[550] text-gray-400"><X className="w-6 h-6" /></button>
+              <button type="button" onClick={() => setIsBookingModalOpen(false)} className="absolute top-10 end-10 p-4 hover:bg-gray-50 rounded-2xl transition-all z-[1050] text-gray-400"><X className="w-6 h-6" /></button>
               <div className="p-12 space-y-12 text-right">
                  <div className="space-y-4">
                     <div className="w-16 h-16 bg-primary/5 rounded-[1.5rem] flex items-center justify-center text-primary border border-primary/10">
@@ -369,7 +364,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                        <Input placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestName} onChange={e => setGuestName(e.target.value)} />
                        <Input placeholder="رقم الجوال" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} />
                     </div>
-                    <Button onClick={handleBookingSubmission} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-bold text-xl shadow-xl shadow-primary/20">
+                    <Button type="button" onClick={handleBookingSubmission} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-bold text-xl shadow-xl shadow-primary/20">
                       {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : 'إرسال طلب الحجز الملكي'}
                     </Button>
                  </div>
