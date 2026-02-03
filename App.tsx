@@ -9,9 +9,19 @@ import { Bookings } from './pages/Bookings';
 import { Home } from './pages/Home';
 import { VendorSubscriptions } from './pages/VendorSubscriptions';
 import { SystemSettings } from './pages/SystemSettings';
+import { UsersManagement } from './pages/UsersManagement';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { ContentCMS } from './pages/ContentCMS';
+import { VendorPOS } from './pages/VendorPOS';
+import { VendorCoupons } from './pages/VendorCoupons';
+import { CalendarBoard } from './pages/CalendarBoard';
+import { VendorServices } from './pages/VendorServices';
+import { VendorBrandSettings } from './pages/VendorBrandSettings';
+import { BrowseHalls } from './pages/BrowseHalls';
+import { Favorites } from './pages/Favorites';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { Loader2, X, Clock, ChevronLeft, ShieldCheck, CheckCircle2, CreditCard, Wallet, Building2, Sparkles, ArrowRight } from 'lucide-react';
+import { Loader2, X, Clock, ChevronLeft, CheckCircle2, CreditCard, Wallet, Building2, Sparkles } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 
 type RegStep = 'info' | 'plan' | 'payment' | 'success';
@@ -22,6 +32,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [browseFilters, setBrowseFilters] = useState<any>(null);
   
   // Registration Flow States
   const [regStep, setRegStep] = useState<RegStep>('info');
@@ -57,8 +68,12 @@ const App: React.FC = () => {
     if (data) { 
       const profile = data as UserProfile;
       setUserProfile(profile); 
-      if (profile.role === 'super_admin') setActiveTab('subscriptions');
-      else if (profile.status === 'approved') setActiveTab('dashboard');
+      // Intelligent Redirect based on Role
+      if (activeTab === 'home') return; // Don't redirect if browsing home
+      
+      if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
+      else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
+      else if (profile.role === 'user') setActiveTab('browse');
       else setActiveTab('pending_approval');
     }
     setLoading(false);
@@ -106,9 +121,10 @@ const App: React.FC = () => {
   );
 
   const isMarketplace = activeTab === 'home';
+  const isBrowse = activeTab === 'browse';
   const isPending = userProfile?.role === 'vendor' && userProfile?.status === 'pending';
 
-  if (isPending && !isMarketplace) {
+  if (isPending && !isMarketplace && !isBrowse) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center" dir="rtl">
          <div className="bg-white p-12 rounded-[3rem] shadow-xl max-w-md space-y-6 border border-primary/5">
@@ -133,13 +149,16 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
-      {!isMarketplace && userProfile && (
+      {/* Sidebar Navigation */}
+      {!isMarketplace && !isBrowse && userProfile && (
         <Sidebar 
           user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
-          onLogout={() => supabase.auth.signOut()} isOpen={false} setIsOpen={() => {}} 
+          onLogout={() => supabase.auth.signOut()} isOpen={false} setIsOpen={() => {}}
+          platformLogo={userProfile.role === 'vendor' ? userProfile.custom_logo_url : undefined}
         />
       )}
 
+      {/* Authentication Modal */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
           <div className="w-full max-w-[500px] bg-white rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in-95 my-auto">
@@ -295,21 +314,56 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <main className={`${!isMarketplace && userProfile ? 'lg:pr-[280px]' : ''}`}>
-        {activeTab === 'home' ? (
+      {/* Main Content Area */}
+      <main className={`${!isMarketplace && !isBrowse && userProfile ? 'lg:pr-[280px]' : ''}`}>
+        
+        {/* Public Pages */}
+        {activeTab === 'home' && (
           <div className="w-full">
             <Home 
               user={userProfile} onLoginClick={() => openAuth('login')} 
               onRegisterClick={() => openAuth('register')}
-              onBrowseHalls={() => {}} onBrowseServices={() => {}}
+              onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
+              onBrowseServices={() => {}}
               onNavigate={setActiveTab} onLogout={() => supabase.auth.signOut()}
             />
           </div>
-        ) : (
-          <div className="mx-auto w-full p-6 lg:p-10">
+        )}
+
+        {/* Browse Page */}
+        {activeTab === 'browse' && (
+           <BrowseHalls 
+             user={userProfile} 
+             mode="halls"
+             onBack={() => setActiveTab('home')}
+             onLoginClick={() => openAuth('login')}
+             onNavigate={setActiveTab}
+             onLogout={() => supabase.auth.signOut()}
+             initialFilters={browseFilters}
+           />
+        )}
+
+        {/* Protected Dashboard Pages */}
+        {activeTab !== 'home' && activeTab !== 'browse' && (
+          <div className="mx-auto w-full p-6 lg:p-10 max-w-[1600px]">
+            {/* Vendor Routes */}
             {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
             {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
-            {activeTab === 'all_bookings' && userProfile && <Bookings user={userProfile} />}
+            {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
+            {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
+            {activeTab === 'hall_bookings' && userProfile && <Bookings user={userProfile} />}
+            {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
+            {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
+            {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
+            
+            {/* User Routes */}
+            {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
+            {activeTab === 'my_bookings' && userProfile && <Bookings user={userProfile} />}
+
+            {/* Super Admin Routes */}
+            {activeTab === 'admin_dashboard' && userProfile?.role === 'super_admin' && <AdminDashboard />}
+            {activeTab === 'admin_users' && userProfile?.role === 'super_admin' && <UsersManagement />}
+            {activeTab === 'admin_cms' && userProfile?.role === 'super_admin' && <ContentCMS />}
             {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
             {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
           </div>

@@ -42,6 +42,15 @@ export interface SystemSettings {
   };
 }
 
+export interface ContentPage {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  is_published: boolean;
+  updated_at?: string;
+}
+
 export interface Hall {
   id: string;
   vendor_id: string;
@@ -88,7 +97,6 @@ export interface Booking {
   vendor?: UserProfile;
 }
 
-// Fix for VendorPOS: Define POSItem interface
 export interface POSItem {
   id: string;
   vendor_id: string;
@@ -99,7 +107,6 @@ export interface POSItem {
   created_at?: string;
 }
 
-// Fix for VendorCoupons: Define Coupon interface
 export interface Coupon {
   id: string;
   vendor_id: string;
