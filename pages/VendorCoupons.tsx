@@ -11,35 +11,43 @@ import { useToast } from '../context/ToastContext';
 
 export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [halls, setHalls] = useState<Hall[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentCoupon, setCurrentCoupon] = useState<Partial<Coupon>>({ 
     discount_type: 'percentage', 
     applicable_to: 'both',
     target_ids: [],
-    is_active: true 
+    is_active: true,
+    start_date: new Date().toISOString().split('T')[0]
   });
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
-    const [cRes, hRes, sRes] = await Promise.all([
-      supabase.from('coupons').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('halls').select('*').eq('vendor_id', user.id),
-      supabase.from('services').select('*').eq('vendor_id', user.id)
-    ]);
-    if (cRes.data) setCoupons(cRes.data as Coupon[]);
-    if (hRes.data) setHalls(hRes.data);
-    if (sRes.data) setServices(sRes.data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('coupons')
+        .select('*')
+        .eq('vendor_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setCoupons(data as Coupon[] || []);
+    } catch (err: any) {
+      console.error("Coupons Fetch Error:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user.id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleSave = async () => {
-    if (!currentCoupon.code || !currentCoupon.discount_value) return;
+    if (!currentCoupon.code || !currentCoupon.discount_value || !currentCoupon.end_date) {
+      toast({ title: 'خطأ', description: 'يرجى إكمال بيانات الكوبون.', variant: 'destructive' });
+      return;
+    }
     const payload = { ...currentCoupon, vendor_id: user.id };
     const { error } = currentCoupon.id 
       ? await supabase.from('coupons').update(payload).eq('id', currentCoupon.id)
@@ -48,7 +56,10 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!error) {
       toast({ title: 'تم حفظ الكوبون', variant: 'success' });
       setIsModalOpen(false);
+      setCurrentCoupon({ discount_type: 'percentage', applicable_to: 'both', target_ids: [], is_active: true, start_date: new Date().toISOString().split('T')[0] });
       fetchData();
+    } else {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -57,9 +68,9 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className="flex justify-between items-center flex-row-reverse">
         <div>
           <h2 className="text-3xl font-ruqaa text-primary">الخصومات والكوبونات</h2>
-          <p className="text-sm text-muted-foreground mt-1">أنشئ عروضاً خاصة لزيادة مبيعات قاعاتك وخدماتك.</p>
+          <p className="text-sm text-muted-foreground mt-1">أنشئ عروضاً خاصة لزيادة مبيعاتك.</p>
         </div>
-        <Button onClick={() => { setCurrentCoupon({ discount_type: 'percentage', applicable_to: 'both', target_ids: [], is_active: true }); setIsModalOpen(true); }} className="h-12 px-8 rounded-xl font-bold gap-2">
+        <Button onClick={() => setIsModalOpen(true)} className="h-12 px-8 rounded-xl font-bold gap-2">
            إنشاء كوبون <Plus className="w-4 h-4" />
         </Button>
       </div>
@@ -68,7 +79,7 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
         {loading ? (
           Array.from({length: 3}).map((_, i) => <div key={i} className="h-48 bg-gray-100 animate-pulse rounded-[2rem]"></div>)
         ) : coupons.length === 0 ? (
-          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[2.5rem] opacity-50 font-bold">لا يوجد عروض نشطة حالياً.</div>
+          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[2.5rem] opacity-50 font-bold">لا توجد عروض نشطة حالياً.</div>
         ) : coupons.map(c => (
           <div key={c.id} className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm relative overflow-hidden group">
              <div className="flex justify-between items-start mb-6 flex-row-reverse">
@@ -85,7 +96,12 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> ينتهي: {c.end_date}</span>
              </div>
              <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button className="p-2 text-red-500 hover:bg-red-50 rounded-lg" onClick={async () => { await supabase.from('coupons').delete().eq('id', c.id); fetchData(); }}><Trash2 className="w-4 h-4" /></button>
+                <button className="p-2 text-red-500 hover:bg-red-50 rounded-lg" onClick={async () => {
+                  if(confirm('هل تريد حذف الكوبون؟')) {
+                    await supabase.from('coupons').delete().eq('id', c.id);
+                    fetchData();
+                  }
+                }}><Trash2 className="w-4 h-4" /></button>
              </div>
           </div>
         ))}
@@ -103,24 +119,10 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </select>
                </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
                <Input label="قيمة الخصم" type="number" value={currentCoupon.discount_value || ''} onChange={e => setCurrentCoupon({...currentCoupon, discount_value: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
-               <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-400">ينطبق على</label>
-                  <select className="w-full h-12 border rounded-xl px-4 text-sm font-bold bg-gray-50" value={currentCoupon.applicable_to} onChange={e => setCurrentCoupon({...currentCoupon, applicable_to: e.target.value as any})}>
-                     <option value="both">الكل (قاعات وخدمات)</option>
-                     <option value="halls">القاعات فقط</option>
-                     <option value="services">الخدمات فقط</option>
-                  </select>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-               <Input label="تاريخ البدء" type="date" value={currentCoupon.start_date || ''} onChange={e => setCurrentCoupon({...currentCoupon, start_date: e.target.value})} className="h-12 rounded-xl font-bold" />
                <Input label="تاريخ الانتهاء" type="date" value={currentCoupon.end_date || ''} onChange={e => setCurrentCoupon({...currentCoupon, end_date: e.target.value})} className="h-12 rounded-xl font-bold" />
             </div>
-
             <Button onClick={handleSave} className="w-full h-14 rounded-xl font-black text-lg shadow-xl shadow-primary/20">تفعيل العرض</Button>
          </div>
       </Modal>

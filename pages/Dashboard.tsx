@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { UserProfile, Booking, VAT_RATE, Hall } from '../types';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Button } from '../components/ui/Button';
-import { CalendarCheck, Banknote, Hourglass, Landmark, TrendingUp, Users, Building2, LayoutDashboard, ChevronDown, Loader2 } from 'lucide-react';
+import { CalendarCheck, Banknote, Hourglass, Landmark, TrendingUp, Users, Building2, LayoutDashboard, ChevronDown, Loader2, AlertCircle } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend, AreaChart, Area
@@ -26,42 +26,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [halls, setHalls] = useState<Hall[]>([]);
   const [selectedHallId, setSelectedHallId] = useState<string>('all');
 
   const fetchData = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
+    setError(null);
     try {
-      // 1. Fetch Halls for selector
-      if (user.role === 'vendor') {
-        const { data: hData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
-        setHalls(hData || []);
-      }
+      // 1. Fetch Halls
+      const { data: hData, error: hError } = await supabase
+        .from('halls')
+        .select('*')
+        .eq('vendor_id', user.id);
+      
+      if (hError) console.error("Halls Fetch Error:", hError);
+      setHalls(hData || []);
 
-      // 2. Fetch Bookings
+      // 2. Fetch Bookings with direct query
       let query = supabase.from('bookings').select('*, halls(*)');
+      
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
         if (selectedHallId !== 'all') query = query.eq('hall_id', selectedHallId);
-      } else if (user.role === 'user') {
+      } else {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data, error: bError } = await query;
+      if (bError) throw bError;
 
       const bookings = (data as Booking[] || []).filter(Boolean);
-      const total = bookings.filter(b => b.status !== 'cancelled').reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+      const activeBookings = bookings.filter(b => b.status !== 'cancelled');
+      const total = activeBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
       
       setStats({
         totalBookings: bookings.length,
         totalRevenue: total,
         pendingBookings: bookings.filter(b => b.status === 'pending').length,
-        avgBookingValue: bookings.length > 0 ? total / bookings.length : 0,
+        avgBookingValue: activeBookings.length > 0 ? total / activeBookings.length : 0,
         zatcaTax: total * (VAT_RATE / (1 + VAT_RATE))
       });
 
-      // Prepare Charts
+      // Prepare Chart Data
       const revenueMap = new Map<string, number>();
       bookings.forEach(b => {
         if (b.status !== 'cancelled' && b.booking_date) {
@@ -69,35 +77,57 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           revenueMap.set(month, (revenueMap.get(month) || 0) + (Number(b.total_amount) || 0));
         }
       });
-      setRevenueData(Array.from(revenueMap, ([name, total]) => ({ name, total })));
+      
+      const chartData = Array.from(revenueMap, ([name, total]) => ({ name, total }));
+      setRevenueData(chartData.length > 0 ? chartData : [{ name: 'لا بيانات', total: 0 }]);
 
       const statusCount = { pending: 0, confirmed: 0, cancelled: 0 };
-      bookings.forEach(b => { if(b.status && (statusCount as any)[b.status] !== undefined) (statusCount as any)[b.status]++; });
-      setStatusData([
+      bookings.forEach(b => { 
+        if(b.status && statusCount.hasOwnProperty(b.status)) {
+          (statusCount as any)[b.status]++; 
+        }
+      });
+      
+      const sData = [
         { name: 'قيد الانتظار', value: statusCount.pending, color: '#D4AF37' },
         { name: 'مؤكد', value: statusCount.confirmed, color: '#4B0082' },
         { name: 'ملغي', value: statusCount.cancelled, color: '#ef4444' },
-      ].filter(i => i.value > 0));
+      ].filter(i => i.value > 0);
+      
+      setStatusData(sData.length > 0 ? sData : [{ name: 'لا حجوزات', value: 1, color: '#f1f1f1' }]);
 
-    } catch (error) {
-      console.error(error);
-    } finally { setLoading(false); }
-  }, [user, selectedHallId]);
+    } catch (err: any) {
+      console.error("Dashboard Fetch Error:", err);
+      setError(err.message || "فشل تحميل البيانات من قاعدة البيانات");
+    } finally { 
+      setLoading(false); 
+    }
+  }, [user.id, user.role, selectedHallId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
+        <AlertCircle className="w-16 h-16 text-red-500 opacity-20" />
+        <h3 className="text-xl font-black">حدث خطأ في عرض البيانات</h3>
+        <p className="text-gray-400 max-w-md">{error}</p>
+        <Button onClick={fetchData} variant="outline">إعادة المحاولة</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row-reverse justify-between items-start md:items-center gap-6">
         <div className="text-right">
           <h2 className="text-4xl font-ruqaa text-primary">لوحة التحكم</h2>
-          <p className="text-sm text-muted-foreground mt-1">مرحباً {user.full_name}، إليك ملخص نشاطك.</p>
+          <p className="text-sm text-muted-foreground mt-1">مرحباً {user.full_name}، إليك نظرة على أداء نشاطك.</p>
         </div>
 
-        {/* Hall Context Selector for Vendors */}
         {user.role === 'vendor' && halls.length > 0 && (
           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm ml-auto md:ml-0">
-             <span className="text-[10px] font-black uppercase text-gray-400 pr-3 border-r mr-2">عرض بيانات</span>
+             <span className="text-[10px] font-black uppercase text-gray-400 pr-3 border-r mr-2">فلترة حسب القاعة</span>
              <select 
               className="bg-transparent border-none text-sm font-black focus:ring-0 outline-none min-w-[150px] text-right appearance-none cursor-pointer"
               value={selectedHallId}
@@ -160,7 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           </div>
 
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-10 flex flex-col items-center">
-              <h3 className="text-xl font-black mb-8 w-full text-right">توزيع الحالات</h3>
+              <h3 className="text-xl font-black mb-8 w-full text-right">توزيع حالات الحجز</h3>
               <div className="h-[250px] w-full" dir="ltr">
                   <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
