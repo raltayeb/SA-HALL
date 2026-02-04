@@ -32,7 +32,18 @@ export const SystemSettings: React.FC = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
-      if (data?.value) setSettings(data.value as ISystemSettings);
+      if (data?.value) {
+        const dbSettings = data.value;
+        // Safely merge DB settings with defaults to ensure nested objects like payment_gateways exist
+        setSettings(prev => ({
+          ...prev,
+          ...dbSettings,
+          payment_gateways: {
+            ...prev.payment_gateways,
+            ...(dbSettings.payment_gateways || {})
+          }
+        }));
+      }
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل تحميل الإعدادات.', variant: 'destructive' });
     } finally {
@@ -88,7 +99,7 @@ export const SystemSettings: React.FC = () => {
                     <input 
                       type="checkbox" 
                       className="w-5 h-5 accent-primary" 
-                      checked={settings.payment_gateways.visa_enabled}
+                      checked={settings.payment_gateways?.visa_enabled ?? false}
                       onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_enabled: e.target.checked}})}
                     />
                  </div>
@@ -96,7 +107,7 @@ export const SystemSettings: React.FC = () => {
                     <Input 
                       label="Merchant ID" 
                       placeholder="Enter Merchant ID"
-                      value={settings.payment_gateways.visa_merchant_id}
+                      value={settings.payment_gateways?.visa_merchant_id || ''}
                       onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_merchant_id: e.target.value}})}
                       className="h-11 rounded-xl"
                     />
@@ -104,7 +115,7 @@ export const SystemSettings: React.FC = () => {
                       label="Secret Key" 
                       type="password"
                       placeholder="••••••••••••"
-                      value={settings.payment_gateways.visa_secret_key}
+                      value={settings.payment_gateways?.visa_secret_key || ''}
                       onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_secret_key: e.target.value}})}
                       className="h-11 rounded-xl"
                     />
@@ -120,7 +131,7 @@ export const SystemSettings: React.FC = () => {
                     <input 
                       type="checkbox" 
                       className="w-5 h-5 accent-primary" 
-                      checked={settings.payment_gateways.cash_enabled}
+                      checked={settings.payment_gateways?.cash_enabled ?? false}
                       onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, cash_enabled: e.target.checked}})}
                     />
                  </div>
