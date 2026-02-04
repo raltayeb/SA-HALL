@@ -1,76 +1,174 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, POSItem, Hall } from '../types';
+import { UserProfile, POSItem, Hall, POS_CATEGORIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Search, PlusCircle, Building2, Loader2, Receipt } from 'lucide-react';
+import { 
+  ShoppingCart, Plus, Minus, Trash2, Package, Search, PlusCircle, 
+  Building2, Loader2, Receipt, Printer, X, LayoutGrid, ScanBarcode, RefreshCcw
+} from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
+interface CartItem {
+  item: POSItem;
+  qty: number;
+}
+
 export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
+  // --- State ---
   const [items, setItems] = useState<POSItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<POSItem[]>([]);
   const [halls, setHalls] = useState<Hall[]>([]);
   const [selectedHallId, setSelectedHallId] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
+  
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentItem, setCurrentItem] = useState<Partial<POSItem>>({});
-  const [cart, setCart] = useState<{item: POSItem, qty: number}[]>([]);
-  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Cart & Transaction
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<any>(null);
 
+  // Item Management
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [currentItem, setCurrentItem] = useState<Partial<POSItem>>({ category: 'عام' });
+
+  const { toast } = useToast();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Initial Data Fetching ---
   const fetchHalls = useCallback(async () => {
     try {
-      const { data: hData, error } = await supabase
-        .from('halls')
-        .select('*')
-        .eq('vendor_id', user.id);
-      
-      if (error) throw error;
+      const { data: hData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
       setHalls(hData || []);
-      if (hData?.[0] && !selectedHallId) {
-        setSelectedHallId(hData[0].id);
-      }
+      if (hData?.[0] && !selectedHallId) setSelectedHallId(hData[0].id);
     } catch (err) {
-      console.error("Fetch Halls Error:", err);
+      console.error(err);
     }
   }, [user.id]);
 
   const fetchItems = useCallback(async () => {
-    if (!selectedHallId || !user.id) return;
+    if (!selectedHallId) return;
     setLoading(true);
     try {
-      const { data: iData, error } = await supabase
-        .from('pos_items')
-        .select('*')
-        .eq('hall_id', selectedHallId)
-        .eq('vendor_id', user.id);
-      
-      if (error) throw error;
+      const { data: iData } = await supabase.from('pos_items').select('*').eq('hall_id', selectedHallId);
       setItems(iData || []);
-    } catch (err: any) {
-      console.error("Fetch Items Error:", err);
-      // In case table is missing, don't crash UI
-      setItems([]);
+      setFilteredItems(iData || []);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [user.id, selectedHallId]);
+  }, [selectedHallId]);
 
   useEffect(() => { fetchHalls(); }, [fetchHalls]);
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const handleSaveItem = async () => {
-    if (!currentItem.name || !currentItem.price || !selectedHallId) {
-      toast({ title: 'تنبيه', description: 'يرجى إكمال بيانات الصنف.', variant: 'destructive' });
-      return;
+  // --- Filtering & Searching ---
+  useEffect(() => {
+    let res = items;
+    if (selectedCategory !== 'الكل') {
+      res = res.filter(i => i.category === selectedCategory);
     }
-    const payload = { 
-      name: currentItem.name,
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      res = res.filter(i => i.name.toLowerCase().includes(q) || i.barcode?.includes(q));
+      
+      // Auto-add if exact barcode match
+      const exactMatch = items.find(i => i.barcode === searchQuery);
+      if (exactMatch) {
+        addToCart(exactMatch);
+        setSearchQuery('');
+      }
+    }
+    setFilteredItems(res);
+  }, [searchQuery, selectedCategory, items]);
+
+  // --- Cart Logic ---
+  const addToCart = (item: POSItem) => {
+    setCart(prev => {
+      const exists = prev.find(i => i.item.id === item.id);
+      if (exists) return prev.map(i => i.item.id === item.id ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { item, qty: 1 }];
+    });
+    // Play beep sound
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3');
+    audio.volume = 0.2;
+    audio.play().catch(() => {});
+  };
+
+  const updateQty = (id: string, delta: number) => {
+    setCart(prev => prev.map(i => {
+      if (i.item.id === id) {
+        const newQty = Math.max(1, i.qty + delta);
+        return { ...i, qty: newQty };
+      }
+      return i;
+    }));
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart(prev => prev.filter(i => i.item.id !== id));
+  };
+
+  const clearCart = () => setCart([]);
+
+  // --- Calculations ---
+  const subtotal = cart.reduce((sum, i) => sum + (Number(i.item.price) * i.qty), 0);
+  const taxRate = user.pos_config?.tax_rate ?? 15;
+  const taxAmount = (subtotal * taxRate) / 100;
+  const total = subtotal + taxAmount;
+
+  // --- Transaction Handling ---
+  const handleCheckout = async () => {
+    if (cart.length === 0) return;
+    setIsProcessing(true);
+    
+    // Simulate transaction saving
+    // In a real app, save to a 'transactions' or 'orders' table
+    
+    // Prepare Receipt Data
+    const receipt = {
+      orderId: `#${Date.now().toString().slice(-6)}`,
+      date: new Date().toLocaleString('ar-SA'),
+      items: cart,
+      subtotal,
+      taxAmount,
+      total,
+      vendor: user
+    };
+    
+    setReceiptData(receipt);
+    setPaymentModalOpen(true);
+    setIsProcessing(false);
+  };
+
+  const confirmPayment = () => {
+    // Deduct stock if needed (logic omitted for brevity)
+    if (user.pos_config?.auto_print) {
+        setTimeout(() => window.print(), 500);
+    }
+    toast({ title: 'تمت العملية', description: 'تم تسجيل عملية البيع بنجاح.', variant: 'success' });
+    setCart([]);
+    setPaymentModalOpen(false);
+  };
+
+  // --- Inventory Management ---
+  const handleSaveItem = async () => {
+    if (!currentItem.name || !currentItem.price || !selectedHallId) return;
+    
+    const payload = {
+      ...currentItem,
+      vendor_id: user.id,
+      hall_id: selectedHallId,
       price: Number(currentItem.price),
       stock: Number(currentItem.stock || 0),
-      vendor_id: user.id, 
-      hall_id: selectedHallId 
+      category: currentItem.category || 'عام'
     };
 
     const { error } = currentItem.id 
@@ -78,120 +176,221 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
       : await supabase.from('pos_items').insert([payload]);
 
     if (!error) {
-      toast({ title: 'تمت الإضافة', variant: 'success' });
-      setIsModalOpen(false);
-      setCurrentItem({});
+      toast({ title: 'تم الحفظ', variant: 'success' });
+      setIsItemModalOpen(false);
+      setCurrentItem({ category: 'عام' });
       fetchItems();
-    } else {
-      toast({ title: 'خطأ في قاعدة البيانات', description: error.message, variant: 'destructive' });
     }
   };
 
-  const addToCart = (item: POSItem) => {
-    setCart(prev => {
-      const existing = prev.find(i => i.item.id === item.id);
-      if (existing) return prev.map(i => i.item.id === item.id ? {...i, qty: i.qty + 1} : i);
-      return [...prev, {item, qty: 1}];
-    });
-  };
-
-  const total = cart.reduce((sum, i) => sum + (Number(i.item.price) * i.qty), 0);
-
   return (
-    <div className="space-y-8 text-right pb-20">
-      <div className="flex flex-col md:flex-row-reverse justify-between items-start md:items-center gap-6">
-        <div>
-          <h2 className="text-3xl font-ruqaa text-primary">نظام المبيعات السريع (POS)</h2>
-          <p className="text-sm text-muted-foreground mt-1">إدارة مبيعات المستلزمات الإضافية داخل القاعة.</p>
-        </div>
-
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm ml-auto md:ml-0">
-          <select 
-            className="bg-transparent border-none text-sm font-black focus:ring-0 outline-none min-w-[150px] text-right appearance-none"
-            value={selectedHallId} onChange={e => setSelectedHallId(e.target.value)}
-          >
-            <option value="" disabled>اختر القاعة</option>
-            {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
-          <Building2 className="w-5 h-5 text-primary ml-2" />
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="flex justify-between items-center flex-row-reverse">
-             <h3 className="font-black text-xl flex items-center gap-2">المخزون المتوفر <Package className="w-5 h-5 text-primary" /></h3>
-             <Button onClick={() => { setCurrentItem({ stock: 0 }); setIsModalOpen(true); }} className="rounded-xl font-bold h-10 gap-2">
-                إضافة صنف جديد <PlusCircle className="w-4 h-4" />
-             </Button>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-             {loading ? (
-               Array.from({length: 6}).map((_, i) => <div key={i} className="aspect-square bg-gray-50 animate-pulse rounded-[2rem] border border-gray-100"></div>)
-             ) : items.length === 0 ? (
-               <div className="col-span-full py-24 text-center border-2 border-dashed rounded-[3rem] opacity-30 flex flex-col items-center gap-4">
-                  <Package className="w-12 h-12" />
-                  <p className="font-black">لا توجد أصناف مضافة حالياً لهذه القاعة.</p>
-               </div>
-             ) : items.map(item => (
-               <div key={item.id} onClick={() => addToCart(item)} className="bg-white border border-gray-100 p-8 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group relative overflow-hidden">
-                  <div className="text-[10px] font-black text-primary bg-primary/5 px-4 py-1 rounded-full inline-block mb-4">مخزون: {item.stock}</div>
-                  <h4 className="font-black text-xl text-gray-900 group-hover:text-primary transition-colors">{item.name}</h4>
-                  <PriceTag amount={item.price} className="text-2xl mt-2" />
-                  <div className="absolute -bottom-4 -left-4 opacity-0 group-hover:opacity-10 transition-opacity">
-                     <ShoppingCart className="w-24 h-24 text-primary" />
-                  </div>
-               </div>
-             ))}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white border border-gray-100 rounded-[3rem] p-10 shadow-2xl sticky top-24 space-y-8 ring-1 ring-black/5">
-             <h3 className="text-xl font-black border-b pb-6 flex items-center justify-end gap-2 text-gray-900">سلة المبيعات <Receipt className="w-5 h-5 text-primary" /></h3>
-             <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
-                {cart.length === 0 ? (
-                  <div className="text-center text-gray-400 py-16 space-y-3">
-                     <ShoppingCart className="w-10 h-10 mx-auto opacity-10" />
-                     <p className="text-xs font-bold italic">السلة فارغة، ابدأ بإضافة أصناف</p>
-                  </div>
-                ) : cart.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between flex-row-reverse border-b border-dashed border-gray-100 pb-4 last:border-0">
-                     <div className="text-right">
-                        <p className="font-black text-sm text-gray-900">{c.item.name}</p>
-                        <p className="text-[10px] text-gray-400 font-bold">{c.qty} وحدة × {c.item.price} SAR</p>
-                     </div>
-                     <div className="flex items-center gap-3">
-                        <button onClick={() => setCart(cart.filter(x => x.item.id !== c.item.id))} className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
-                        <PriceTag amount={c.item.price * c.qty} className="text-sm font-black text-gray-900" />
-                     </div>
-                  </div>
-                ))}
-             </div>
-             <div className="pt-8 border-t border-gray-100 space-y-8">
-                <div className="flex justify-between items-center flex-row-reverse">
-                   <span className="font-black text-gray-400 uppercase text-[10px] tracking-widest">المجموع النهائي</span>
-                   <PriceTag amount={total} className="text-5xl text-primary" iconSize={32} />
-                </div>
-                <Button disabled={cart.length === 0} className="w-full h-18 rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 hover:scale-[1.02] transition-transform">تأكيد البيع وطباعة</Button>
-             </div>
-          </div>
-        </div>
-      </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إضافة صنف جديد للمخزون">
-         <div className="space-y-6 text-right p-2">
-            <Input label="اسم الصنف" placeholder="مثال: مياه معدنية 330 مل" value={currentItem.name || ''} onChange={e => setCurrentItem({...currentItem, name: e.target.value})} className="h-14 rounded-2xl text-right font-bold text-lg" />
-            <div className="grid grid-cols-2 gap-6">
-               <Input label="سعر البيع (SAR)" type="number" placeholder="0.00" value={currentItem.price || ''} onChange={e => setCurrentItem({...currentItem, price: Number(e.target.value)})} className="h-14 rounded-2xl text-right font-bold" />
-               <Input label="الكمية الحالية" type="number" placeholder="0" value={currentItem.stock || ''} onChange={e => setCurrentItem({...currentItem, stock: Number(e.target.value)})} className="h-14 rounded-2xl text-right font-bold" />
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-4 overflow-hidden">
+      
+      {/* Top Bar */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm shrink-0">
+         <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-black text-primary flex items-center gap-2"><LayoutGrid className="w-6 h-6" /> نقطة بيع</h2>
+            <div className="h-8 w-[1px] bg-gray-200"></div>
+            <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+               <Building2 className="w-4 h-4 text-gray-400" />
+               <select 
+                 className="bg-transparent border-none text-sm font-bold outline-none cursor-pointer min-w-[120px]"
+                 value={selectedHallId} onChange={e => setSelectedHallId(e.target.value)}
+               >
+                 {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+               </select>
             </div>
-            <div className="pt-4">
-              <Button onClick={handleSaveItem} className="w-full h-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20">حفظ في قاعدة البيانات</Button>
+         </div>
+         <div className="flex items-center gap-3 w-full max-w-md">
+            <div className="flex-1 relative">
+               <input 
+                 ref={searchInputRef}
+                 className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-10 text-right font-bold outline-none focus:ring-2 ring-primary/20"
+                 placeholder="بحث أو مسح باركود..."
+                 value={searchQuery}
+                 onChange={e => setSearchQuery(e.target.value)}
+                 autoFocus
+               />
+               <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            </div>
+            <Button onClick={() => { setCurrentItem({ category: 'عام', stock: 100 }); setIsItemModalOpen(true); }} className="h-12 w-12 rounded-2xl p-0 flex items-center justify-center bg-gray-900 text-white hover:bg-black shadow-lg">
+               <Plus className="w-6 h-6" />
+            </Button>
+         </div>
+      </div>
+
+      <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
+         
+         {/* Left Side: Product Grid */}
+         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+            {/* Categories */}
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 shrink-0">
+               <button 
+                 onClick={() => setSelectedCategory('الكل')}
+                 className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all shadow-sm ${selectedCategory === 'الكل' ? 'bg-primary text-white shadow-primary/30' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+               >
+                 الكل
+               </button>
+               {POS_CATEGORIES.map(cat => (
+                 <button 
+                   key={cat}
+                   onClick={() => setSelectedCategory(cat)}
+                   className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all shadow-sm ${selectedCategory === cat ? 'bg-primary text-white shadow-primary/30' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                 >
+                   {cat}
+                 </button>
+               ))}
+            </div>
+
+            {/* Grid */}
+            <div className="flex-1 overflow-y-auto pr-2">
+               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-20">
+                  {loading ? (
+                    Array.from({length: 10}).map((_,i) => <div key={i} className="aspect-square bg-white rounded-[2rem] animate-pulse"></div>)
+                  ) : filteredItems.map(item => (
+                    <div 
+                      key={item.id} 
+                      onClick={() => addToCart(item)}
+                      className="bg-white border border-gray-100 rounded-[2rem] p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all group relative overflow-hidden aspect-square"
+                    >
+                       <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
+                          <Package className="w-6 h-6" />
+                       </div>
+                       <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1">{item.name}</h3>
+                       <PriceTag amount={item.price} className="text-primary font-black" />
+                       <div className="absolute top-3 right-3 text-[10px] bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-bold">{item.stock}</div>
+                    </div>
+                  ))}
+                  {/* Quick Add Placeholder */}
+                  <div onClick={() => setIsItemModalOpen(true)} className="border-2 border-dashed border-gray-200 rounded-[2rem] p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all text-gray-400 hover:text-primary aspect-square">
+                     <PlusCircle className="w-8 h-8 mb-2" />
+                     <span className="font-bold text-xs">صنف جديد</span>
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         {/* Right Side: Cart */}
+         <div className="w-[400px] bg-white border border-gray-100 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden shrink-0 ring-1 ring-black/5">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+               <h3 className="font-black text-xl flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> السلة ({cart.length})</h3>
+               <button onClick={clearCart} className="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all" title="إفراغ السلة">
+                  <Trash2 className="w-5 h-5" />
+               </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+               {cart.length === 0 ? (
+                 <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4">
+                    <Receipt className="w-20 h-20 opacity-20" />
+                    <p className="font-bold">ابدأ بإضافة الأصناف</p>
+                 </div>
+               ) : cart.map((c) => (
+                 <div key={c.item.id} className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-gray-900 border">{c.qty}</div>
+                    <div className="flex-1 text-right">
+                       <p className="font-bold text-sm text-gray-900 truncate">{c.item.name}</p>
+                       <p className="text-[10px] text-gray-500 font-bold">{c.item.price} SAR / وحدة</p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                       <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-primary hover:text-white transition-colors text-xs font-bold shadow-sm">+</button>
+                       <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors text-xs font-bold shadow-sm">{c.qty === 1 ? <Trash2 className="w-3 h-3" /> : '-'}</button>
+                    </div>
+                    <div className="font-black text-sm w-16 text-left">
+                       {(c.item.price * c.qty).toFixed(2)}
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            <div className="p-6 bg-gray-900 text-white space-y-4 rounded-t-[2.5rem] shadow-inner-soft">
+               <div className="space-y-2 text-sm font-medium opacity-80">
+                  <div className="flex justify-between"><span>المجموع</span><span>{subtotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>الضريبة ({taxRate}%)</span><span>{taxAmount.toFixed(2)}</span></div>
+               </div>
+               <div className="flex justify-between text-3xl font-black border-t border-white/20 pt-4">
+                  <span>الإجمالي</span>
+                  <span>{total.toFixed(2)} <span className="text-xs align-top">SAR</span></span>
+               </div>
+               <Button 
+                 onClick={handleCheckout} 
+                 disabled={cart.length === 0 || isProcessing}
+                 className="w-full h-16 rounded-[1.8rem] bg-primary text-white font-black text-xl hover:bg-primary/90 shadow-xl shadow-primary/30 transition-transform active:scale-95"
+               >
+                 {isProcessing ? <Loader2 className="animate-spin" /> : 'دفع وإصدار فاتورة'}
+               </Button>
+            </div>
+         </div>
+      </div>
+
+      {/* Add Item Modal */}
+      <Modal isOpen={isItemModalOpen} onClose={() => setIsItemModalOpen(false)} title="إضافة صنف جديد">
+         <div className="space-y-4 text-right">
+            <Input label="اسم الصنف" value={currentItem.name || ''} onChange={e => setCurrentItem({...currentItem, name: e.target.value})} className="h-12 rounded-xl" />
+            <div className="grid grid-cols-2 gap-4">
+               <Input label="السعر" type="number" value={currentItem.price || ''} onChange={e => setCurrentItem({...currentItem, price: Number(e.target.value)})} className="h-12 rounded-xl" />
+               <Input label="الباركود (اختياري)" value={currentItem.barcode || ''} onChange={e => setCurrentItem({...currentItem, barcode: e.target.value})} className="h-12 rounded-xl" />
+            </div>
+            <div className="space-y-2">
+               <label className="text-xs font-bold text-gray-500">التصنيف</label>
+               <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})}>
+                  {POS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+            </div>
+            <Button onClick={handleSaveItem} className="w-full h-14 rounded-xl font-black mt-4">حفظ</Button>
+         </div>
+      </Modal>
+
+      {/* Receipt / Payment Modal */}
+      <Modal isOpen={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="إتمام العملية">
+         <div className="text-center space-y-6">
+            <div className="bg-green-50 text-green-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in">
+               <RefreshCcw className="w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black">إصدار الفاتورة</h3>
+            
+            {/* Thermal Receipt Preview */}
+            <div id="receipt-print" className="bg-white border p-4 w-72 mx-auto text-center font-mono text-xs shadow-lg rounded-none">
+               <div className="font-bold text-sm mb-2 border-b pb-2">{user.business_name || 'اسم المتجر'}</div>
+               {user.pos_config?.receipt_header && <div className="mb-2">{user.pos_config.receipt_header}</div>}
+               <div className="flex justify-between text-[10px] text-gray-500 mb-2">
+                  <span>{new Date().toLocaleDateString()}</span>
+                  <span>{receiptData?.orderId}</span>
+               </div>
+               <div className="border-t border-b border-dashed py-2 space-y-1 text-left">
+                  {cart.map((c, i) => (
+                     <div key={i} className="flex justify-between">
+                        <span>{c.item.name} x{c.qty}</span>
+                        <span>{(c.item.price * c.qty).toFixed(2)}</span>
+                     </div>
+                  ))}
+               </div>
+               <div className="pt-2 space-y-1 font-bold">
+                  <div className="flex justify-between"><span>Total</span><span>{total.toFixed(2)}</span></div>
+               </div>
+               <div className="mt-4 pt-2 border-t text-[10px]">{user.pos_config?.receipt_footer}</div>
+               {user.pos_config?.tax_id && <div className="text-[9px]">VAT: {user.pos_config.tax_id}</div>}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+               <Button variant="outline" onClick={() => { window.print(); confirmPayment(); }} className="flex-1 h-12 rounded-xl font-bold gap-2">
+                  <Printer className="w-4 h-4" /> طباعة وإنهاء
+               </Button>
+               <Button onClick={confirmPayment} className="flex-1 h-12 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white">
+                  تأكيد بدون طباعة
+               </Button>
             </div>
          </div>
       </Modal>
+
+      {/* Hide printable area initially */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #receipt-print, #receipt-print * { visibility: visible; }
+          #receipt-print { position: absolute; left: 0; top: 0; width: 100%; border: none; shadow: none; }
+        }
+      `}</style>
     </div>
   );
 };

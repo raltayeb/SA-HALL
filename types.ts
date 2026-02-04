@@ -1,6 +1,15 @@
 
 export type Role = 'super_admin' | 'vendor' | 'user';
 
+export interface POSConfig {
+  tax_rate: number;
+  tax_id: string;
+  receipt_header: string;
+  receipt_footer: string;
+  printer_width: '80mm' | '58mm';
+  auto_print: boolean;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -24,6 +33,7 @@ export interface UserProfile {
   facebook_url?: string;
   instagram_url?: string;
   twitter_url?: string;
+  pos_config?: POSConfig;
 }
 
 export interface SystemSettings {
@@ -125,6 +135,9 @@ export interface POSItem {
   name: string;
   price: number;
   stock: number;
+  category?: string;
+  barcode?: string;
+  image_url?: string;
   created_at?: string;
 }
 
@@ -145,4 +158,5 @@ export interface Coupon {
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك', 'حائل', 'القصيم', 'جازان', 'نجران', 'الجوف', 'عرعر'];
 export const HALL_AMENITIES = ['مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية', 'بوفيه مفتوح', 'غرفة كبار الزوار', 'مدخل مستقل'];
 export const SERVICE_CATEGORIES = ['ضيافة', 'تصوير', 'كوش', 'بوفيه', 'إضاءة وصوت', 'زينة وزهور', 'تنسيق حفلات', 'أخرى'];
+export const POS_CATEGORIES = ['مشروبات', 'مأكولات', 'خدمات إضافية', 'تأجير', 'عام'];
 export const VAT_RATE = 0.15;
