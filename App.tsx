@@ -20,20 +20,18 @@ import { VendorServices } from './pages/VendorServices';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { Favorites } from './pages/Favorites';
-import { AdminRequests } from './pages/AdminRequests'; // New Import
+import { AdminRequests } from './pages/AdminRequests';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { PriceTag } from './components/ui/PriceTag';
-import { Loader2, X, Clock, ChevronLeft, CheckCircle2, CreditCard, Wallet, Building2, Sparkles, Plus, Minus, Calculator, AlertOctagon, Mail, Lock } from 'lucide-react';
+import { Loader2, X, Clock, AlertOctagon } from 'lucide-react';
 import { useToast } from './context/ToastContext';
+import { NotificationProvider } from './context/NotificationContext'; // Added
 
-// ... (Rest of imports and RegStep type remain same)
 type RegStep = 'info' | 'plan' | 'payment' | 'verify' | 'success';
 
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState('home');
-  // ... (State variables remain same)
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -50,7 +48,6 @@ const App: React.FC = () => {
 
   const [systemFees, setSystemFees] = useState({ hallFee: 500, serviceFee: 200 });
   const [customPlan, setCustomPlan] = useState({ halls: 1, services: 0 });
-  const [paymentMethod, setPaymentMethod] = useState<'visa' | 'cash'>('visa');
   
   const { toast } = useToast();
 
@@ -69,7 +66,7 @@ const App: React.FC = () => {
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) fetchProfile(session.user.id);
-      else { setUserProfile(null); setLoading(false); }
+      else { setUserProfile(null); setLoading(false); setActiveTab('home'); }
     });
 
     const fetchSystemFees = async () => {
@@ -92,16 +89,12 @@ const App: React.FC = () => {
       const profile = data as UserProfile;
       setUserProfile(profile); 
       
-      if (profile.role === 'vendor' && profile.status === 'pending') {
-         setLoading(false);
-         return; 
+      // Auto Redirect Logic: Redirect only if currently on home or browse
+      if (activeTab === 'home' || activeTab === 'browse') {
+        if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
+        else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
+        else if (profile.role === 'user') setActiveTab('browse');
       }
-
-      if (activeTab === 'home') return; 
-      
-      if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
-      else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
-      else if (profile.role === 'user') setActiveTab('browse');
     }
     setLoading(false);
   };
@@ -113,22 +106,10 @@ const App: React.FC = () => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       setShowAuthModal(false);
+      // fetchProfile will be triggered by auth state change
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally { setAuthLoading(false); }
-  };
-
-  const handlePaymentComplete = async () => {
-    setAuthLoading(true);
-    setTimeout(() => {
-        setAuthLoading(false);
-        setRegStep('verify');
-        toast({ 
-            title: 'تم إرسال رمز التحقق', 
-            description: `تم إرسال الرمز إلى ${email}. (رمز الاختبار: ${MOCK_OTP})`, 
-            variant: 'success' 
-        });
-    }, 1500);
   };
 
   const handleVerifyAndRegister = async () => {
@@ -156,6 +137,7 @@ const App: React.FC = () => {
       if (error) throw error;
 
       if (data.user) {
+         // Add explicit profile creation fallback here if trigger fails
          await new Promise(r => setTimeout(r, 1000));
          const { data: profile } = await supabase.from('profiles').select('id').eq('id', data.user.id).maybeSingle();
          if (!profile) {
@@ -179,8 +161,6 @@ const App: React.FC = () => {
     } finally { setAuthLoading(false); }
   };
 
-  const totalPrice = (customPlan.halls * systemFees.hallFee) + (customPlan.services * systemFees.serviceFee);
-
   if (loading) return (
     <div className="flex h-screen items-center justify-center bg-white">
       <div className="text-5xl font-ruqaa text-primary animate-pulse">القاعة</div>
@@ -194,7 +174,6 @@ const App: React.FC = () => {
   if (isPending && !isMarketplace && !isBrowse) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center" dir="rtl">
-         {/* Pending Screen Content (Same as before) */}
          <div className="bg-white p-12 rounded-[3rem] shadow-xl max-w-md space-y-8 border border-primary/5 animate-in zoom-in-95">
             <div className="w-24 h-24 bg-yellow-50 rounded-[2.5rem] flex items-center justify-center mx-auto text-yellow-600 shadow-sm border border-yellow-100">
                <Clock className="w-12 h-12 animate-pulse" />
@@ -224,127 +203,136 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
-      {/* Sidebar Navigation */}
-      {!isMarketplace && !isBrowse && userProfile && (
-        <Sidebar 
-          user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
-          onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }} isOpen={false} setIsOpen={() => {}}
-          platformLogo={userProfile.role === 'vendor' ? userProfile.custom_logo_url : undefined}
-        />
-      )}
+    <NotificationProvider userId={userProfile?.id}>
+      <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
+        {/* Sidebar Navigation */}
+        {!isMarketplace && !isBrowse && userProfile && (
+          <Sidebar 
+            user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
+            onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }} isOpen={false} setIsOpen={() => {}}
+            platformLogo={userProfile.role === 'vendor' ? userProfile.custom_logo_url : undefined}
+          />
+        )}
 
-      {/* Authentication Modal code remains same... */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-[550px] bg-white rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in-95 my-auto">
-             <button onClick={() => setShowAuthModal(false)} className="absolute top-6 left-6 text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
-             {/* ...Auth Modal Content... */}
-             {/* For brevity, reusing existing auth modal content structure, just ensuring it renders correctly */}
-             <div className="text-center mb-8">
-                <div className="text-5xl font-ruqaa text-primary mb-1">القاعة</div>
-                <h2 className="text-xl font-black text-gray-900">
-                  {!isRegister ? 'بوابة الشركاء' : 'إعداد الحساب'}
-                </h2>
-             </div>
-             {!isRegister ? (
-                <form onSubmit={handleLogin} className="space-y-4">
-                   <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
-                   <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
-                   <Button type="submit" className="w-full h-12 rounded-xl font-black text-base" disabled={authLoading}>
-                     {authLoading ? <Loader2 className="animate-spin" /> : 'دخول'}
-                   </Button>
-                   <button type="button" onClick={() => setIsRegister(true)} className="w-full mt-4 text-[10px] font-black text-primary hover:underline">ليس لديك حساب؟ انضم الآن</button>
-                </form>
-             ) : (
-                /* Registration logic mirrors existing App.tsx logic */
-                <div className="space-y-4">
-                   {/* Simplified Reg View for this output block, assume existing logic persists */}
-                   {regStep === 'info' && (
-                      <div className="space-y-4">
-                        <Input placeholder="اسمك الكامل" value={fullName} onChange={e => setFullName(e.target.value)} />
-                        <Input placeholder="البريد" value={email} onChange={e => setEmail(e.target.value)} />
-                        <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} />
-                        <Button onClick={() => setRegStep('plan')}>التالي</Button>
-                        <button onClick={() => setIsRegister(false)} className="w-full text-xs text-center mt-2">عندي حساب</button>
-                      </div>
-                   )}
-                   {regStep !== 'info' && regStep !== 'success' && (
-                      <div className="text-center">
-                         <p>خطوة {regStep}</p>
-                         {/* Placeholder for other steps to avoid massive file duplication in response */}
-                         <Button onClick={() => regStep === 'verify' ? handleVerifyAndRegister() : setRegStep('verify')} className="mt-4">متابعة (محاكاة)</Button>
-                      </div>
-                   )}
-                   {regStep === 'success' && (
-                      <div className="text-center">
-                         <h3 className="font-bold">تم التسجيل!</h3>
-                         <Button onClick={() => setShowAuthModal(false)} className="mt-4">إغلاق</Button>
-                      </div>
-                   )}
-                </div>
-             )}
+        {/* Authentication Modal */}
+        {showAuthModal && (
+          <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+            <div className="w-full max-w-[550px] bg-white rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in-95 my-auto">
+              <button onClick={() => setShowAuthModal(false)} className="absolute top-6 left-6 text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
+              
+              <div className="text-center mb-8">
+                  <div className="text-5xl font-ruqaa text-primary mb-1">القاعة</div>
+                  <h2 className="text-xl font-black text-gray-900">
+                    {!isRegister ? 'بوابة الشركاء' : 'إعداد الحساب'}
+                  </h2>
+              </div>
+              {!isRegister ? (
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <Input type="email" placeholder="البريد الإلكتروني" value={email} onChange={e => setEmail(e.target.value)} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
+                    <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
+                    <Button type="submit" className="w-full h-12 rounded-xl font-black text-base" disabled={authLoading}>
+                      {authLoading ? <Loader2 className="animate-spin" /> : 'دخول'}
+                    </Button>
+                    <button type="button" onClick={() => setIsRegister(true)} className="w-full mt-4 text-[10px] font-black text-primary hover:underline">ليس لديك حساب؟ انضم الآن</button>
+                  </form>
+              ) : (
+                  <div className="space-y-4">
+                    {/* Compact Registration Form for Context */}
+                    {regStep === 'info' && (
+                        <div className="space-y-4">
+                          <Input placeholder="اسمك الكامل" value={fullName} onChange={e => setFullName(e.target.value)} />
+                          <Input placeholder="البريد" value={email} onChange={e => setEmail(e.target.value)} />
+                          <Input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} />
+                          <Button onClick={() => setRegStep('plan')}>التالي</Button>
+                          <button onClick={() => setIsRegister(false)} className="w-full text-xs text-center mt-2">عندي حساب</button>
+                        </div>
+                    )}
+                    {regStep === 'plan' && (
+                        <div className="space-y-4 text-center">
+                           <h3 className="font-bold">اختر خطتك</h3>
+                           <div className="p-4 border rounded-xl bg-gray-50 cursor-pointer hover:border-primary transition-all">
+                              <p className="font-black">الباقة المخصصة</p>
+                              <p className="text-xs text-gray-500">ادفع فقط مقابل ما تحتاج</p>
+                           </div>
+                           <Button onClick={() => setRegStep('payment')}>متابعة للدفع</Button>
+                        </div>
+                    )}
+                    {regStep === 'payment' && (
+                        <div className="space-y-4 text-center">
+                           <h3 className="font-bold">الدفع</h3>
+                           <p className="text-xs">المبلغ الإجمالي: {((customPlan.halls * systemFees.hallFee) + (customPlan.services * systemFees.serviceFee))} ر.س</p>
+                           <Button onClick={() => { setAuthLoading(true); setTimeout(() => { setAuthLoading(false); setRegStep('verify'); toast({title: 'رمز التحقق: ' + MOCK_OTP, variant: 'success'}); }, 1500); }}>تأكيد ودفع</Button>
+                        </div>
+                    )}
+                    {regStep === 'verify' && (
+                        <div className="space-y-4 text-center">
+                           <Input placeholder="رمز التحقق" value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+                           <Button onClick={handleVerifyAndRegister} disabled={authLoading}>{authLoading ? 'جاري التحقق...' : 'تأكيد التسجيل'}</Button>
+                        </div>
+                    )}
+                    {regStep === 'success' && (
+                        <div className="text-center">
+                          <h3 className="font-bold text-green-600">تم التسجيل بنجاح!</h3>
+                          <p className="text-xs text-gray-500 mb-4">تم إرسال طلبك للمراجعة.</p>
+                          <Button onClick={() => setShowAuthModal(false)} className="mt-4">إغلاق</Button>
+                        </div>
+                    )}
+                  </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Main Content Area */}
-      <main className={`${!isMarketplace && !isBrowse && userProfile ? 'lg:pr-[280px]' : ''}`}>
-        
-        {/* Public Pages */}
-        {activeTab === 'home' && (
-          <div className="w-full">
-            <Home 
-              user={userProfile} onLoginClick={() => openAuth('login')} 
-              onRegisterClick={() => openAuth('register')}
-              onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
-              onBrowseServices={() => {}}
-              onNavigate={setActiveTab} onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
+        {/* Main Content Area */}
+        <main className={`${!isMarketplace && !isBrowse && userProfile ? 'lg:pr-[280px]' : ''}`}>
+          {activeTab === 'home' && (
+            <div className="w-full">
+              <Home 
+                user={userProfile} onLoginClick={() => openAuth('login')} 
+                onRegisterClick={() => openAuth('register')}
+                onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
+                onBrowseServices={() => {}}
+                onNavigate={setActiveTab} onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
+              />
+            </div>
+          )}
+
+          {activeTab === 'browse' && (
+            <BrowseHalls 
+              user={userProfile} 
+              mode="halls"
+              onBack={() => setActiveTab('home')}
+              onLoginClick={() => openAuth('login')}
+              onNavigate={setActiveTab}
+              onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
+              initialFilters={browseFilters}
             />
-          </div>
-        )}
+          )}
 
-        {activeTab === 'browse' && (
-           <BrowseHalls 
-             user={userProfile} 
-             mode="halls"
-             onBack={() => setActiveTab('home')}
-             onLoginClick={() => openAuth('login')}
-             onNavigate={setActiveTab}
-             onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
-             initialFilters={browseFilters}
-           />
-        )}
-
-        {/* Protected Dashboard Pages */}
-        {activeTab !== 'home' && activeTab !== 'browse' && (
-          <div className="mx-auto w-full p-6 lg:p-10 max-w-[1600px]">
-            {/* Vendor Routes */}
-            {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
-            {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
-            {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
-            {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
-            {activeTab === 'hall_bookings' && userProfile && <Bookings user={userProfile} />}
-            {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
-            {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
-            {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
-            
-            {/* User Routes */}
-            {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
-            {activeTab === 'my_bookings' && userProfile && <Bookings user={userProfile} />}
-
-            {/* Super Admin Routes */}
-            {activeTab === 'admin_dashboard' && userProfile?.role === 'super_admin' && <AdminDashboard />}
-            {activeTab === 'admin_users' && userProfile?.role === 'super_admin' && <UsersManagement />}
-            {activeTab === 'admin_requests' && userProfile?.role === 'super_admin' && <AdminRequests />} {/* Added Route */}
-            {activeTab === 'admin_categories' && userProfile?.role === 'super_admin' && <ServiceCategories />}
-            {activeTab === 'admin_cms' && userProfile?.role === 'super_admin' && <ContentCMS />}
-            {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
-            {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
-          </div>
-        )}
-      </main>
-    </div>
+          {activeTab !== 'home' && activeTab !== 'browse' && (
+            <div className="mx-auto w-full p-6 lg:p-10 max-w-[1600px]">
+              {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
+              {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
+              {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
+              {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
+              {activeTab === 'hall_bookings' && userProfile && <Bookings user={userProfile} />}
+              {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
+              {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
+              {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
+              {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
+              {activeTab === 'my_bookings' && userProfile && <Bookings user={userProfile} />}
+              {activeTab === 'admin_dashboard' && userProfile?.role === 'super_admin' && <AdminDashboard />}
+              {activeTab === 'admin_users' && userProfile?.role === 'super_admin' && <UsersManagement />}
+              {activeTab === 'admin_requests' && userProfile?.role === 'super_admin' && <AdminRequests />}
+              {activeTab === 'admin_categories' && userProfile?.role === 'super_admin' && <ServiceCategories />}
+              {activeTab === 'admin_cms' && userProfile?.role === 'super_admin' && <ContentCMS />}
+              {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
+              {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
+            </div>
+          )}
+        </main>
+      </div>
+    </NotificationProvider>
   );
 };
 

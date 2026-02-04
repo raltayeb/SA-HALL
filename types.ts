@@ -87,7 +87,7 @@ export interface Booking {
   id: string;
   hall_id?: string;
   service_id?: string;
-  user_id: string;
+  user_id: string | null; // Allow null for guests
   vendor_id: string;
   booking_date: string;
   start_time?: string; 
@@ -95,7 +95,7 @@ export interface Booking {
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   package_name?: string; 
   total_amount: number;
-  paid_amount?: number; // New field for Deposit/Paid part
+  paid_amount?: number; 
   vat_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; 
   notes?: string;
@@ -105,6 +105,17 @@ export interface Booking {
   services?: Service;
   client?: UserProfile;
   vendor?: UserProfile;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'booking_new' | 'booking_update' | 'system' | 'payment';
+  link?: string;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface POSItem {

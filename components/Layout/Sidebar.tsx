@@ -3,30 +3,12 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { UserProfile, Hall } from '../../types';
 import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  ClipboardList, 
-  Search, 
-  Ticket, 
-  LogOut, 
-  Sparkles,
-  Heart,
-  CalendarDays,
-  Settings,
-  Palette,
-  X,
-  ShoppingCart,
-  Tag,
-  ChevronDown,
-  LayoutGrid,
-  FileText,
-  BarChart3,
-  ShieldCheck,
-  Layers,
-  Inbox
+  LayoutDashboard, Users, Building2, ClipboardList, Search, Ticket, LogOut, 
+  Sparkles, Heart, CalendarDays, Settings, Palette, X, ShoppingCart, Tag, 
+  ChevronDown, LayoutGrid, FileText, BarChart3, ShieldCheck, Layers, Inbox, Bell
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { useNotifications } from '../../context/NotificationContext'; // Import context
 
 interface SidebarProps {
   user: UserProfile | null;
@@ -42,6 +24,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, siteName = "القاعة", platformLogo }) => {
   const [vendorHalls, setVendorHalls] = useState<Hall[]>([]);
   const [selectedContextId, setSelectedContextId] = useState<string>('all');
+  const { unreadCount, markAllAsRead } = useNotifications(); // Use context
 
   useEffect(() => {
     if (user?.role === 'vendor') {
@@ -112,7 +95,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       }
     ];
   } else {
-    // User
     menuGroups = [
       {
         title: "الرئيسية",
@@ -127,7 +109,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
 
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100] lg:hidden" onClick={() => setIsOpen(false)} />}
       
       <aside className={`
@@ -155,21 +136,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setIsOpen(false)}><X className="w-5 h-5" /></Button>
             </div>
 
-            {/* Hall Selector (Vendor Only) */}
-            {user.role === 'vendor' && (
-              <div className="relative group">
-                <select 
-                  className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 pr-10 text-right text-xs font-black appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
-                  value={selectedContextId}
-                  onChange={(e) => setSelectedContextId(e.target.value)}
-                >
-                  <option value="all">كافة القاعات</option>
-                  {vendorHalls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                </select>
-                <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-hover:text-primary transition-colors" />
-              </div>
-            )}
+            {/* Notification & Hall Selector */}
+            <div className="flex gap-2">
+               {/* Notifications Button */}
+               <button 
+                 onClick={() => { setActiveTab('hall_bookings'); markAllAsRead(); }} 
+                 className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center relative hover:bg-gray-50 transition-all shrink-0"
+               >
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                  )}
+               </button>
+
+               {user.role === 'vendor' && (
+                <div className="relative group flex-1">
+                  <select 
+                    className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 pr-10 text-right text-xs font-black appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
+                    value={selectedContextId}
+                    onChange={(e) => setSelectedContextId(e.target.value)}
+                  >
+                    <option value="all">كافة القاعات</option>
+                    {vendorHalls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                  </select>
+                  <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                  <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-hover:text-primary transition-colors" />
+                </div>
+               )}
+            </div>
           </div>
 
           {/* Menu Items */}
