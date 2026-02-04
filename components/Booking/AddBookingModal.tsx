@@ -105,7 +105,9 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             vendor_id: vendorId,
             user_id: vendorId, // Assign to vendor self if manual guest
             vat_amount: (formData.total_amount || 0) * 0.15,
-            notes: `العميل: ${guestName} | جوال: ${guestPhone} | ${formData.notes || ''}`
+            guest_name: guestName,
+            guest_phone: guestPhone,
+            notes: formData.notes // Keep notes separate from guest details
         };
 
         const { error } = await supabase.from('bookings').insert([payload]);

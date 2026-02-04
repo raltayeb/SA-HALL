@@ -108,6 +108,8 @@ export interface Booking {
   paid_amount?: number; 
   vat_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; 
+  guest_name?: string;
+  guest_phone?: string;
   notes?: string;
   created_at?: string;
   halls?: Hall;
