@@ -5,7 +5,7 @@ import { Booking } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Loader2, Save, Calculator, DollarSign, User, Phone, FileText } from 'lucide-react';
+import { Loader2, Save, Calculator, DollarSign, User, Phone, FileText, CheckCircle2, Clock, PieChart, CreditCard } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { PriceTag } from '../ui/PriceTag';
 
@@ -50,17 +50,27 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
 
   const remainingAmount = Math.max(0, formData.total_amount - formData.paid_amount);
 
+  const getStatusStyles = () => {
+    switch (formData.payment_status) {
+        case 'paid':
+            return { bg: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', icon: <CheckCircle2 className="w-5 h-5 text-white" />, label: 'مدفوع بالكامل (تم السداد)' };
+        case 'partial':
+            return { bg: 'bg-amber-500', lightBg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', icon: <PieChart className="w-5 h-5 text-white" />, label: 'مدفوع جزئياً (مقدم)' };
+        default:
+            return { bg: 'bg-gray-500', lightBg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', icon: <Clock className="w-5 h-5 text-white" />, label: 'آجل / غير مدفوع' };
+    }
+  };
+
+  const statusStyle = getStatusStyles();
+
   const handleSave = async () => {
     setLoading(true);
     try {
-        // Auto update payment status based on amounts
+        // Auto update payment status logic if user manually changes amounts
+        // We trust the manual selection if it contradicts math, but mostly keep consistent
         let newPaymentStatus = formData.payment_status;
         if (formData.paid_amount >= formData.total_amount && formData.total_amount > 0) {
             newPaymentStatus = 'paid';
-        } else if (formData.paid_amount > 0) {
-            newPaymentStatus = 'partial';
-        } else {
-            newPaymentStatus = 'unpaid';
         }
 
         const { error } = await supabase
@@ -114,7 +124,7 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                 </div>
             </div>
 
-            {/* Guest Details Section (Improved Look) */}
+            {/* Guest Details Section */}
             <div className="bg-white border border-gray-200 p-4 rounded-2xl space-y-4 shadow-sm">
                 <div className="flex items-center gap-2 text-gray-800 font-bold text-xs border-b pb-2 mb-2">
                     <User className="w-4 h-4 text-primary" /> بطاقة العميل
@@ -135,12 +145,28 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                 </div>
             </div>
 
-            {/* Financials Section */}
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 space-y-4">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs">
-                    <Calculator className="w-4 h-4" /> الحسابات المالية
+            {/* Enhanced Financials Section */}
+            <div className={`p-5 rounded-2xl border space-y-5 ${statusStyle.lightBg} ${statusStyle.border}`}>
+                <div className="flex items-center justify-between border-b border-gray-200/50 pb-4">
+                    <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                        <Calculator className="w-4 h-4" /> الحسابات المالية
+                    </div>
+                    {/* Payment Status Banner */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg shadow-sm ${statusStyle.bg}`}>
+                        {statusStyle.icon}
+                        <span className="text-white text-xs font-black">{statusStyle.label}</span>
+                    </div>
                 </div>
                 
+                <div className="space-y-3">
+                    <label className="text-[10px] font-bold text-gray-500">تحديث حالة الدفع يدوياً</label>
+                    <div className="flex bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
+                        <button onClick={() => setFormData({...formData, payment_status: 'paid'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'paid' ? 'bg-emerald-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>كامل</button>
+                        <button onClick={() => setFormData({...formData, payment_status: 'partial'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'partial' ? 'bg-amber-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>جزئي</button>
+                        <button onClick={() => setFormData({...formData, payment_status: 'unpaid'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'unpaid' ? 'bg-gray-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>آجل</button>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-gray-500">إجمالي المبلغ</label>
@@ -149,17 +175,17 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                         </div>
                     </div>
                     <Input 
-                        label="المبلغ المدفوع (المقدم)" 
+                        label="المدفوع حتى الآن" 
                         type="number" 
                         value={formData.paid_amount} 
                         onChange={e => setFormData({...formData, paid_amount: Number(e.target.value)})}
-                        className="bg-white border-blue-200 focus:border-blue-400 font-bold"
+                        className="bg-white border-gray-200 focus:border-primary font-bold"
                     />
                 </div>
 
-                <div className="flex justify-between items-center pt-2 border-t border-blue-200">
-                    <span className="text-xs font-bold text-blue-800">المبلغ المتبقي:</span>
-                    <PriceTag amount={remainingAmount} className={`text-lg font-black ${remainingAmount > 0 ? 'text-red-500' : 'text-green-600'}`} />
+                <div className="flex justify-between items-center pt-2 border-t border-gray-200/50">
+                    <span className="text-xs font-bold text-gray-600">المبلغ المتبقي للتحصيل:</span>
+                    <PriceTag amount={remainingAmount} className={`text-xl font-black ${remainingAmount > 0 ? 'text-red-500' : 'text-green-600'}`} />
                 </div>
             </div>
 

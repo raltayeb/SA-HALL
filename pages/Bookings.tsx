@@ -9,7 +9,7 @@ import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetail
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
 import { 
   Search, Download, Plus, Edit2, Bell,
-  Calendar, User, CreditCard, Filter, History
+  Calendar, User, CreditCard, Filter, History, CheckCircle2, Clock, PieChart
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
@@ -97,6 +97,32 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     return matchClient && matchDate && matchStart && matchEnd && matchHall && matchPayment && matchStatus;
   });
 
+  const getPaymentStatusBadge = (status: string | undefined) => {
+    switch (status) {
+      case 'paid':
+        return (
+          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 w-fit">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-xs font-black">مدفوع بالكامل</span>
+          </div>
+        );
+      case 'partial':
+        return (
+          <div className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 w-fit">
+            <PieChart className="w-3.5 h-3.5" />
+            <span className="text-xs font-black">مدفوع جزئياً</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1.5 bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 w-fit">
+            <Clock className="w-3.5 h-3.5" />
+            <span className="text-xs font-black">آجل / غير مدفوع</span>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="space-y-6 text-right">
       {/* Header */}
@@ -164,9 +190,9 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 />
                             </div>
                         </th>
-                        <th className="p-4 min-w-[130px]">
+                        <th className="p-4 min-w-[150px]">
                             <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><CreditCard className="w-3 h-3" /> الدفع</span>
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><CreditCard className="w-3 h-3" /> حالة الدفع</span>
                                 <select 
                                     className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
                                     value={columnFilters.paymentStatus}
@@ -175,13 +201,13 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                     <option value="all">الكل</option>
                                     <option value="paid">مدفوع</option>
                                     <option value="partial">جزئي</option>
-                                    <option value="unpaid">غير مدفوع</option>
+                                    <option value="unpaid">آجل</option>
                                 </select>
                             </div>
                         </th>
                         <th className="p-4 min-w-[130px]">
                             <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Filter className="w-3 h-3" /> الحالة</span>
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Filter className="w-3 h-3" /> حالة الحجز</span>
                                 <select 
                                     className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
                                     value={columnFilters.status}
@@ -218,9 +244,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{b.halls?.name || 'حجز خدمة'}</span>
                             </td>
                             <td className="p-4">
-                                <Badge variant={b.payment_status === 'paid' ? 'success' : b.payment_status === 'partial' ? 'warning' : 'destructive'} className="rounded-lg px-3">
-                                    {b.payment_status === 'paid' ? 'مدفوع' : b.payment_status === 'partial' ? 'جزئي' : 'غير مدفوع'}
-                                </Badge>
+                                {getPaymentStatusBadge(b.payment_status)}
                             </td>
                             <td className="p-4">
                                 <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="rounded-lg px-3">

@@ -1,0 +1,397 @@
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../supabaseClient';
+import { Hall, UserProfile, Service, VAT_RATE, HALL_AMENITIES } from '../types';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { PriceTag } from '../components/ui/PriceTag';
+import { Badge } from '../components/ui/Badge';
+import { 
+  MapPin, Users, Star, Share2, Heart, ChevronRight, ChevronLeft,
+  CheckCircle2, Loader2, Sparkles, 
+  ShieldCheck, Clock, CreditCard, ArrowLeft, X, User, Phone, Wallet
+} from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { format, parseISO, startOfDay, isSameDay, isBefore } from 'date-fns';
+
+interface HallDetailsProps {
+  item: (Hall | Service) & { vendor?: UserProfile };
+  type: 'hall' | 'service';
+  user: UserProfile | null;
+  onBack: () => void;
+}
+
+export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBack }) => {
+  // UI State
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [step, setStep] = useState(1);
+  const [isBooking, setIsBooking] = useState(false);
+
+  // Data State
+  const [blockedDates, setBlockedDates] = useState<Date[]>([]);
+  
+  // Booking Form State
+  const [bookingDate, setBookingDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState('16:00');
+  const [endTime, setEndTime] = useState('23:00');
+  const [guestName, setGuestName] = useState(user?.full_name || '');
+  const [guestPhone, setGuestPhone] = useState(user?.phone_number || '');
+  const [paymentMethod, setPaymentMethod] = useState<'pay_later' | 'credit_card'>('credit_card');
+  const [cardData, setCardData] = useState({ number: '', expiry: '', cvc: '' });
+
+  const { toast } = useToast();
+  const isHall = type === 'hall';
+  const hall = isHall ? (item as Hall) : null;
+  const service = !isHall ? (item as Service) : null;
+  
+  const allImages = (item as any).images && (item as any).images.length > 0 
+    ? (item as any).images 
+    : [(item as any).image_url].filter(Boolean);
+
+  // Auto-scroll Slider
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % allImages.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [allImages.length]);
+
+  const fetchDetails = useCallback(async () => {
+    if (isHall) {
+      const { data: bookingsData } = await supabase
+        .from('bookings')
+        .select('booking_date')
+        .eq('hall_id', item.id)
+        .neq('status', 'cancelled');
+        
+      if (bookingsData) {
+        const dates = bookingsData.map(b => parseISO(b.booking_date));
+        setBlockedDates(dates);
+      }
+    }
+  }, [item.id, isHall]);
+
+  useEffect(() => { fetchDetails(); }, [fetchDetails]);
+
+  // Calculations
+  const basePrice = isHall ? Number(hall!.price_per_night) : Number(service!.price);
+  const vat = basePrice * VAT_RATE;
+  const total = basePrice + vat;
+
+  // Handlers
+  const checkAvailability = () => {
+    if (!bookingDate) return false;
+    if (isBefore(bookingDate, startOfDay(new Date()))) {
+        toast({ title: 'تاريخ غير صالح', description: 'لا يمكن الحجز في الماضي.', variant: 'destructive' });
+        return false;
+    }
+    const isBlocked = blockedDates.some(blocked => isSameDay(blocked, bookingDate));
+    if (isBlocked) {
+        toast({ title: 'نعتذر', description: 'هذا اليوم محجوز مسبقاً.', variant: 'destructive' });
+        return false;
+    }
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (step === 1) {
+        if (!bookingDate) {
+            toast({ title: 'تنبيه', description: 'يرجى اختيار التاريخ.', variant: 'destructive' });
+            return;
+        }
+        if (startTime >= endTime) {
+            toast({ title: 'خطأ في الوقت', description: 'وقت الخروج يجب أن يكون بعد وقت الدخول.', variant: 'destructive' });
+            return;
+        }
+        if (!checkAvailability()) return;
+        setStep(2);
+    } else if (step === 2) {
+        if (!guestName || !guestPhone) {
+            toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الشخصية.', variant: 'destructive' });
+            return;
+        }
+        setStep(3);
+    }
+  };
+
+  const handleBookingSubmission = async () => {
+    if (paymentMethod === 'credit_card' && (!cardData.number || !cardData.expiry || !cardData.cvc)) {
+        toast({ title: 'بيانات الدفع', description: 'بيانات البطاقة ناقصة.', variant: 'destructive' });
+        return;
+    }
+
+    setIsBooking(true);
+    try {
+      const isPaid = paymentMethod === 'credit_card';
+      const dateStr = bookingDate ? format(bookingDate, 'yyyy-MM-dd') : '';
+
+      const { error: bookingError } = await supabase.from('bookings').insert([{
+        hall_id: isHall ? hall!.id : null,
+        service_id: !isHall ? service!.id : null,
+        user_id: user?.id || null, 
+        vendor_id: item.vendor_id,
+        booking_date: dateStr,
+        start_time: startTime,
+        end_time: endTime,
+        total_amount: total,
+        paid_amount: isPaid ? total : 0,
+        vat_amount: vat,
+        payment_status: isPaid ? 'paid' : 'unpaid',
+        guest_name: guestName,
+        guest_phone: guestPhone,
+        status: isPaid ? 'confirmed' : 'pending',
+        notes: `طريقة الدفع: ${isPaid ? 'بطاقة ائتمان' : 'تحويل بنكي/آجل'}`
+      }]);
+
+      if (bookingError) throw bookingError;
+
+      toast({ 
+        title: 'تم إرسال الطلب بنجاح', 
+        description: isPaid ? 'تم تأكيد حجزك وإرسال التفاصيل.' : 'سيقوم فريق القاعة بالتواصل معك.', 
+        variant: 'success' 
+      });
+      setIsWizardOpen(false);
+      onBack();
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsBooking(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#F8F9FC] min-h-screen animate-in fade-in duration-500 pt-24 pb-20">
+      
+      <main className="max-w-7xl mx-auto px-4 lg:px-8 relative z-10">
+         
+         {/* 1. Natural Boxed Slider */}
+         <div className="relative w-full aspect-[16/9] md:h-[500px] md:aspect-auto rounded-[2.5rem] overflow-hidden bg-black group mb-10 shadow-2xl">
+            {allImages.map((img, i) => (
+               <div 
+                  key={i} 
+                  className={`absolute inset-0 transition-opacity duration-1000 ${i === activeSlide ? 'opacity-100' : 'opacity-0'}`}
+               >
+                  <img src={img} className="w-full h-full object-cover" alt="Venue" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+               </div>
+            ))}
+            
+            {/* Slider Controls */}
+            <div className="absolute inset-0 flex items-center justify-between px-6 opacity-0 group-hover:opacity-100 transition-opacity">
+               <button onClick={() => setActiveSlide((prev) => (prev - 1 + allImages.length) % allImages.length)} className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md hover:bg-white text-white hover:text-black flex items-center justify-center transition-all">
+                  <ChevronRight className="w-6 h-6" />
+               </button>
+               <button onClick={() => setActiveSlide((prev) => (prev + 1) % allImages.length)} className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md hover:bg-white text-white hover:text-black flex items-center justify-center transition-all">
+                  <ChevronLeft className="w-6 h-6" />
+               </button>
+            </div>
+
+            {/* Indicators */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+               {allImages.map((_, i) => (
+                  <button 
+                     key={i} 
+                     onClick={() => setActiveSlide(i)} 
+                     className={`h-1.5 rounded-full transition-all duration-300 ${i === activeSlide ? 'w-8 bg-white' : 'w-2 bg-white/40'}`} 
+                  />
+               ))}
+            </div>
+         </div>
+
+         <div className="grid lg:grid-cols-12 gap-12">
+            
+            {/* RIGHT: Content */}
+            <div className="lg:col-span-8 space-y-8">
+               <div className="bg-white rounded-[2.5rem] p-10 shadow-xl shadow-gray-200/50 space-y-8 border border-gray-100">
+                  <div className="flex flex-wrap items-center gap-4">
+                     <Badge className="bg-primary/10 text-primary border-primary/20 px-3 py-1 text-xs gap-1"><Sparkles className="w-3 h-3" /> موصى به</Badge>
+                     {isHall && <span className="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{hall?.capacity} ضيف</span>}
+                     <div className="flex items-center gap-1 text-yellow-500 text-sm font-bold"><Star className="w-4 h-4 fill-current" /> 4.9 (120 تقييم)</div>
+                  </div>
+
+                  <div>
+                     <div className="flex justify-between items-start">
+                        <h2 className="text-3xl font-black text-gray-900 mb-4 leading-tight">{item.name}</h2>
+                        <div className="flex gap-2">
+                           <Button variant="ghost" className="rounded-full w-10 h-10 p-0 hover:bg-gray-100"><Share2 className="w-5 h-5 text-gray-400" /></Button>
+                           <Button variant="ghost" className="rounded-full w-10 h-10 p-0 hover:bg-gray-100"><Heart className="w-5 h-5 text-gray-400" /></Button>
+                        </div>
+                     </div>
+                     <p className="text-xs text-gray-500 font-bold flex items-center gap-1 mb-6"><MapPin className="w-3 h-3" /> {isHall ? hall?.city : 'خدمة'}</p>
+                     
+                     <p className="text-gray-600 leading-loose text-lg font-medium">
+                        {item.description || "استمتع بتجربة فريدة ومميزة. نوفر لكم أفضل الخدمات لضمان نجاح مناسبتكم بأعلى معايير الجودة والفخامة."}
+                     </p>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-8">
+                     <h3 className="text-xl font-black mb-6 flex items-center gap-2 text-gray-900"><CheckCircle2 className="w-6 h-6 text-primary" /> المميزات والخدمات</h3>
+                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {(isHall ? (hall?.amenities?.length ? hall.amenities : HALL_AMENITIES) : ['فريق احترافي', 'معدات حديثة']).map((amenity, i) => (
+                           <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 hover:border-primary/30 transition-colors">
+                              <span className="w-2 h-2 rounded-full bg-green-500"></span> {amenity}
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+
+               {/* Map Section */}
+               <div className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
+                  <h3 className="text-xl font-black mb-6 text-gray-900">الموقع على الخريطة</h3>
+                  <div className="aspect-video bg-gray-100 rounded-[2rem] border border-gray-200 flex items-center justify-center relative overflow-hidden group cursor-pointer">
+                     <MapPin className="w-12 h-12 text-gray-400 group-hover:scale-110 transition-transform" />
+                     <span className="mt-2 text-sm text-gray-500 font-bold absolute bottom-6">اضغط لفتح الخريطة</span>
+                  </div>
+               </div>
+            </div>
+
+            {/* LEFT: Booking Sidebar */}
+            <div className="lg:col-span-4 relative">
+               <div className="sticky top-24 space-y-6">
+                  <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-2xl shadow-primary/5 space-y-6 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-purple-400"></div>
+                     
+                     <div className="flex justify-between items-end border-b border-gray-100 pb-6">
+                        <div className="text-right">
+                           <p className="text-xs font-bold text-gray-400 mb-1">السعر يبدأ من</p>
+                           <PriceTag amount={basePrice} className="text-4xl font-black text-primary" />
+                        </div>
+                        <div className="text-left">
+                           <span className="text-xs font-bold text-gray-400">/{isHall ? 'الليلة' : 'الخدمة'}</span>
+                        </div>
+                     </div>
+
+                     <div className="space-y-4">
+                        <div className="bg-green-50 text-green-700 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 border border-green-100">
+                           <ShieldCheck className="w-5 h-5" /> ضمان أفضل سعر
+                        </div>
+                        <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 space-y-2 text-center">
+                           <p className="text-xs font-bold text-gray-400">سياسة الإلغاء</p>
+                           <p className="text-sm font-black text-gray-800">إلغاء مجاني قبل 48 ساعة من الموعد</p>
+                        </div>
+                     </div>
+
+                     <Button onClick={() => { setStep(1); setIsWizardOpen(true); }} className="w-full h-16 rounded-[1.8rem] text-xl font-black shadow-2xl shadow-primary/25 hover:scale-[1.02] active:scale-95 transition-all bg-primary text-white">
+                        احجز الآن
+                     </Button>
+                     
+                     <div className="flex justify-center items-center gap-2 text-[10px] text-gray-400 font-bold">
+                        <User className="w-3 h-3" /> أكثر من 50 شخص حجزوا هذا المكان
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </div>
+      </main>
+
+      {/* Booking Wizard Modal */}
+      {isWizardOpen && (
+        <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+           <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-white/20 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
+              
+              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+                 <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-black text-sm">{step}</span>
+                    <span className="text-sm font-bold text-gray-500">
+                        {step === 1 ? 'الموعد' : step === 2 ? 'البيانات' : 'الدفع'}
+                    </span>
+                 </div>
+                 <button onClick={() => setIsWizardOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
+              </div>
+
+              <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+                 {step === 1 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="text-center">
+                            <h3 className="text-xl font-black mb-2">متى مناسبتك؟</h3>
+                            <p className="text-sm text-gray-500 font-medium">اختر التاريخ والوقت المناسب</p>
+                        </div>
+                        <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100">
+                            {/* Standard HTML Date Input Replacement */}
+                            <label className="block text-sm font-bold text-gray-700 mb-2">تاريخ الحجز</label>
+                            <input
+                                type="date"
+                                value={bookingDate ? format(bookingDate, 'yyyy-MM-dd') : ''}
+                                onChange={(e) => setBookingDate(e.target.value ? parseISO(e.target.value) : undefined)}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="w-full h-12 bg-white border border-gray-200 rounded-xl px-4 font-bold text-gray-900 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input label="وقت الدخول" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="h-12 rounded-xl text-center font-bold" />
+                            <Input label="وقت الخروج" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="h-12 rounded-xl text-center font-bold" />
+                        </div>
+                    </div>
+                 )}
+
+                 {step === 2 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="text-center">
+                            <h3 className="text-xl font-black mb-2">بيانات التواصل</h3>
+                            <p className="text-sm text-gray-500 font-medium">لمن سيتم إصدار الحجز؟</p>
+                        </div>
+                        <div className="space-y-4">
+                            <Input label="الاسم الكامل" value={guestName} onChange={e => setGuestName(e.target.value)} className="h-14 rounded-2xl font-bold" icon={<User className="w-4 h-4" />} />
+                            <Input label="رقم الجوال" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} className="h-14 rounded-2xl font-bold" icon={<Phone className="w-4 h-4" />} />
+                        </div>
+                    </div>
+                 )}
+
+                 {step === 3 && (
+                    <div className="space-y-6 animate-in slide-in-from-right-4">
+                        <div className="text-center">
+                            <h3 className="text-xl font-black mb-2">مراجعة وتأكيد</h3>
+                            <p className="text-sm text-gray-500 font-medium">الخطوة الأخيرة لإتمام الحجز</p>
+                        </div>
+                        
+                        <div className="bg-gray-50 p-6 rounded-[2rem] border border-gray-100 space-y-4">
+                            <div className="flex justify-between text-sm font-bold text-gray-500">
+                                <span>التاريخ</span>
+                                <span className="text-gray-900">{bookingDate ? format(bookingDate, 'yyyy-MM-dd') : ''}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-bold text-gray-500">
+                                <span>الإجمالي</span>
+                                <PriceTag amount={total} className="text-primary font-black" />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => setPaymentMethod('credit_card')} className={`p-4 rounded-2xl border-2 font-bold text-xs flex flex-col items-center gap-2 ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
+                                <CreditCard className="w-6 h-6" /> دفع إلكتروني
+                            </button>
+                            <button onClick={() => setPaymentMethod('pay_later')} className={`p-4 rounded-2xl border-2 font-bold text-xs flex flex-col items-center gap-2 ${paymentMethod === 'pay_later' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
+                                <Wallet className="w-6 h-6" /> تحويل / آجل
+                            </button>
+                        </div>
+
+                        {paymentMethod === 'credit_card' && (
+                            <div className="space-y-3 animate-in slide-in-from-top-2">
+                                <Input placeholder="رقم البطاقة" value={cardData.number} onChange={e => setCardData({...cardData, number: e.target.value})} className="text-center font-mono h-12 rounded-xl" />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Input placeholder="MM/YY" value={cardData.expiry} onChange={e => setCardData({...cardData, expiry: e.target.value})} className="text-center font-mono h-12 rounded-xl" />
+                                    <Input placeholder="CVC" value={cardData.cvc} onChange={e => setCardData({...cardData, cvc: e.target.value})} className="text-center font-mono h-12 rounded-xl" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                 )}
+              </div>
+
+              <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
+                 {step > 1 && (
+                    <Button variant="outline" onClick={() => setStep(step - 1)} className="h-14 px-6 rounded-2xl font-bold">
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                 )}
+                 <Button onClick={step < 3 ? handleNextStep : handleBookingSubmission} disabled={isBooking} className="flex-1 h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">
+                    {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : (step < 3 ? 'التالي' : 'تأكيد الحجز')}
+                 </Button>
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};

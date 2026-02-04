@@ -1,50 +1,32 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, Service, SAUDI_CITIES } from '../types';
+import { Hall, UserProfile, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag, SaudiRiyalIcon } from '../components/ui/PriceTag';
 import { 
   Search, MapPin, Users, Star, 
-  Sparkles, Building2, 
-  ChevronLeft, ArrowLeft,
-  Diamond, Calendar as CalendarIcon, Send, Globe, User, Share2, Package, LogOut, LayoutDashboard, CalendarDays, Settings, ClipboardList,
-  Play, ChevronDown, CheckCircle2, Quote, ArrowRight, Home as HomeIcon,
-  ShieldCheck, Zap, CreditCard, Clock, Award
+  Sparkles, ChevronDown, Play, 
+  Quote, ArrowLeft, ShieldCheck, Zap, CreditCard, Clock, Award
 } from 'lucide-react';
-import { HallDetailPopup } from '../components/Home/HallDetailPopup';
 
 interface HomeProps {
   user: UserProfile | null;
   onLoginClick: () => void;
   onRegisterClick?: () => void;
   onBrowseHalls: (filters?: any) => void;
-  onBrowseServices: () => void;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string, item?: any) => void;
   onLogout: () => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onBrowseServices, onNavigate, onLogout }) => {
+export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<(Hall & { vendor?: UserProfile })[]>([]);
   const [loadingHalls, setLoadingHalls] = useState(true);
-  const [selectedEntity, setSelectedEntity] = useState<{ item: any, type: 'hall' | 'service' } | null>(null);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   // Hero Filter State
   const [filterCity, setFilterCity] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterBudget, setFilterBudget] = useState(150000);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const fetchHalls = useCallback(async () => {
     setLoadingHalls(true);
@@ -77,54 +59,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-[#111827]">
-      {/* Luxury Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 lg:px-20 py-4 shadow-sm">
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-12">
-            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onNavigate('home')}>
-              <img src="/logo.png" alt="SA Hall" className="h-14 w-auto object-contain" />
-            </div>
-            <nav className="hidden lg:flex items-center gap-8">
-              <button className="text-xs font-bold text-primary border-b-2 border-primary pb-1">الرئيسية</button>
-              <button onClick={() => onBrowseHalls()} className="text-xs font-bold text-gray-500 hover:text-primary transition-colors">القاعات</button>
-              <button className="text-xs font-bold text-gray-500 hover:text-primary transition-colors">الباقات</button>
-              <button className="text-xs font-bold text-gray-500 hover:text-primary transition-colors">إدارة المناسبات</button>
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {!user ? (
-              <div className="flex items-center gap-4">
-                <button onClick={onLoginClick} className="text-xs font-bold text-gray-600 hover:text-primary">بوابة الشركاء</button>
-                <Button onClick={onRegisterClick || onLoginClick} className="rounded-full px-6 h-10 text-xs font-black bg-[#111827] hover:bg-black text-white">كن شريك نجاح</Button>
-              </div>
-            ) : (
-              <div className="relative" ref={menuRef}>
-                <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 bg-white border p-1 rounded-full hover:shadow-md transition-all">
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-black">{user.full_name?.[0]}</div>
-                  <span className="text-[11px] font-bold ps-1 pe-2">{user.full_name}</span>
-                  <ChevronDown className="w-3 h-3 text-gray-400 me-2" />
-                </button>
-                {isUserMenuOpen && (
-                  <div className="absolute left-0 mt-3 w-56 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 z-[110] text-right">
-                    <div className="p-4 border-b border-gray-50">
-                      <p className="text-xs font-bold text-gray-900">{user.full_name}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{user.email}</p>
-                    </div>
-                    <div className="p-2 space-y-1">
-                      <button onClick={() => onNavigate('dashboard')} className="w-full flex items-center justify-end gap-3 px-4 py-3 rounded-xl text-[11px] font-bold text-gray-600 hover:bg-gray-50">لوحة التحكم <LayoutDashboard className="w-4 h-4" /></button>
-                      <button onClick={onLogout} className="w-full flex items-center justify-end gap-3 px-4 py-3 rounded-xl text-[11px] font-bold text-red-600 hover:bg-red-50">خروج <LogOut className="w-4 h-4" /></button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
-      <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden px-6 lg:px-20 w-full">
+      <section className="relative min-h-[90vh] flex items-center pt-24 overflow-hidden px-6 lg:px-20 w-full">
         <div className="absolute inset-0 z-0">
           <img 
             src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=2000" 
@@ -170,7 +106,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase text-gray-400 ps-1">نوع القاعة</label>
                   <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                    <HomeIcon className="w-5 h-5 text-primary" />
+                    <Award className="w-5 h-5 text-primary" />
                     <select 
                       className="bg-transparent border-none text-sm font-bold w-full outline-none appearance-none cursor-pointer"
                       value={filterType}
@@ -239,10 +175,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
               halls.map((hall) => (
                 <div 
                   key={hall.id} 
-                  onClick={() => setSelectedEntity({ item: hall, type: 'hall' })} 
+                  onClick={() => onNavigate('hall_details', { item: hall, type: 'hall' })} 
                   className="group relative cursor-pointer text-right transition-all duration-500 hover:-translate-y-2"
                 >
-                  {/* Clean Creative Card */}
                   <div className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl transition-all">
                     <div className="relative aspect-[4/3] overflow-hidden">
                       <img 
@@ -488,7 +423,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
              <div className="col-span-2 space-y-8">
                 <div className="flex items-center gap-2 justify-end">
                    <h2 className="text-4xl font-ruqaa text-white leading-none mt-1">قاعه</h2>
-                   <img src="/logo.png" alt="SA Hall" className="h-8 w-auto brightness-0 invert opacity-80" />
+                   <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-8 w-auto brightness-0 invert opacity-80" />
                 </div>
                 <p className="text-sm text-gray-400 font-medium leading-relaxed max-w-xs ml-auto">نحن نعيد تعريف مفهوم الفخامة في حجز وإدارة المناسبات الكبرى في المملكة العربية السعودية، لنخلق ذكريات خالدة تليق بتطلعاتك.</p>
              </div>
@@ -519,15 +454,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           </div>
         </div>
       </footer>
-
-      {selectedEntity && (
-        <HallDetailPopup 
-          item={selectedEntity.item} 
-          type={selectedEntity.type}
-          user={user} 
-          onClose={() => setSelectedEntity(null)} 
-        />
-      )}
     </div>
   );
 };
