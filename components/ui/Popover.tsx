@@ -4,23 +4,37 @@ import React, { useState, useRef, useEffect } from 'react';
 interface PopoverProps {
   children: React.ReactNode;
   align?: 'start' | 'center' | 'end';
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export const Popover: React.FC<PopoverProps> = ({ children, align = 'start' }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const Popover: React.FC<PopoverProps> = ({ children, align = 'start', open, onOpenChange }) => {
+  const [internalOpen, setInternalOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : internalOpen;
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!isControlled) {
+      setInternalOpen(newOpen);
+    }
+    onOpenChange?.(newOpen);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        handleOpenChange(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen]);
 
-  const toggle = () => setIsOpen(!isOpen);
+  const toggle = () => handleOpenChange(!isOpen);
 
   // We find the trigger and content by type name or by convention (first is trigger, second is content)
   const childrenArray = React.Children.toArray(children);
