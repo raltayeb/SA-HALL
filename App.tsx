@@ -46,6 +46,8 @@ const App: React.FC = () => {
   
   // Use Ref to track current profile ID to prevent loop
   const profileIdRef = useRef<string | null>(null);
+  // Use Ref to track active tab to prevent stale closures in auth listener
+  const activeTabRef = useRef(activeTab);
   
   // Auth State
   const [isRegister, setIsRegister] = useState(false);
@@ -87,6 +89,11 @@ const App: React.FC = () => {
     setOtpCode('');
   };
 
+  // Sync activeTabRef with state
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
   const fetchProfile = async (id: string, isInitialLoad = false) => {
     // If we already have this user loaded and it's not a forced initial load, skip
     if (profileIdRef.current === id && !isInitialLoad) {
@@ -101,9 +108,11 @@ const App: React.FC = () => {
           setUserProfile(profile);
           profileIdRef.current = profile.id;
 
-          // Only redirect if on landing pages and it's the first load
+          // Only redirect if on landing pages and it's the first load (or recovery)
+          // We check activeTabRef.current to ensure we don't redirect if the user is already inside the dashboard
           if (isInitialLoad) {
-            if (activeTab === 'home' || activeTab === 'browse') {
+            const currentTab = activeTabRef.current;
+            if (currentTab === 'home' || currentTab === 'browse') {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
                 else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
                 else if (profile.role === 'user') setActiveTab('browse');

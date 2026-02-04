@@ -117,6 +117,41 @@ export interface Booking {
   vendor?: UserProfile;
 }
 
+export interface PaymentLog {
+  id: string;
+  booking_id: string;
+  vendor_id: string;
+  amount: number;
+  payment_method: 'cash' | 'card' | 'transfer';
+  payment_date: string;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
+}
+
+export interface Expense {
+  id: string;
+  vendor_id: string;
+  title: string;
+  amount: number;
+  category: 'salary' | 'rent' | 'maintenance' | 'utilities' | 'marketing' | 'other';
+  expense_date: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface ExternalInvoice {
+  id: string;
+  vendor_id: string;
+  customer_name: string;
+  invoice_date: string;
+  items: { description: string; quantity: number; unit_price: number; total: number }[];
+  total_amount: number;
+  vat_amount: number;
+  status: 'paid' | 'unpaid';
+  created_at?: string;
+}
+
 export interface Notification {
   id: string;
   user_id: string;
@@ -159,4 +194,5 @@ export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 
 export const HALL_AMENITIES = ['مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية', 'بوفيه مفتوح', 'غرفة كبار الزوار', 'مدخل مستقل'];
 export const SERVICE_CATEGORIES = ['ضيافة', 'تصوير', 'كوش', 'بوفيه', 'إضاءة وصوت', 'زينة وزهور', 'تنسيق حفلات', 'أخرى'];
 export const POS_CATEGORIES = ['مشروبات', 'مأكولات', 'خدمات إضافية', 'تأجير', 'عام'];
+export const EXPENSE_CATEGORIES = ['رواتب', 'إيجار', 'صيانة', 'فواتير', 'تسويق', 'أخرى'];
 export const VAT_RATE = 0.15;

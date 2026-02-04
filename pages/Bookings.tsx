@@ -6,14 +6,14 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
+import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
 import { 
-  Search, Download, Plus, Edit2, SlidersHorizontal, Bell,
-  Calendar, User, CreditCard, Filter
+  Search, Download, Plus, Edit2, Bell,
+  Calendar, User, CreditCard, Filter, History
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { format } from 'date-fns';
-import { arSA } from 'date-fns/locale';
 
 interface BookingsProps {
   user: UserProfile;
@@ -26,6 +26,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // Column Filters
@@ -96,15 +97,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     return matchClient && matchDate && matchStart && matchEnd && matchHall && matchPayment && matchStatus;
   });
 
-  const handleEditClick = (booking: Booking) => {
-      setSelectedBooking(booking);
-      if (user.role === 'vendor') {
-          setIsEditModalOpen(true);
-      } else {
-          setIsInvoiceOpen(true); // Users only see invoice
-      }
-  };
-
   return (
     <div className="space-y-6 text-right">
       {/* Header */}
@@ -161,28 +153,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 />
                             </div>
                         </th>
-                        <th className="p-4 min-w-[100px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">وقت الدخول</span>
-                                <input 
-                                    type="time"
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.startTime}
-                                    onChange={e => setColumnFilters({...columnFilters, startTime: e.target.value})}
-                                />
-                            </div>
-                        </th>
-                        <th className="p-4 min-w-[100px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">وقت الخروج</span>
-                                <input 
-                                    type="time"
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.endTime}
-                                    onChange={e => setColumnFilters({...columnFilters, endTime: e.target.value})}
-                                />
-                            </div>
-                        </th>
                         <th className="p-4 min-w-[150px]">
                             <div className="space-y-3">
                                 <span className="text-[10px] font-black uppercase text-primary tracking-wider">القاعة / الباقة</span>
@@ -224,16 +194,16 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 </select>
                             </div>
                         </th>
-                        <th className="p-4 text-center min-w-[80px]">
+                        <th className="p-4 text-center min-w-[120px]">
                             <span className="text-[10px] font-black uppercase text-primary tracking-wider">أجراءات</span>
                         </th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                     {loading ? (
-                        <tr><td colSpan={8} className="p-10 text-center animate-pulse text-gray-400 font-bold">جاري تحميل البيانات...</td></tr>
+                        <tr><td colSpan={6} className="p-10 text-center animate-pulse text-gray-400 font-bold">جاري تحميل البيانات...</td></tr>
                     ) : filteredBookings.length === 0 ? (
-                        <tr><td colSpan={8} className="p-10 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة للفلاتر</td></tr>
+                        <tr><td colSpan={6} className="p-10 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة للفلاتر</td></tr>
                     ) : filteredBookings.map((b) => (
                         <tr key={b.id} className="hover:bg-gray-50/50 transition-colors group">
                             <td className="p-4">
@@ -242,9 +212,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                             </td>
                             <td className="p-4 font-bold text-xs text-gray-600 font-mono">
                                 {format(new Date(b.booking_date), 'yyyy-MM-dd')}
+                                {b.start_time && <div className="text-[10px] text-gray-400 mt-1 dir-ltr">{b.start_time.slice(0,5)} - {b.end_time?.slice(0,5)}</div>}
                             </td>
-                            <td className="p-4 font-bold text-xs text-gray-900 dir-ltr">{b.start_time ? format(new Date(`2000-01-01T${b.start_time}`), 'h:mm a') : '-'}</td>
-                            <td className="p-4 font-bold text-xs text-gray-900 dir-ltr">{b.end_time ? format(new Date(`2000-01-01T${b.end_time}`), 'h:mm a') : '-'}</td>
                             <td className="p-4">
                                 <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{b.halls?.name || 'حجز خدمة'}</span>
                             </td>
@@ -259,7 +228,14 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 </Badge>
                             </td>
                             <td className="p-4 text-center">
-                                <button onClick={() => handleEditClick(b)} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
+                                <div className="flex items-center justify-center gap-2">
+                                    <button onClick={() => { setSelectedBooking(b); setIsPaymentModalOpen(true); }} className="text-green-600 hover:bg-green-50 p-2 rounded-lg transition-all" title="سجل الدفعات">
+                                        <History className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => { setSelectedBooking(b); user.role === 'vendor' ? setIsEditModalOpen(true) : setIsInvoiceOpen(true); }} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all" title="تعديل التفاصيل">
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     ))}
@@ -282,12 +258,20 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                 }} 
             />
             {user.role === 'vendor' && (
-                <EditBookingDetailsModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
-                    booking={selectedBooking}
-                    onSuccess={fetchBookings}
-                />
+                <>
+                    <EditBookingDetailsModal
+                        isOpen={isEditModalOpen}
+                        onClose={() => setIsEditModalOpen(false)}
+                        booking={selectedBooking}
+                        onSuccess={fetchBookings}
+                    />
+                    <PaymentHistoryModal 
+                        isOpen={isPaymentModalOpen}
+                        onClose={() => setIsPaymentModalOpen(false)}
+                        booking={selectedBooking}
+                        onUpdate={fetchBookings}
+                    />
+                </>
             )}
         </>
       )}
