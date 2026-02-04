@@ -223,8 +223,9 @@ const App: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-white">
-      <div className="text-5xl font-ruqaa text-primary animate-pulse">القاعة</div>
+    <div className="flex h-screen items-center justify-center bg-white flex-col gap-4">
+      <img src="/logo.png" alt="SA Hall" className="h-20 w-auto animate-pulse" />
+      <div className="text-xl font-ruqaa text-primary">القاعة</div>
     </div>
   );
 
@@ -282,7 +283,8 @@ const App: React.FC = () => {
               <button onClick={() => setShowAuthModal(false)} className="absolute top-6 left-6 text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
               
               <div className="text-center mb-6">
-                  <div className="text-5xl font-ruqaa text-primary mb-1">القاعة</div>
+                  <img src="/logo.png" alt="SA Hall" className="h-16 mx-auto mb-2 object-contain" />
+                  <div className="text-2xl font-ruqaa text-primary mb-1">القاعة</div>
                   <h2 className="text-xl font-black text-gray-900">
                     {!isRegister ? 'بوابة الشركاء' : 'إنشاء حساب بائع جديد'}
                   </h2>

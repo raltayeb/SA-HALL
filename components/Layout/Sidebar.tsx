@@ -120,9 +120,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         {/* Header */}
         <div className="h-24 flex items-center px-6 border-b border-border/40">
           <div className="flex items-center gap-4 w-full">
-            <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center">
-                {/* Logo Placeholder */}
-                <span className="font-ruqaa text-2xl pb-2">ق</span>
+            <div className="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center p-1.5 overflow-hidden">
+                <img src={platformLogo || "/logo.png"} alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <h1 className="text-xl font-ruqaa text-foreground leading-none mt-1">القاعة</h1>

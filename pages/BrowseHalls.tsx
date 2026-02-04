@@ -98,8 +98,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-12">
           <div className="flex items-center gap-10">
             <div onClick={onBack} className="flex items-center gap-2 cursor-pointer group shrink-0">
-              <Diamond className="w-7 h-7 text-primary fill-current" />
-              <h2 className="text-4xl font-ruqaa text-primary leading-none mt-1">قاعه</h2>
+              <img src="/logo.png" alt="SA Hall" className="h-10 w-auto object-contain" />
             </div>
             
             <div className="hidden xl:flex items-center h-12 min-w-[500px] rounded-2xl border border-gray-100 bg-gray-50 px-6 focus-within:ring-2 focus-within:ring-primary/10 transition-all">

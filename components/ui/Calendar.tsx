@@ -2,6 +2,7 @@
 import React from "react";
 import { DayPicker } from "react-day-picker";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { arSA } from "date-fns/locale";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
@@ -13,41 +14,45 @@ function Calendar({
 }: CalendarProps) {
   return (
     <DayPicker
+      locale={arSA}
+      dir="rtl"
       showOutsideDays={showOutsideDays}
-      className={`p-4 bg-white rounded-2xl border border-gray-100 shadow-sm ${className}`}
+      className={`p-4 bg-white rounded-[1.5rem] border border-gray-100 shadow-xl shadow-primary/5 ${className}`}
       classNames={{
-        months: "flex flex-col space-y-4",
-        month: "space-y-4",
-        caption: "flex justify-between items-center relative h-10 mb-2 px-1",
-        caption_label: "text-sm font-bold text-gray-900 mx-auto tracking-tight",
-        nav: "flex items-center gap-1",
-        nav_button: "h-8 w-8 bg-transparent border-none flex items-center justify-center text-gray-400 hover:text-primary transition-all z-10 hover:bg-gray-50 rounded-lg",
-        nav_button_previous: "absolute left-0",
-        nav_button_next: "absolute right-0",
-        table: "w-full border-collapse",
-        head_row: "flex justify-between mb-4",
-        head_cell: "text-gray-400 w-8 font-bold text-[10px] uppercase text-center tracking-wider",
-        row: "flex w-full mt-1 justify-between",
-        cell: "h-8 w-8 text-center text-[11px] p-0 relative focus-within:relative focus-within:z-20",
-        day: "h-8 w-8 p-0 font-bold rounded-lg transition-all hover:bg-primary/5 flex items-center justify-center text-gray-700",
-        day_selected: "bg-primary text-white hover:bg-primary hover:text-white focus:bg-primary font-bold shadow-md !rounded-lg",
-        day_today: "text-primary font-black border-b-2 border-primary rounded-none",
-        day_outside: "text-gray-300 opacity-50 pointer-events-none",
-        day_disabled: "text-gray-200 opacity-30 cursor-not-allowed",
+        months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+        month: "space-y-4 w-full",
+        
+        caption: "flex justify-center pt-1 relative items-center mb-2",
+        caption_label: "text-lg font-black text-primary tracking-tight font-ruqaa",
+        
+        nav: "space-x-1 flex items-center absolute inset-x-0 justify-between px-1",
+        nav_button: "h-8 w-8 bg-white border border-gray-100 p-0 hover:bg-primary hover:text-white rounded-xl transition-all flex items-center justify-center shadow-sm text-gray-500",
+        nav_button_previous: "",
+        nav_button_next: "",
+        
+        table: "w-full border-collapse", // Standard table layout to prevent vertical stacking
+        head_row: "", // Let it be a table row
+        head_cell: "text-gray-400 w-10 font-bold text-[0.8rem] pb-2 uppercase tracking-wider",
+        
+        row: "w-full mt-2", // Let it be a table row
+        cell: "h-10 w-10 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-primary/5 first:[&:has([aria-selected])]:rounded-r-xl last:[&:has([aria-selected])]:rounded-l-xl focus-within:relative focus-within:z-20",
+        
+        day: "h-10 w-10 p-0 font-bold text-sm aria-selected:opacity-100 rounded-xl hover:bg-gray-100 hover:text-primary transition-all flex items-center justify-center mx-auto",
+        day_selected: "bg-primary text-white hover:bg-primary hover:text-white focus:bg-primary focus:text-white shadow-lg shadow-primary/30",
+        day_today: "bg-gray-50 text-primary border-2 border-primary/20",
+        day_outside: "text-gray-300 opacity-50",
+        day_disabled: "text-gray-300 opacity-50 cursor-not-allowed bg-gray-50/50",
         day_hidden: "invisible",
-        caption_dropdowns: "flex gap-2 items-center mx-auto",
-        dropdown: "bg-transparent border-none text-[11px] font-bold text-gray-900 focus:ring-0 cursor-pointer p-1 hover:bg-gray-50 rounded transition-colors",
-        vhidden: "hidden",
         ...classNames,
       }}
       components={{
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        IconLeft: ({ ...props }) => <ChevronRight className="h-5 w-5" />, // Swapped for RTL (Previous points Right)
+        IconRight: ({ ...props }) => <ChevronLeft className="h-5 w-5" />, // Swapped for RTL (Next points Left)
       }}
       {...props}
     />
   );
 }
-Calendar.displayName = "Calendar";
 
+Calendar.displayName = "Calendar";
 export { Calendar };

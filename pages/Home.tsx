@@ -82,12 +82,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-12">
             <div className="flex items-center gap-2 cursor-pointer group" onClick={() => onNavigate('home')}>
-              <div className="text-primary transition-transform group-hover:rotate-12">
-                <Diamond className="w-8 h-8 fill-current" />
-              </div>
-              <h1 className="text-3xl font-ruqaa leading-none tracking-tighter text-primary mt-1">
-                قاعه
-              </h1>
+              <img src="/logo.png" alt="SA Hall" className="h-14 w-auto object-contain" />
             </div>
             <nav className="hidden lg:flex items-center gap-8">
               <button className="text-xs font-bold text-primary border-b-2 border-primary pb-1">الرئيسية</button>
@@ -493,7 +488,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
              <div className="col-span-2 space-y-8">
                 <div className="flex items-center gap-2 justify-end">
                    <h2 className="text-4xl font-ruqaa text-white leading-none mt-1">قاعه</h2>
-                   <Diamond className="w-8 h-8 text-primary fill-current" />
+                   <img src="/logo.png" alt="SA Hall" className="h-8 w-auto brightness-0 invert opacity-80" />
                 </div>
                 <p className="text-sm text-gray-400 font-medium leading-relaxed max-w-xs ml-auto">نحن نعيد تعريف مفهوم الفخامة في حجز وإدارة المناسبات الكبرى في المملكة العربية السعودية، لنخلق ذكريات خالدة تليق بتطلعاتك.</p>
              </div>
