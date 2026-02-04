@@ -21,6 +21,7 @@ import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { Favorites } from './pages/Favorites';
 import { AdminRequests } from './pages/AdminRequests';
+import { VendorAccounting } from './pages/VendorAccounting';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -264,7 +265,7 @@ const App: React.FC = () => {
 
   return (
     <NotificationProvider userId={userProfile?.id}>
-      <div className="min-h-screen bg-gray-50 text-gray-900" dir="rtl">
+      <div className="min-h-screen bg-[#F8F9FC] text-gray-900 font-sans" dir="rtl">
         {/* Sidebar Navigation */}
         {!isMarketplace && !isBrowse && userProfile && (
           <Sidebar 
@@ -495,7 +496,7 @@ const App: React.FC = () => {
         )}
 
         {/* Main Content Area */}
-        <main className={`${!isMarketplace && !isBrowse && userProfile ? 'lg:pr-[280px]' : ''}`}>
+        <main className={`${!isMarketplace && !isBrowse && userProfile ? 'lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8' : ''}`}>
           {activeTab === 'home' && (
             <div className="w-full">
               <Home 
@@ -521,7 +522,7 @@ const App: React.FC = () => {
           )}
 
           {activeTab !== 'home' && activeTab !== 'browse' && (
-            <div className="mx-auto w-full p-6 lg:p-10 max-w-[1600px]">
+            <div className="mx-auto w-full max-w-[1600px]">
               {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
               {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
               {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
@@ -529,6 +530,7 @@ const App: React.FC = () => {
               {activeTab === 'hall_bookings' && userProfile && <Bookings user={userProfile} />}
               {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
               {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
+              {activeTab === 'accounting' && userProfile && <VendorAccounting user={userProfile} />}
               {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
               {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
               {activeTab === 'my_bookings' && userProfile && <Bookings user={userProfile} />}
