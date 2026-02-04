@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { UserProfile, VAT_RATE } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
@@ -43,6 +43,9 @@ const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [browseFilters, setBrowseFilters] = useState<any>(null);
   
+  // Use Ref to track current profile ID to prevent loop
+  const profileIdRef = useRef<string | null>(null);
+  
   // Auth State
   const [isRegister, setIsRegister] = useState(false);
   const [regStep, setRegStep] = useState<RegStep>(0);
@@ -83,17 +86,62 @@ const App: React.FC = () => {
     setOtpCode('');
   };
 
+  const fetchProfile = async (id: string, isInitialLoad = false) => {
+    // If we already have this user loaded and it's not a forced initial load, skip
+    if (profileIdRef.current === id && !isInitialLoad) {
+        setLoading(false);
+        return;
+    }
+
+    try {
+        const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
+        if (data) { 
+          const profile = data as UserProfile;
+          setUserProfile(profile);
+          profileIdRef.current = profile.id;
+
+          // Only redirect if on landing pages and it's the first load
+          if (isInitialLoad) {
+            if (activeTab === 'home' || activeTab === 'browse') {
+                if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
+                else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
+                else if (profile.role === 'user') setActiveTab('browse');
+            }
+          }
+        }
+    } catch (error) {
+        console.error("Profile fetch error:", error);
+    } finally {
+        setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    // 1. Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session?.user) {
+        fetchProfile(session.user.id, true); // True for initial load redirect
+      } else {
+        setLoading(false);
+      }
     });
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) fetchProfile(session.user.id);
-      else { setUserProfile(null); setLoading(false); setActiveTab('home'); }
+    // 2. Auth State Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignore TOKEN_REFRESHED to prevent loops
+      if (event === 'TOKEN_REFRESHED') return;
+
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session?.user) fetchProfile(session.user.id, event === 'SIGNED_IN');
+      } else if (event === 'SIGNED_OUT') {
+        setUserProfile(null);
+        profileIdRef.current = null;
+        setLoading(false);
+        setActiveTab('home');
+      }
     });
 
+    // 3. Fetch Fees
     const fetchSystemFees = async () => {
       const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
       if (data?.value) {
@@ -106,21 +154,7 @@ const App: React.FC = () => {
     fetchSystemFees();
 
     return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (id: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
-    if (data) { 
-      const profile = data as UserProfile;
-      setUserProfile(profile); 
-      if (activeTab === 'home' || activeTab === 'browse') {
-        if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
-        else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
-        else if (profile.role === 'user') setActiveTab('browse');
-      }
-    }
-    setLoading(false);
-  };
+  }, []); // Keep empty dependency array
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
