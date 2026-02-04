@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
-export type ToastVariant = 'default' | 'success' | 'destructive';
+export type ToastVariant = 'default' | 'success' | 'destructive' | 'warning';
 
 export interface ToastProps {
   id: string;
@@ -23,12 +23,14 @@ export const Toast: React.FC<ToastProps> = ({ id, title, description, variant = 
     default: 'bg-card text-card-foreground border-border',
     success: 'bg-green-50 text-green-900 border-green-200 dark:bg-green-900/20 dark:text-green-100 dark:border-green-900',
     destructive: 'bg-destructive/10 text-destructive border-destructive/20',
+    warning: 'bg-yellow-50 text-yellow-900 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-100 dark:border-yellow-900',
   };
 
   const icons = {
     default: <Info className="w-5 h-5 text-primary" />,
     success: <CheckCircle className="w-5 h-5 text-green-600" />,
     destructive: <AlertCircle className="w-5 h-5 text-destructive" />,
+    warning: <AlertTriangle className="w-5 h-5 text-yellow-600" />,
   };
 
   return (

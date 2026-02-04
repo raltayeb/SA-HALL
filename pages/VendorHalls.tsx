@@ -9,7 +9,7 @@ import { Modal } from '../components/ui/Modal';
 import { 
   Plus, MapPin, Users, ImageOff, Edit, Trash2, 
   Image as ImageIcon, X, CheckSquare, Square, 
-  Calendar, Loader2, Info, Upload, Building2, Lock, ArrowUpRight
+  Calendar, Loader2, Info, Upload, Building2, Lock, ArrowUpRight, Send
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format } from 'date-fns';
@@ -26,6 +26,10 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ images: [], amenities: [], city: SAUDI_CITIES[0] });
   
+  // Upgrade Request State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAvailabilityModalOpen, setIsAvailabilityModalOpen] = useState(false);
@@ -40,6 +44,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       const { data, error } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
       if (error) throw error;
       setHalls(data || []);
+      
+      // Check for pending requests
+      const { data: requests } = await supabase.from('upgrade_requests').select('*').eq('vendor_id', user.id).eq('request_type', 'hall').eq('status', 'pending');
+      if (requests && requests.length > 0) setHasPendingRequest(true);
+      
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل القاعات', variant: 'destructive' });
     } finally {
@@ -98,11 +107,31 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (halls.length >= user.hall_limit) {
-       toast({ title: 'تم الوصول للحد الأقصى', description: 'يرجى ترقية الباقة لإضافة المزيد من القاعات.', variant: 'destructive' });
+       setIsUpgradeModalOpen(true);
        return;
     }
     setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 100 }); 
     setIsEditing(true);
+  };
+
+  const handleRequestUpgrade = async () => {
+    if(hasPendingRequest) {
+        toast({ title: 'طلب معلق', description: 'لديك طلب ترقية قيد المراجعة بالفعل.', variant: 'warning' });
+        return;
+    }
+    try {
+        const { error } = await supabase.from('upgrade_requests').insert([{
+            vendor_id: user.id,
+            request_type: 'hall',
+            status: 'pending'
+        }]);
+        if(error) throw error;
+        toast({ title: 'تم الإرسال', description: 'تم إرسال طلب إضافة قاعة للإدارة بنجاح.', variant: 'success' });
+        setHasPendingRequest(true);
+        setIsUpgradeModalOpen(false);
+    } catch (err: any) {
+        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    }
   };
 
   const toggleAmenity = (amenity: string) => {
@@ -130,12 +159,35 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
            </p>
         </div>
         {!isEditing && (
-          <Button onClick={handleAddNew} className={`rounded-xl h-12 px-6 font-bold gap-2 ${halls.length >= user.hall_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 cursor-not-allowed shadow-none' : 'shadow-lg shadow-primary/20'}`}>
+          <Button onClick={handleAddNew} className={`rounded-xl h-12 px-6 font-bold gap-2 ${halls.length >= user.hall_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 shadow-none hover:text-primary' : 'shadow-lg shadow-primary/20'}`}>
             {halls.length >= user.hall_limit ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {halls.length >= user.hall_limit ? 'ترقية الباقة' : 'إضافة قاعة جديدة'}
+            {halls.length >= user.hall_limit ? 'طلب إضافة قاعة' : 'إضافة قاعة جديدة'}
           </Button>
         )}
       </div>
+
+      {/* Upgrade Request Modal */}
+      <Modal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} title="طلب زيادة السعة">
+         <div className="space-y-6 text-center py-4">
+            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
+                <Building2 className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+                <h3 className="text-xl font-black">لقد وصلت للحد الأقصى</h3>
+                <p className="text-sm text-gray-500 font-bold leading-relaxed">باقة اشتراكك الحالية تسمح بـ {user.hall_limit} قاعات فقط. يمكنك إرسال طلب للإدارة لزيادة الحد المسموح وإضافة قاعة جديدة.</p>
+            </div>
+            
+            {hasPendingRequest ? (
+                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 text-yellow-800 font-bold text-sm">
+                    يوجد طلب قيد المراجعة حالياً. سيتم إشعارك عند الموافقة.
+                </div>
+            ) : (
+                <Button onClick={handleRequestUpgrade} className="w-full h-12 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2">
+                    <Send className="w-4 h-4" /> إرسال طلب الترقية
+                </Button>
+            )}
+         </div>
+      </Modal>
 
       {isEditing && (
         <div className="bg-card p-8 rounded-[1.125rem] border shadow-xl animate-in fade-in text-right">

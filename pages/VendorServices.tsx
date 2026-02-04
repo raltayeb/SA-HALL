@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { formatCurrency } from '../utils/currency';
-import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package, Upload, Loader2, X, Lock } from 'lucide-react';
+import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package, Upload, Loader2, X, Lock, Send } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 
@@ -22,19 +22,26 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
   const [uploading, setUploading] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service>>({});
   
+  // Upgrade Logic
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [servicesRes, categoriesRes] = await Promise.all([
+      const [servicesRes, categoriesRes, requestRes] = await Promise.all([
         supabase.from('services').select('*').eq('vendor_id', user.id),
-        supabase.from('service_categories').select('*').order('name')
+        supabase.from('service_categories').select('*').order('name'),
+        supabase.from('upgrade_requests').select('*').eq('vendor_id', user.id).eq('request_type', 'service').eq('status', 'pending')
       ]);
       
       setServices(servicesRes.data || []);
       setCategories(categoriesRes.data || []);
+      if(requestRes.data && requestRes.data.length > 0) setHasPendingRequest(true);
+
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل الخدمات', variant: 'destructive' });
     } finally {
@@ -95,11 +102,31 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (services.length >= user.service_limit) {
-       toast({ title: 'تم الوصول للحد الأقصى', description: 'يرجى ترقية الباقة لإضافة المزيد من الخدمات.', variant: 'destructive' });
+       setIsUpgradeModalOpen(true);
        return;
     }
     setCurrentService({ is_active: true, category: categories[0]?.name || '' }); 
     setIsEditing(true);
+  };
+
+  const handleRequestUpgrade = async () => {
+    if(hasPendingRequest) {
+        toast({ title: 'طلب معلق', description: 'لديك طلب زيادة خدمات قيد المراجعة.', variant: 'warning' });
+        return;
+    }
+    try {
+        const { error } = await supabase.from('upgrade_requests').insert([{
+            vendor_id: user.id,
+            request_type: 'service',
+            status: 'pending'
+        }]);
+        if(error) throw error;
+        toast({ title: 'تم الإرسال', description: 'تم إرسال طلب إضافة خدمة للإدارة.', variant: 'success' });
+        setHasPendingRequest(true);
+        setIsUpgradeModalOpen(false);
+    } catch (err: any) {
+        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -113,11 +140,33 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
              لديك {services.length} من أصل {user.service_limit} خدمات مسموحة.
           </p>
         </div>
-        <Button onClick={handleAddNew} className={`gap-2 px-6 rounded-xl font-black h-12 ${services.length >= user.service_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 cursor-not-allowed shadow-none' : 'shadow-lg shadow-primary/20'}`}>
+        <Button onClick={handleAddNew} className={`gap-2 px-6 rounded-xl font-black h-12 ${services.length >= user.service_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 shadow-none' : 'shadow-lg shadow-primary/20'}`}>
           {services.length >= user.service_limit ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-          {services.length >= user.service_limit ? 'ترقية الباقة' : 'إضافة خدمة جديدة'}
+          {services.length >= user.service_limit ? 'طلب إضافة خدمة' : 'إضافة خدمة جديدة'}
         </Button>
       </div>
+
+      <Modal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} title="طلب زيادة خدمات">
+         <div className="space-y-6 text-center py-4">
+            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
+                <Sparkles className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+                <h3 className="text-xl font-black">اكتمل عدد الخدمات</h3>
+                <p className="text-sm text-gray-500 font-bold leading-relaxed">يمكنك إضافة حتى {user.service_limit} خدمات فقط. قم بطلب زيادة الحد من الإدارة.</p>
+            </div>
+            
+            {hasPendingRequest ? (
+                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 text-yellow-800 font-bold text-sm">
+                    الطلب قيد المراجعة.
+                </div>
+            ) : (
+                <Button onClick={handleRequestUpgrade} className="w-full h-12 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2">
+                    <Send className="w-4 h-4" /> إرسال طلب
+                </Button>
+            )}
+         </div>
+      </Modal>
 
       <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} title={currentService.id ? 'تعديل الخدمة' : 'خدمة جديدة'}>
         <div className="space-y-6 text-right">

@@ -4,30 +4,38 @@ import { supabase } from '../supabaseClient';
 import { Booking, UserProfile } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { PriceTag } from '../components/ui/PriceTag';
+import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { 
-  Calendar, Receipt, CheckCircle, XCircle, Clock, Search, 
-  AlertCircle, Sparkles, Loader2, User as UserIcon, 
-  Phone, Building2
+  Search, Download, Plus, Edit2, SlidersHorizontal, Bell,
+  Calendar, User, CreditCard, Filter
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
-import { Modal } from '../components/ui/Modal';
+import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
 
 interface BookingsProps {
   user: UserProfile;
 }
-
-type BookingFilter = 'all' | 'pending' | 'confirmed' | 'cancelled';
 
 export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<BookingFilter>('all');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
+  // Column Filters
+  const [columnFilters, setColumnFilters] = useState({
+    client: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    hall: '',
+    paymentStatus: 'all',
+    status: 'all'
+  });
+
   const { toast } = useToast();
 
   const fetchBookings = useCallback(async () => {
@@ -49,7 +57,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('booking_date', { ascending: false });
       if (error) throw error;
       setBookings(data as Booking[] || []);
     } catch (err: any) {
@@ -61,85 +69,194 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
-  const updateStatus = async (booking: Booking, status: 'confirmed' | 'cancelled') => {
-    try {
-      const { error } = await supabase.from('bookings').update({ status }).eq('id', booking.id);
-      if (error) throw error;
-
-      await supabase.from('notifications').insert([{
-        user_id: booking.user_id,
-        title: status === 'confirmed' ? 'تم تأكيد حجزك ✅' : 'تحديث على حجزك',
-        message: `تم ${status === 'confirmed' ? 'تأكيد' : 'إلغاء'} حجزك لقاعة ${booking.halls?.name}.`,
-        type: status === 'confirmed' ? 'booking_confirmed' : 'booking_cancelled',
-        link: 'my_bookings',
-        is_read: false
-      }]);
-
-      toast({ title: 'تم التحديث', variant: 'success' });
-      fetchBookings();
-    } catch (err: any) {
-      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
-    }
+  const exportToExcel = () => {
+    const csvContent = "data:text/csv;charset=utf-8," 
+        + "التاريخ,العميل,القاعة,المبلغ,الحالة,حالة الدفع\n"
+        + bookings.map(b => `${b.booking_date},${b.client?.full_name || 'زائر'},${b.halls?.name},${b.total_amount},${b.status},${b.payment_status}`).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "bookings.csv");
+    document.body.appendChild(link);
+    link.click();
   };
 
   const filteredBookings = bookings.filter(b => {
-    const searchLower = search.toLowerCase();
-    const matchesSearch = (b.halls?.name || '').toLowerCase().includes(searchLower) || 
-                          (b.client?.full_name || '').toLowerCase().includes(searchLower);
-    const matchesFilter = filter === 'all' || b.status === filter;
-    return matchesSearch && matchesFilter;
+    const matchClient = !columnFilters.client || (b.client?.full_name || 'عميل خارجي').toLowerCase().includes(columnFilters.client.toLowerCase()) || (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase());
+    const matchDate = !columnFilters.date || b.booking_date.includes(columnFilters.date);
+    const matchStart = !columnFilters.startTime || (b.start_time || '').includes(columnFilters.startTime);
+    const matchEnd = !columnFilters.endTime || (b.end_time || '').includes(columnFilters.endTime);
+    const matchHall = !columnFilters.hall || (b.halls?.name || '').toLowerCase().includes(columnFilters.hall.toLowerCase());
+    const matchPayment = columnFilters.paymentStatus === 'all' || b.payment_status === columnFilters.paymentStatus;
+    const matchStatus = columnFilters.status === 'all' || b.status === columnFilters.status;
+
+    return matchClient && matchDate && matchStart && matchEnd && matchHall && matchPayment && matchStatus;
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row-reverse justify-between items-start md:items-center gap-4 text-right">
-        <h2 className="text-2xl font-black tracking-tight text-primary">سجل الحجوزات</h2>
-        <div className="flex items-center gap-3 w-full md:w-auto flex-row-reverse">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input className="w-full h-10 bg-card border rounded-xl pr-10 pl-4 text-xs font-bold" placeholder="بحث..." value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
-          <select className="h-10 border rounded-xl bg-card px-4 text-xs font-bold" value={filter} onChange={e => setFilter(e.target.value as any)}>
-            <option value="all">الكل</option>
-            <option value="pending">قيد الانتظار</option>
-            <option value="confirmed">المؤكدة</option>
-          </select>
-        </div>
+    <div className="space-y-6 text-right">
+      {/* Header */}
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+         <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary">
+                <Bell className="w-6 h-6" />
+            </div>
+            <div>
+                <h2 className="text-2xl font-black text-gray-900">إدارة الحجوزات</h2>
+                <p className="text-xs font-bold text-gray-400">تابع حجوزاتك وتفاصيلها المالية بدقة.</p>
+            </div>
+         </div>
+         <div className="flex gap-3">
+            <Button variant="outline" onClick={exportToExcel} className="gap-2 h-12 rounded-xl font-bold border-gray-200 hover:border-primary hover:text-primary transition-all">
+                <Download className="w-4 h-4" /> تصدير
+            </Button>
+            {user.role === 'vendor' && (
+                <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-12 rounded-xl font-black shadow-lg shadow-primary/20">
+                    <Plus className="w-4 h-4" /> حجز جديد
+                </Button>
+            )}
+         </div>
       </div>
 
-      <div className="grid gap-4">
-        {loading ? (
-          <div className="py-20 text-center animate-pulse border-2 border-dashed rounded-[1.125rem]">جاري التحميل...</div>
-        ) : filteredBookings.length === 0 ? (
-          <div className="py-20 text-center border-2 border-dashed rounded-[1.125rem] text-muted-foreground font-bold italic">لا توجد سجلات مطابقة.</div>
-        ) : (
-          filteredBookings.map((b) => (
-            <div key={b.id} className="bg-card border rounded-[1.125rem] p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row-reverse items-center gap-6 text-right">
-               <div className="w-16 h-16 rounded-xl bg-muted overflow-hidden shrink-0 border">
-                  {b.halls?.image_url ? <img src={b.halls.image_url} className="w-full h-full object-cover" /> : <Calendar className="w-8 h-8 m-4 opacity-20" />}
-               </div>
-               <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2 flex-row-reverse">
-                    <h3 className="font-black text-lg">{b.halls?.name}</h3>
-                    <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'cancelled' ? 'destructive' : 'warning'}>{b.status}</Badge>
-                  </div>
-                  <div className="flex items-center gap-4 text-[11px] font-bold text-muted-foreground flex-row-reverse">
-                    <span className="flex items-center gap-1 flex-row-reverse"><UserIcon className="w-3 h-3" /> {b.client?.full_name}</span>
-                    <span className="flex items-center gap-1 flex-row-reverse"><Clock className="w-3 h-3" /> {b.booking_date}</span>
-                  </div>
-               </div>
-               <div className="flex flex-col md:flex-row gap-3 items-center">
-                  <PriceTag amount={b.total_amount} className="text-xl" />
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="rounded-lg h-9 font-bold" onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }}>الفاتورة</Button>
-                    {b.status === 'pending' && user.role === 'vendor' && (
-                      <Button size="sm" className="rounded-lg h-9 font-bold" onClick={() => updateStatus(b, 'confirmed')}>تأكيد</Button>
-                    )}
-                  </div>
-               </div>
-            </div>
-          ))
-        )}
+      {/* Advanced Table */}
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-right">
+                <thead>
+                    <tr className="bg-gray-50/50 border-b border-gray-100">
+                        <th className="p-4 min-w-[180px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><User className="w-3 h-3" /> العميل</span>
+                                <div className="relative">
+                                    <input 
+                                        placeholder="بحث بالاسم..." 
+                                        className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                        value={columnFilters.client}
+                                        onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
+                                    />
+                                    <Search className="w-3 h-3 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[150px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Calendar className="w-3 h-3" /> التاريخ</span>
+                                <input 
+                                    type="date"
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.date}
+                                    onChange={e => setColumnFilters({...columnFilters, date: e.target.value})}
+                                />
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[100px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">وقت الدخول</span>
+                                <input 
+                                    type="time"
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.startTime}
+                                    onChange={e => setColumnFilters({...columnFilters, startTime: e.target.value})}
+                                />
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[100px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">وقت الخروج</span>
+                                <input 
+                                    type="time"
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.endTime}
+                                    onChange={e => setColumnFilters({...columnFilters, endTime: e.target.value})}
+                                />
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[150px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">القاعة / الباقة</span>
+                                <input 
+                                    placeholder="فلترة..." 
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.hall}
+                                    onChange={e => setColumnFilters({...columnFilters, hall: e.target.value})}
+                                />
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[130px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><CreditCard className="w-3 h-3" /> الدفع</span>
+                                <select 
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.paymentStatus}
+                                    onChange={e => setColumnFilters({...columnFilters, paymentStatus: e.target.value})}
+                                >
+                                    <option value="all">الكل</option>
+                                    <option value="paid">مدفوع</option>
+                                    <option value="partial">جزئي</option>
+                                    <option value="unpaid">غير مدفوع</option>
+                                </select>
+                            </div>
+                        </th>
+                        <th className="p-4 min-w-[130px]">
+                            <div className="space-y-3">
+                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Filter className="w-3 h-3" /> الحالة</span>
+                                <select 
+                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                                    value={columnFilters.status}
+                                    onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}
+                                >
+                                    <option value="all">الكل</option>
+                                    <option value="confirmed">مؤكد</option>
+                                    <option value="pending">قيد الانتظار</option>
+                                    <option value="cancelled">ملغي</option>
+                                </select>
+                            </div>
+                        </th>
+                        <th className="p-4 text-center min-w-[80px]">
+                            <span className="text-[10px] font-black uppercase text-primary tracking-wider">أجراءات</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                    {loading ? (
+                        <tr><td colSpan={8} className="p-10 text-center animate-pulse text-gray-400 font-bold">جاري تحميل البيانات...</td></tr>
+                    ) : filteredBookings.length === 0 ? (
+                        <tr><td colSpan={8} className="p-10 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة للفلاتر</td></tr>
+                    ) : filteredBookings.map((b) => (
+                        <tr key={b.id} className="hover:bg-gray-50/50 transition-colors group">
+                            <td className="p-4">
+                                <div className="font-bold text-sm text-gray-900">{b.client?.full_name || 'عميل خارجي'}</div>
+                                <div className="text-[10px] text-gray-400 truncate max-w-[150px]">{b.notes?.split('|')[0] || ''}</div>
+                            </td>
+                            <td className="p-4 font-bold text-xs text-gray-600 font-mono">
+                                {format(new Date(b.booking_date), 'yyyy-MM-dd')}
+                            </td>
+                            <td className="p-4 font-bold text-xs text-gray-900 dir-ltr">{b.start_time ? format(new Date(`2000-01-01T${b.start_time}`), 'h:mm a') : '-'}</td>
+                            <td className="p-4 font-bold text-xs text-gray-900 dir-ltr">{b.end_time ? format(new Date(`2000-01-01T${b.end_time}`), 'h:mm a') : '-'}</td>
+                            <td className="p-4">
+                                <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{b.halls?.name || 'حجز خدمة'}</span>
+                            </td>
+                            <td className="p-4">
+                                <Badge variant={b.payment_status === 'paid' ? 'success' : b.payment_status === 'partial' ? 'warning' : 'destructive'} className="rounded-lg px-3">
+                                    {b.payment_status === 'paid' ? 'مدفوع' : b.payment_status === 'partial' ? 'جزئي' : 'غير مدفوع'}
+                                </Badge>
+                            </td>
+                            <td className="p-4">
+                                <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="rounded-lg px-3">
+                                    {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'انتظار' : 'ملغي'}
+                                </Badge>
+                            </td>
+                            <td className="p-4 text-center">
+                                <button onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+        <div className="p-4 border-t border-gray-100 text-xs font-bold text-gray-400 text-left">
+            العدد الإجمالي: {filteredBookings.length}
+        </div>
       </div>
 
       {selectedBooking && (
@@ -150,6 +267,15 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
             ...selectedBooking,
             profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)
           }} 
+        />
+      )}
+
+      {user.role === 'vendor' && (
+        <AddBookingModal 
+            isOpen={isAddModalOpen} 
+            onClose={() => setIsAddModalOpen(false)} 
+            vendorId={user.id}
+            onSuccess={fetchBookings}
         />
       )}
     </div>

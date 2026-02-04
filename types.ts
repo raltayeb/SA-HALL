@@ -17,7 +17,6 @@ export interface UserProfile {
   service_limit: number;
   subscription_plan?: string;
   payment_status?: 'paid' | 'unpaid';
-  // Fix for VendorBrandSettings: Add branding and social media properties
   theme_color?: string;
   whatsapp_number?: string;
   business_email?: string;
@@ -91,9 +90,13 @@ export interface Booking {
   user_id: string;
   vendor_id: string;
   booking_date: string;
+  start_time?: string; // New
+  end_time?: string;   // New
+  payment_status?: 'paid' | 'partial' | 'unpaid'; // New
+  package_name?: string; // New
   total_amount: number;
   vat_amount: number;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; // Added completed
   notes?: string;
   created_at?: string;
   halls?: Hall;

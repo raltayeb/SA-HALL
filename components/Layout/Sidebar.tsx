@@ -23,7 +23,8 @@ import {
   FileText,
   BarChart3,
   ShieldCheck,
-  Layers
+  Layers,
+  Inbox
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -60,6 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         title: "نظرة عامة",
         items: [
           { id: 'admin_dashboard', label: 'لوحة القيادة', icon: <BarChart3 className="w-5 h-5" /> },
+          { id: 'admin_requests', label: 'طلبات الترقية', icon: <Inbox className="w-5 h-5" /> },
         ]
       },
       {
@@ -88,18 +90,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         ]
       },
       {
-        title: "الأصول",
-        items: [
-          { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-5 h-5" /> },
-          { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-5 h-5" /> },
-        ]
-      },
-      {
         title: "العمليات",
         items: [
           { id: 'pos', label: 'المبيعات (POS)', icon: <ShoppingCart className="w-5 h-5" /> },
           { id: 'coupons', label: 'الكوبونات والخصم', icon: <Tag className="w-5 h-5" /> },
           { id: 'hall_bookings', label: 'الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
+        ]
+      },
+      {
+        title: "الأصول",
+        items: [
+          { id: 'my_halls', label: 'قاعاتي', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'my_services', label: 'خدماتي', icon: <Sparkles className="w-5 h-5" /> },
         ]
       },
       {
