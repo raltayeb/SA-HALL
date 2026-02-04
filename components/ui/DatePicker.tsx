@@ -1,71 +1,58 @@
 
 import * as React from "react"
 import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
+import { arSA } from "date-fns/locale"
+import { Calendar } from "./Calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "./Popover"
+import { Matcher } from "react-day-picker"
 
 interface DatePickerProps {
   date: Date | undefined;
   setDate: (date: Date | undefined) => void;
-  label?: string;
   placeholder?: string;
-  disabledDays?: (date: Date) => boolean;
+  disabledDates?: Matcher | Matcher[];
+  className?: string;
 }
 
-export function DatePicker({ date, setDate, label, placeholder = "اختر التاريخ" }: DatePickerProps) {
-  // Native date input uses YYYY-MM-DD string format
-  const dateValue = date ? format(date, "yyyy-MM-dd") : "";
+export function DatePicker({ date, setDate, placeholder = "Select date", disabledDates, className }: DatePickerProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    if (val) {
-      setDate(new Date(val));
-    } else {
-      setDate(undefined);
-    }
+  const handleSelect = (d: Date | undefined) => {
+    setDate(d);
+    setIsOpen(false);
   };
 
   return (
-    <div className="grid gap-2 w-full group">
-      {label && (
-        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest text-right px-1">
-          {label}
-        </label>
-      )}
-      <div className="relative">
-        <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-primary">
-          <CalendarIcon className="h-5 w-5" />
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <div className={`relative max-w-sm w-full ${className}`}>
+          <div className="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+            <svg className="w-4 h-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 10h16m-8-3V4M7 7V4m10 3V4M5 20h14a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1Zm3-7h.01v.01H8V13Zm4 0h.01v.01H12V13Zm4 0h.01v.01H16V13Zm-8 4h.01v.01H8V17Zm4 0h.01v.01H12V17Zm4 0h.01v.01H16V17Z"/>
+            </svg>
+          </div>
+          <input 
+            id="datepicker-actions" 
+            readOnly
+            type="text" 
+            className="block w-full ps-10 pe-3 py-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary px-3 shadow-sm placeholder:text-gray-400 cursor-pointer outline-none transition-colors hover:bg-gray-100" 
+            placeholder={placeholder}
+            value={date ? format(date, 'yyyy-MM-dd', { locale: arSA }) : ''}
+            onClick={() => setIsOpen(true)}
+          />
         </div>
-        <input
-          type="date"
-          value={dateValue}
-          onChange={handleChange}
-          className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-6 pr-14 text-right font-bold text-gray-900 focus:ring-2 focus:ring-primary/20 focus:border-primary/30 outline-none transition-all appearance-none cursor-pointer"
-          style={{ 
-            colorScheme: 'light',
-            // Specific styling for the native picker icon to hide it or move it if needed
-          }}
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-[200]" align="start">
+        <Calendar
+          mode="single"
+          selected={date}
+          onSelect={handleSelect}
+          disabled={disabledDates}
+          initialFocus
+          locale={arSA}
+          className="p-3"
         />
-        {!date && (
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 font-bold text-sm">
-            {placeholder}
-          </span>
-        )}
-      </div>
-      <style>{`
-        /* Minimal styling for native date picker */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          background: transparent;
-          bottom: 0;
-          color: transparent;
-          cursor: pointer;
-          height: auto;
-          left: 0;
-          position: absolute;
-          right: 0;
-          top: 0;
-          width: auto;
-        }
-      `}</style>
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }

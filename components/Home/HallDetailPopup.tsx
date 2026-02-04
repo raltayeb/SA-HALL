@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { PriceTag } from '../ui/PriceTag';
 import { Badge } from '../ui/Badge';
-import { Calendar } from '../ui/Calendar'; 
+import { DatePicker } from '../ui/DatePicker';
 import { 
   X, MapPin, Users, Star, Share2, 
   Calendar as CalendarIcon, CheckCircle2, 
@@ -295,26 +295,16 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                     <h3 className="text-sm font-black text-gray-900 flex items-center justify-end gap-2">
                        <CalendarIcon className="w-4 h-4 text-primary" /> اختر تاريخ المناسبة
                     </h3>
-                    <div className="flex justify-center bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm">
-                       <Calendar
-                          mode="single"
-                          selected={bookingDate}
-                          onSelect={setBookingDate}
-                          disabled={[
+                    <div className="flex justify-center bg-white">
+                        <DatePicker
+                          date={bookingDate}
+                          setDate={setBookingDate}
+                          placeholder="اضغط لاختيار التاريخ"
+                          disabledDates={[
                              { before: startOfDay(new Date()) },
                              ...blockedDates 
                           ]}
-                          className="w-full"
-                          classNames={{
-                             // Green for available, dark gray for disabled
-                             day: "h-10 w-10 p-0 font-bold text-sm rounded-xl transition-all flex items-center justify-center bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 mx-auto", 
-                             day_selected: "!bg-[#4B0082] !text-white shadow-xl hover:!bg-[#3a0063]",
-                             day_disabled: "!bg-gray-200 !text-gray-400 opacity-100 cursor-not-allowed hover:!bg-gray-200 decoration-0",
-                             day_today: "border-2 border-emerald-500",
-                             head_cell: "text-gray-400 font-bold text-[0.8rem] w-10 pb-2",
-                             caption_label: "text-base font-black text-gray-900"
-                          }}
-                       />
+                        />
                     </div>
                     {bookingDate && (
                         <div className="text-center text-xs font-bold text-primary bg-primary/5 py-2 rounded-lg">
