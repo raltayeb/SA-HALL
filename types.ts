@@ -90,13 +90,14 @@ export interface Booking {
   user_id: string;
   vendor_id: string;
   booking_date: string;
-  start_time?: string; // New
-  end_time?: string;   // New
-  payment_status?: 'paid' | 'partial' | 'unpaid'; // New
-  package_name?: string; // New
+  start_time?: string; 
+  end_time?: string;   
+  payment_status?: 'paid' | 'partial' | 'unpaid'; 
+  package_name?: string; 
   total_amount: number;
+  paid_amount?: number; // New field for Deposit/Paid part
   vat_amount: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; // Added completed
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; 
   notes?: string;
   created_at?: string;
   halls?: Hall;

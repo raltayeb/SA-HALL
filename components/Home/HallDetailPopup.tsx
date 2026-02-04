@@ -11,7 +11,7 @@ import {
   X, MapPin, Users, Star, Share2, 
   Calendar as CalendarIcon, CheckCircle2, 
   Loader2, Sparkles, Check, ChevronRight, ChevronLeft,
-  ShieldCheck, Zap, Diamond
+  ShieldCheck, Zap, Diamond, Clock, CreditCard
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { format } from 'date-fns';
@@ -29,8 +29,21 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
   const [vendorServices, setVendorServices] = useState<Service[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [bookingDate, setBookingDate] = useState<Date | undefined>(new Date());
+  
+  // Guest Info
   const [guestName, setGuestName] = useState(user?.full_name || '');
   const [guestPhone, setGuestPhone] = useState(user?.phone_number || '');
+  
+  // Time Selection
+  const [startTime, setStartTime] = useState('16:00');
+  const [endTime, setEndTime] = useState('23:00');
+
+  // Payment
+  const [paymentMethod, setPaymentMethod] = useState<'pay_later' | 'credit_card'>('pay_later');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCVC, setCardCVC] = useState('');
+
   const [isChecking, setIsChecking] = useState(false);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(true);
   const [isBooking, setIsBooking] = useState(false);
@@ -110,7 +123,6 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
     e.preventDefault();
     e.stopPropagation();
     
-    // GUEST BOOKING: No user check here anymore
     if (isAvailable === false) {
         toast({ title: 'عذراً', description: 'هذا التاريخ محجوز بالفعل.', variant: 'destructive' });
         return;
@@ -121,46 +133,58 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
 
   const handleBookingSubmission = async () => {
     if (!guestName || !guestPhone) {
-      toast({ title: 'تنبيه', description: 'يرجى إدخال كافة البيانات المطلوبة لمتابعة الحجز.', variant: 'destructive' });
+      toast({ title: 'تنبيه', description: 'يرجى إدخال اسمك ورقم الجوال.', variant: 'destructive' });
       return;
     }
     if (!bookingDate) {
       toast({ title: 'تنبيه', description: 'يرجى اختيار تاريخ المناسبة.', variant: 'destructive' });
       return;
     }
+    
+    if (paymentMethod === 'credit_card' && (!cardNumber || !cardExpiry || !cardCVC)) {
+        toast({ title: 'بيانات الدفع', description: 'يرجى إدخال بيانات البطاقة لإتمام الدفع.', variant: 'destructive' });
+        return;
+    }
 
     setIsBooking(true);
     const { total, vat } = calculateTotal();
     const dateStr = format(bookingDate, 'yyyy-MM-dd');
 
+    // Simulate Payment Processing
+    const isPaid = paymentMethod === 'credit_card';
+    const paymentStatus = isPaid ? 'paid' : 'unpaid';
+    const paidAmount = isPaid ? total : 0;
+
     try {
-      // Create a new GoogleGenAI or equivalent if needed, but here we just insert to Supabase
       const { error: bookingError } = await supabase.from('bookings').insert([{
         hall_id: isHall ? hall!.id : null,
         service_id: !isHall ? service!.id : null,
-        user_id: user?.id || null, // Allow NULL for guests
+        user_id: user?.id || null, 
         vendor_id: item.vendor_id,
         booking_date: dateStr,
+        start_time: startTime,
+        end_time: endTime,
         total_amount: total,
+        paid_amount: paidAmount, // Store paid amount
         vat_amount: vat,
-        status: 'pending',
-        notes: `الاسم: ${guestName} | الجوال: ${guestPhone} ${!user ? '(حجز زائر)' : ''}`
+        payment_status: paymentStatus,
+        status: isPaid ? 'confirmed' : 'pending', // Auto confirm if paid
+        notes: `الاسم: ${guestName} | الجوال: ${guestPhone} ${!user ? '(حجز زائر)' : ''} | الدفع: ${isPaid ? 'بطاقة ائتمان' : 'لاحقاً'}`
       }]);
 
       if (bookingError) throw bookingError;
 
-      // Notify vendor
       await supabase.from('notifications').insert([{
         user_id: item.vendor_id,
-        title: 'حجز جديد (زائر) 👑',
-        message: `لديك طلب حجز جديد لـ ${item.name} من ${guestName}.`,
+        title: isPaid ? 'حجز جديد مدفوع 💰' : 'طلب حجز جديد (زائر) 👑',
+        message: `لديك طلب حجز ${isPaid ? 'مؤكد' : 'جديد'} لـ ${item.name} من ${guestName}.`,
         type: 'booking_new',
         link: 'hall_bookings'
       }]);
 
       toast({ 
-        title: 'تم إرسال طلبك بنجاح', 
-        description: 'سيقوم فريق القاعة بالتواصل معك قريباً لتأكيد التفاصيل.', 
+        title: isPaid ? 'تم الحجز والدفع بنجاح' : 'تم إرسال طلبك بنجاح', 
+        description: isPaid ? 'تم تأكيد حجزك وإرسال التفاصيل.' : 'سيقوم فريق القاعة بالتواصل معك قريباً لتأكيد التفاصيل والدفع.', 
         variant: 'success' 
       });
       setIsBookingModalOpen(false);
@@ -197,7 +221,9 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
          </div>
       </header>
 
+      {/* Main Content (Images, Info, Services) - Same as before... */}
       <div className="flex-1 overflow-y-auto">
+        {/* ... (Images Section - No changes needed) ... */}
         <section className="px-6 lg:px-20 pt-10">
             <div className="max-w-7xl mx-auto">
                <div className="relative aspect-[21/9] rounded-[3rem] overflow-hidden bg-gray-100 shadow-2xl group border border-gray-100">
@@ -220,7 +246,8 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
         <div className="max-w-7xl mx-auto px-6 lg:px-20 py-16">
           <div className="grid lg:grid-cols-12 gap-16">
             <div className="lg:col-span-7 space-y-12 text-start">
-              <div className="space-y-6">
+               {/* ... (Description, Amenities, Vendor Services - No changes needed) ... */}
+                <div className="space-y-6">
                 <div className="flex flex-wrap items-center gap-4">
                   <span className="bg-primary/5 text-primary px-5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] border border-primary/10 flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> قاعة ملكية</span>
                   <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10"><Star className="w-4 h-4 fill-current" /><span className="text-[10px] font-bold tracking-widest uppercase">4.9 تقييم</span></div>
@@ -321,7 +348,7 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
                           className={`w-full h-16 rounded-2xl font-bold text-xl transition-all ${isAvailable === false ? 'opacity-50 cursor-not-allowed grayscale' : 'shadow-2xl shadow-primary/20 hover:scale-[1.02]'}`}
                           disabled={isHall && isAvailable === false}
                         >
-                          {isHall && isAvailable === false ? 'التاريخ محجوز' : 'تأكيد طلب الحجز'} <Zap className="w-5 h-5 ms-3 fill-current" />
+                          {isHall && isAvailable === false ? 'التاريخ محجوز' : 'إكمال الحجز'} <Zap className="w-5 h-5 ms-3 fill-current" />
                         </Button>
                      </div>
 
@@ -340,32 +367,91 @@ export const HallDetailPopup: React.FC<HallDetailPopupProps> = ({ item, type, us
       </div>
 
       {isBookingModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in">
-           <div className="w-full max-w-xl bg-white rounded-[3rem] shadow-2xl relative border border-gray-100 overflow-hidden flex flex-col animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in overflow-y-auto">
+           <div className="w-full max-w-2xl bg-white rounded-[3rem] shadow-2xl relative border border-gray-100 flex flex-col animate-in zoom-in-95 my-10">
               <button type="button" onClick={() => setIsBookingModalOpen(false)} className="absolute top-10 end-10 p-4 hover:bg-gray-50 rounded-2xl transition-all z-[1050] text-gray-400"><X className="w-6 h-6" /></button>
-              <div className="p-12 space-y-12 text-right">
+              <div className="p-12 space-y-8 text-right">
                  <div className="space-y-4">
                     <div className="w-16 h-16 bg-primary/5 rounded-[1.5rem] flex items-center justify-center text-primary border border-primary/10">
                        <CalendarIcon className="w-8 h-8" />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold text-gray-900 tracking-tighter uppercase leading-none">تفاصيل الحجز</h2>
+                      <h2 className="text-3xl font-bold text-gray-900 tracking-tighter uppercase leading-none">تأكيد الحجز</h2>
                       <p className="text-gray-400 font-bold text-sm mt-2">أكمل بياناتك لنقوم بتخصيص التجربة المثالية لمناسبتك.</p>
                     </div>
                  </div>
-                 <div className="space-y-8">
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold uppercase text-gray-400 tracking-widest flex items-center gap-3 justify-end">التاريخ المستهدف <Sparkles className="w-4 h-4 text-primary" /></label>
-                       <div className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-8 flex items-center justify-end font-bold text-xl text-gray-900">
-                         {bookingDate ? format(bookingDate, 'dd MMMM yyyy', { locale: arSA }) : 'لم يتم اختيار تاريخ'}
-                       </div>
+                 
+                 <div className="space-y-6">
+                    {/* Date & Time Section */}
+                    <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 space-y-4">
+                        <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-widest">
+                            <Clock className="w-4 h-4" /> التوقيت والموعد
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-gray-400">تاريخ المناسبة</label>
+                                <div className="w-full h-12 bg-white border border-gray-200 rounded-xl px-4 flex items-center justify-end font-bold text-sm text-gray-900">
+                                    {bookingDate ? format(bookingDate, 'dd MMMM yyyy', { locale: arSA }) : 'لم يتم اختيار تاريخ'}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400">من الساعة</label>
+                                    <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full h-12 bg-white border border-gray-200 rounded-xl px-2 font-bold text-sm text-center outline-none focus:ring-2 focus:ring-primary/20" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-gray-400">إلى الساعة</label>
+                                    <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full h-12 bg-white border border-gray-200 rounded-xl px-2 font-bold text-sm text-center outline-none focus:ring-2 focus:ring-primary/20" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div className="grid md:grid-cols-2 gap-4 text-right">
-                       <Input placeholder="الاسم الكامل" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestName} onChange={e => setGuestName(e.target.value)} />
-                       <Input placeholder="رقم الجوال" className="h-14 rounded-2xl bg-gray-50 border-gray-100 text-gray-900 font-bold text-lg px-6 text-right" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} />
+
+                    {/* Guest Info */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                       <Input label="الاسم الكامل" placeholder="الاسم" className="h-14 rounded-2xl font-bold text-right" value={guestName} onChange={e => setGuestName(e.target.value)} />
+                       <Input label="رقم الجوال" placeholder="05xxxxxxxx" className="h-14 rounded-2xl font-bold text-right" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} />
                     </div>
-                    <Button type="button" onClick={handleBookingSubmission} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-bold text-xl shadow-xl shadow-primary/20">
-                      {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : 'إرسال طلب الحجز الملكي'}
+
+                    {/* Payment Section */}
+                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-center gap-2 text-primary font-black text-xs uppercase tracking-widest">
+                            <CreditCard className="w-4 h-4" /> طريقة الدفع
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button 
+                                onClick={() => setPaymentMethod('pay_later')}
+                                className={`h-16 rounded-2xl border-2 font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === 'pay_later' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}
+                            >
+                                <span>دفع لاحقاً</span>
+                                <span className="text-[9px]">تأكيد مبدئي</span>
+                            </button>
+                            <button 
+                                onClick={() => setPaymentMethod('credit_card')}
+                                className={`h-16 rounded-2xl border-2 font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all ${paymentMethod === 'credit_card' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'}`}
+                            >
+                                <span>بطاقة ائتمان</span>
+                                <span className="text-[9px]">تأكيد فوري</span>
+                            </button>
+                        </div>
+
+                        {paymentMethod === 'credit_card' && (
+                            <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 space-y-4 animate-in slide-in-from-top-2">
+                                <Input label="رقم البطاقة" placeholder="0000 0000 0000 0000" value={cardNumber} onChange={e => setCardNumber(e.target.value)} className="bg-white" />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input label="تاريخ الانتهاء" placeholder="MM/YY" value={cardExpiry} onChange={e => setCardExpiry(e.target.value)} className="bg-white" />
+                                    <Input label="CVC" placeholder="123" value={cardCVC} onChange={e => setCardCVC(e.target.value)} className="bg-white" />
+                                </div>
+                                <div className="flex justify-between items-center text-xs font-bold pt-2">
+                                    <span>المبلغ المستحق للدفع:</span>
+                                    <PriceTag amount={total} className="text-lg text-primary" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <Button type="button" onClick={handleBookingSubmission} disabled={isChecking || isBooking} className="w-full h-16 rounded-[1.5rem] font-bold text-xl shadow-xl shadow-primary/20 mt-6">
+                      {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : paymentMethod === 'credit_card' ? `دفع ${total} ر.س وتأكيد` : 'إرسال طلب الحجز'}
                     </Button>
                  </div>
               </div>

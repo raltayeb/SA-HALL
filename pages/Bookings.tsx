@@ -5,6 +5,7 @@ import { Booking, UserProfile } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
+import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
 import { 
   Search, Download, Plus, Edit2, SlidersHorizontal, Bell,
   Calendar, User, CreditCard, Filter
@@ -21,8 +22,10 @@ interface BookingsProps {
 export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   // Column Filters
@@ -71,8 +74,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
   const exportToExcel = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
-        + "التاريخ,العميل,القاعة,المبلغ,الحالة,حالة الدفع\n"
-        + bookings.map(b => `${b.booking_date},${b.client?.full_name || 'زائر'},${b.halls?.name},${b.total_amount},${b.status},${b.payment_status}`).join("\n");
+        + "التاريخ,العميل,القاعة,المبلغ,المدفوع,الحالة,حالة الدفع\n"
+        + bookings.map(b => `${b.booking_date},${b.client?.full_name || 'زائر'},${b.halls?.name},${b.total_amount},${b.paid_amount || 0},${b.status},${b.payment_status}`).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -92,6 +95,15 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
     return matchClient && matchDate && matchStart && matchEnd && matchHall && matchPayment && matchStatus;
   });
+
+  const handleEditClick = (booking: Booking) => {
+      setSelectedBooking(booking);
+      if (user.role === 'vendor') {
+          setIsEditModalOpen(true);
+      } else {
+          setIsInvoiceOpen(true); // Users only see invoice
+      }
+  };
 
   return (
     <div className="space-y-6 text-right">
@@ -247,7 +259,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 </Badge>
                             </td>
                             <td className="p-4 text-center">
-                                <button onClick={() => { setSelectedBooking(b); setIsInvoiceOpen(true); }} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
+                                <button onClick={() => handleEditClick(b)} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all"><Edit2 className="w-4 h-4" /></button>
                             </td>
                         </tr>
                     ))}
@@ -260,14 +272,24 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       </div>
 
       {selectedBooking && (
-        <InvoiceModal 
-          isOpen={isInvoiceOpen} 
-          onClose={() => setIsInvoiceOpen(false)} 
-          booking={{
-            ...selectedBooking,
-            profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)
-          }} 
-        />
+        <>
+            <InvoiceModal 
+                isOpen={isInvoiceOpen} 
+                onClose={() => setIsInvoiceOpen(false)} 
+                booking={{
+                    ...selectedBooking,
+                    profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)
+                }} 
+            />
+            {user.role === 'vendor' && (
+                <EditBookingDetailsModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    booking={selectedBooking}
+                    onSuccess={fetchBookings}
+                />
+            )}
+        </>
       )}
 
       {user.role === 'vendor' && (
