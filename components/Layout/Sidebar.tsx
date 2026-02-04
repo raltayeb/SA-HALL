@@ -22,7 +22,8 @@ import {
   LayoutGrid,
   FileText,
   BarChart3,
-  ShieldCheck
+  ShieldCheck,
+  Layers
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -71,6 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {
         title: "المحتوى والنظام",
         items: [
+          { id: 'admin_categories', label: 'تصنيفات الخدمات', icon: <Layers className="w-5 h-5" /> },
           { id: 'admin_cms', label: 'إدارة الصفحات (CMS)', icon: <FileText className="w-5 h-5" /> },
           { id: 'settings', label: 'إعدادات المنصة', icon: <Settings className="w-5 h-5" /> },
         ]

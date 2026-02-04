@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Service, SERVICE_CATEGORIES } from '../types';
+import { UserProfile, Service, ServiceCategory } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { formatCurrency } from '../utils/currency';
-import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package, Upload, Loader2, X } from 'lucide-react';
+import { Plus, Sparkles, Tag, ImageOff, Edit, Trash2, Package, Upload, Loader2, X, Lock } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 
@@ -16,6 +16,7 @@ interface VendorServicesProps {
 
 export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
   const [services, setServices] = useState<Service[]>([]);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -24,16 +25,16 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const fetchServices = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('vendor_id', user.id);
+      const [servicesRes, categoriesRes] = await Promise.all([
+        supabase.from('services').select('*').eq('vendor_id', user.id),
+        supabase.from('service_categories').select('*').order('name')
+      ]);
       
-      if (error) throw error;
-      setServices(data || []);
+      setServices(servicesRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل الخدمات', variant: 'destructive' });
     } finally {
@@ -41,9 +42,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
     }
   }, [user.id, toast]);
 
-  useEffect(() => { 
-    fetchServices(); 
-  }, [fetchServices]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -53,10 +52,8 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
     try {
       const file = files[0];
       const fileName = `${user.id}/service-${Date.now()}.${file.name.split('.').pop()}`;
-
       const { error: uploadError } = await supabase.storage.from('service-images').upload(fileName, file);
       if (uploadError) throw uploadError;
-
       const { data: { publicUrl } } = supabase.storage.from('service-images').getPublicUrl(fileName);
       setCurrentService(prev => ({ ...prev, image_url: publicUrl }));
       toast({ title: 'نجاح', description: 'تم رفع صورة الخدمة بنجاح.', variant: 'success' });
@@ -78,7 +75,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
       vendor_id: user.id, 
       price: Number(currentService.price),
       is_active: currentService.is_active ?? true,
-      category: currentService.category || SERVICE_CATEGORIES[0]
+      category: currentService.category || categories[0]?.name || 'عام'
     };
 
     try {
@@ -89,11 +86,20 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
       if (error) throw error;
 
       setIsEditing(false);
-      fetchServices();
+      fetchData();
       toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات الخدمة بنجاح.', variant: 'success' });
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     }
+  };
+
+  const handleAddNew = () => {
+    if (services.length >= user.service_limit) {
+       toast({ title: 'تم الوصول للحد الأقصى', description: 'يرجى ترقية الباقة لإضافة المزيد من الخدمات.', variant: 'destructive' });
+       return;
+    }
+    setCurrentService({ is_active: true, category: categories[0]?.name || '' }); 
+    setIsEditing(true);
   };
 
   return (
@@ -103,10 +109,13 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
           <h2 className="text-2xl font-black flex items-center gap-2 justify-end">
              إدارة خدماتي الإضافية <Sparkles className="w-6 h-6 text-primary" />
           </h2>
-          <p className="text-sm text-muted-foreground">قدم خدمات الطعام، التصوير، والتنسيق لعملاء القاعة.</p>
+          <p className="text-sm text-muted-foreground">
+             لديك {services.length} من أصل {user.service_limit} خدمات مسموحة.
+          </p>
         </div>
-        <Button onClick={() => { setCurrentService({ is_active: true, category: SERVICE_CATEGORIES[0] }); setIsEditing(true); }} className="gap-2 px-6 rounded-xl font-black h-12 shadow-lg shadow-primary/20">
-          <Plus className="w-4 h-4" /> إضافة خدمة جديدة
+        <Button onClick={handleAddNew} className={`gap-2 px-6 rounded-xl font-black h-12 ${services.length >= user.service_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 cursor-not-allowed shadow-none' : 'shadow-lg shadow-primary/20'}`}>
+          {services.length >= user.service_limit ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+          {services.length >= user.service_limit ? 'ترقية الباقة' : 'إضافة خدمة جديدة'}
         </Button>
       </div>
 
@@ -116,7 +125,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">التصنيف</label>
             <select className="w-full h-12 border rounded-xl px-4 text-sm font-bold bg-card outline-none" value={currentService.category || ''} onChange={e => setCurrentService({...currentService, category: e.target.value})}>
-              {SERVICE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+              {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
             </select>
           </div>
           <Input label="سعر الخدمة (ر.س)" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
@@ -173,20 +182,13 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
                   <Button variant="outline" className="rounded-xl h-12 border-2 text-destructive hover:bg-destructive/10" onClick={async () => {
                     if(confirm('هل تريد حذف هذه الخدمة نهائياً؟')) {
                       await supabase.from('services').delete().eq('id', s.id);
-                      fetchServices();
+                      fetchData();
                     }
                   }}><Trash2 className="w-5 h-5" /></Button>
                 </div>
               </div>
             </div>
           ))
-        )}
-        {!loading && services.length === 0 && (
-          <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-50 flex flex-col items-center gap-4">
-             <Package className="w-12 h-12 text-muted-foreground" />
-             <p className="font-black text-muted-foreground text-right">لا يوجد خدمات مضافة حالياً.</p>
-             <Button onClick={() => { setCurrentService({ is_active: true, category: SERVICE_CATEGORIES[0] }); setIsEditing(true); }} variant="outline" className="font-black">أضف خدمتك الأولى</Button>
-          </div>
         )}
       </div>
     </div>
