@@ -48,6 +48,11 @@ export interface SystemSettings {
     cash_enabled: boolean;
     visa_merchant_id?: string;
     visa_secret_key?: string;
+    // HyperPay Specifics
+    hyperpay_enabled: boolean;
+    hyperpay_entity_id?: string;
+    hyperpay_access_token?: string;
+    hyperpay_mode?: 'test' | 'live';
   };
 }
 

@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { SystemSettings as ISystemSettings } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Settings, Save, Landmark, Coins, Building2, Sparkles, Loader2, CreditCard, Wallet, ShieldCheck } from 'lucide-react';
+import { Settings, Save, Landmark, Coins, Building2, Sparkles, Loader2, CreditCard, Wallet, ShieldCheck, Globe } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export const SystemSettings: React.FC = () => {
@@ -19,7 +19,11 @@ export const SystemSettings: React.FC = () => {
       visa_enabled: true,
       cash_enabled: true,
       visa_merchant_id: '',
-      visa_secret_key: ''
+      visa_secret_key: '',
+      hyperpay_enabled: false,
+      hyperpay_entity_id: '',
+      hyperpay_access_token: '',
+      hyperpay_mode: 'test'
     }
   });
   
@@ -90,38 +94,52 @@ export const SystemSettings: React.FC = () => {
              إدارة بوابات الدفع <ShieldCheck className="w-5 h-5 text-primary" />
            </h3>
            <div className="grid md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              {/* HyperPay Config */}
+              <div className="space-y-6 border-l pl-6">
+                 <div className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100">
                     <div className="flex items-center gap-3">
-                       <CreditCard className="w-5 h-5 text-primary" />
-                       <span className="text-sm font-bold">دفع البطاقات (Visa/Mastercard)</span>
+                       <Globe className="w-5 h-5 text-purple-700" />
+                       <span className="text-sm font-bold text-purple-900">HyperPay (مدى / فيزا)</span>
                     </div>
                     <input 
                       type="checkbox" 
-                      className="w-5 h-5 accent-primary" 
-                      checked={settings.payment_gateways?.visa_enabled ?? false}
-                      onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_enabled: e.target.checked}})}
+                      className="w-5 h-5 accent-purple-700" 
+                      checked={settings.payment_gateways?.hyperpay_enabled ?? false}
+                      onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, hyperpay_enabled: e.target.checked}})}
                     />
                  </div>
-                 <div className="space-y-4 pr-2">
-                    <Input 
-                      label="Merchant ID" 
-                      placeholder="Enter Merchant ID"
-                      value={settings.payment_gateways?.visa_merchant_id || ''}
-                      onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_merchant_id: e.target.value}})}
-                      className="h-11 rounded-xl"
-                    />
-                    <Input 
-                      label="Secret Key" 
-                      type="password"
-                      placeholder="••••••••••••"
-                      value={settings.payment_gateways?.visa_secret_key || ''}
-                      onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, visa_secret_key: e.target.value}})}
-                      className="h-11 rounded-xl"
-                    />
-                 </div>
+                 {settings.payment_gateways?.hyperpay_enabled && (
+                    <div className="space-y-4 animate-in fade-in">
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="hp_mode" checked={settings.payment_gateways.hyperpay_mode === 'test'} onChange={() => setSettings({...settings, payment_gateways: {...settings.payment_gateways, hyperpay_mode: 'test'}})} className="accent-primary" />
+                                <span className="text-xs font-bold">تجريبي (Test)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="hp_mode" checked={settings.payment_gateways.hyperpay_mode === 'live'} onChange={() => setSettings({...settings, payment_gateways: {...settings.payment_gateways, hyperpay_mode: 'live'}})} className="accent-primary" />
+                                <span className="text-xs font-bold">مباشر (Live)</span>
+                            </label>
+                        </div>
+                        <Input 
+                        label="Entity ID" 
+                        placeholder="8a829417..."
+                        value={settings.payment_gateways?.hyperpay_entity_id || ''}
+                        onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, hyperpay_entity_id: e.target.value}})}
+                        className="h-11 rounded-xl"
+                        />
+                        <Input 
+                        label="Access Token" 
+                        type="password"
+                        placeholder="OGE4Mjk0MTc..."
+                        value={settings.payment_gateways?.hyperpay_access_token || ''}
+                        onChange={e => setSettings({...settings, payment_gateways: {...settings.payment_gateways, hyperpay_access_token: e.target.value}})}
+                        className="h-11 rounded-xl"
+                        />
+                    </div>
+                 )}
               </div>
 
+              {/* Cash Config */}
               <div className="space-y-6">
                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
                     <div className="flex items-center gap-3">
@@ -137,7 +155,7 @@ export const SystemSettings: React.FC = () => {
                  </div>
                  <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
                     <p className="text-[10px] font-bold text-primary leading-relaxed">
-                      عند تفعيل الدفع النقدي، سيتمكن البائعون من إتمام عملية الاشتراك، ولكن سيبقى حسابهم في حالة "بانتظار الموافقة" حتى يتم تأكيد التحصيل يدوياً.
+                      عند تفعيل الدفع النقدي، سيتمكن البائعون من إتمام عملية الاشتراك، ولكن سيبقى حسابهم في حالة "بانتظار الموافقة" حتى يتم تأكيد التحصيل يدوياً من قبل الإدارة.
                     </p>
                  </div>
               </div>

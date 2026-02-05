@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { UserProfile, VAT_RATE } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
-import { PublicNavbar } from './components/Layout/PublicNavbar'; // Import new navbar
+import { PublicNavbar } from './components/Layout/PublicNavbar';
 import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
 import { Bookings } from './pages/Bookings';
@@ -28,14 +28,15 @@ import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
   Loader2, X, Clock, AlertOctagon, User, Building2, 
-  CreditCard, CheckCircle2, ShieldCheck, Mail, ArrowLeft, ArrowRight
+  CreditCard, CheckCircle2, ShieldCheck, Mail, ArrowLeft, ArrowRight,
+  Globe, Lock
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { PriceTag } from './components/ui/PriceTag';
 import { formatCurrency } from './utils/currency';
 
-// Steps: 0=Info, 1=Plan, 2=Payment, 3=Verify, 4=Success
+// Steps: 0=Info, 1=OTP, 2=Plan, 3=Payment, 4=Success
 type RegStep = 0 | 1 | 2 | 3 | 4;
 
 const App: React.FC = () => {
@@ -66,12 +67,12 @@ const App: React.FC = () => {
     services: 3
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cash'>('online');
   const [otpCode, setOtpCode] = useState('');
   
   const [systemFees, setSystemFees] = useState({ hallFee: 500, serviceFee: 200 });
+  const [hyperPayConfig, setHyperPayConfig] = useState({ enabled: false });
   const { toast } = useToast();
-  const MOCK_OTP = "1234";
 
   const subtotal = (planData.halls * systemFees.hallFee) + (planData.services * systemFees.serviceFee);
   const vatAmount = subtotal * VAT_RATE;
@@ -141,16 +142,19 @@ const App: React.FC = () => {
       }
     });
 
-    const fetchSystemFees = async () => {
+    const fetchSystemSettings = async () => {
       const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
       if (data?.value) {
         setSystemFees({
           hallFee: Number(data.value.hall_listing_fee) || 500,
           serviceFee: Number(data.value.service_listing_fee) || 200
         });
+        if (data.value.payment_gateways) {
+            setHyperPayConfig({ enabled: data.value.payment_gateways.hyperpay_enabled });
+        }
       }
     };
-    fetchSystemFees();
+    fetchSystemSettings();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -167,53 +171,108 @@ const App: React.FC = () => {
     } finally { setAuthLoading(false); }
   };
 
+  // Improved Vendor Registration Flow
   const handleRegisterStep = async () => {
-    if (regStep === 0) {
-       if (!regData.fullName || !regData.email || !regData.password || !regData.businessName) {
-         toast({ title: 'نقص بيانات', description: 'يرجى ملء كافة الحقول المطلوبة.', variant: 'destructive' });
-         return;
-       }
-       setRegStep(1);
-    } else if (regStep === 1) {
-       setRegStep(2);
-    } else if (regStep === 2) {
-       setAuthLoading(true);
-       setTimeout(() => {
-          setAuthLoading(false);
-          setRegStep(3);
-          toast({ title: 'رمز التحقق', description: `الرمز هو: ${MOCK_OTP}`, variant: 'success' });
-       }, 1500);
-    } else if (regStep === 3) {
-       if (otpCode !== MOCK_OTP) {
-          toast({ title: 'خطأ', description: 'رمز التحقق غير صحيح.', variant: 'destructive' });
-          return;
-       }
-       setAuthLoading(true);
-       try {
-          const { error } = await supabase.auth.signUp({ 
-            email: regData.email, 
-            password: regData.password, 
-            options: { 
-              data: { 
-                full_name: regData.fullName, 
-                business_name: regData.businessName,
-                phone: regData.phone,
-                role: 'vendor',
-                hall_limit: planData.halls,
-                service_limit: planData.services,
-                payment_status: paymentMethod === 'card' ? 'paid' : 'unpaid',
-                subscription_plan: 'custom'
-              } 
-            } 
-          });
-          
-          if (error) throw error;
-          setRegStep(4);
-       } catch (err: any) {
-          toast({ title: 'فشل التسجيل', description: err.message, variant: 'destructive' });
-       } finally {
-          setAuthLoading(false);
-       }
+    setAuthLoading(true);
+    try {
+        if (regStep === 0) {
+            // Step 0: Create User (Trigger sends email)
+            if (!regData.fullName || !regData.email || !regData.password || !regData.businessName) {
+                toast({ title: 'نقص بيانات', description: 'يرجى ملء كافة الحقول.', variant: 'destructive' });
+                setAuthLoading(false);
+                return;
+            }
+            
+            // Sign Up with Metadata
+            const { error } = await supabase.auth.signUp({ 
+                email: regData.email, 
+                password: regData.password, 
+                options: { 
+                    data: { 
+                        full_name: regData.fullName, 
+                        business_name: regData.businessName,
+                        phone: regData.phone,
+                        role: 'vendor',
+                        status: 'pending', // Starts pending, updated after payment
+                        payment_status: 'unpaid'
+                    } 
+                } 
+            });
+
+            if (error) {
+                if (error.message.includes('already registered')) {
+                    toast({ title: 'الحساب مسجل', description: 'البريد الإلكتروني مسجل مسبقاً، حاول تسجيل الدخول.', variant: 'warning' });
+                } else {
+                    toast({ title: 'فشل التسجيل', description: error.message, variant: 'destructive' });
+                }
+            } else {
+                toast({ title: 'تم إنشاء الحساب', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
+                setRegStep(1); // Move to OTP
+            }
+
+        } else if (regStep === 1) {
+            // Step 1: Verify OTP
+            if (!otpCode) {
+                toast({ title: 'رمز مفقود', description: 'يرجى إدخال رمز التحقق.', variant: 'destructive' });
+                setAuthLoading(false);
+                return;
+            }
+
+            const { data, error } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'signup' });
+            
+            if (error) {
+                toast({ title: 'رمز غير صحيح', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
+            } else if (data.user) {
+                toast({ title: 'تم التحقق', description: 'تم تفعيل البريد الإلكتروني بنجاح.', variant: 'success' });
+                setRegStep(2); // Move to Plan
+            }
+
+        } else if (regStep === 2) {
+            // Step 2: Confirm Plan Selection
+            setRegStep(3); // Move to Payment
+
+        } else if (regStep === 3) {
+            // Step 3: Payment Processing
+            const user = (await supabase.auth.getUser()).data.user;
+            if (!user) throw new Error('User not found');
+
+            // Simulate Payment Logic
+            if (paymentMethod === 'online') {
+                // Here we would integrate HyperPay iframe/redirect
+                // For demo, we simulate success
+                await new Promise(r => setTimeout(r, 2000)); 
+            }
+
+            // Update Profile with Plan & Payment Status
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                    hall_limit: planData.halls,
+                    service_limit: planData.services,
+                    payment_status: paymentMethod === 'online' ? 'paid' : 'unpaid',
+                    // If online paid => approved immediately (or keep pending for manual check)
+                    // If cash => pending
+                    status: paymentMethod === 'online' ? 'approved' : 'pending',
+                    subscription_plan: 'custom'
+                })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            // Send notification to Admin
+            await supabase.from('notifications').insert([{
+                user_id: user.id, // Notification for self
+                title: 'اكتمال التسجيل',
+                message: paymentMethod === 'online' ? 'تم الدفع وتفعيل الحساب بنجاح.' : 'تم استلام الطلب، بانتظار تحصيل الرسوم لتفعيل الحساب.',
+                type: 'system'
+            }]);
+
+            setRegStep(4); // Success Screen
+        }
+    } catch (err: any) {
+        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+        setAuthLoading(false);
     }
   };
 
@@ -231,7 +290,6 @@ const App: React.FC = () => {
   );
 
   const isPublicPage = activeTab === 'home' || activeTab === 'browse' || activeTab === 'hall_details';
-  const isPending = userProfile?.role === 'vendor' && userProfile?.status === 'pending';
 
   // Render Logic
   return (
@@ -287,21 +345,24 @@ const App: React.FC = () => {
                     <button type="button" onClick={() => setIsRegister(true)} className="w-full mt-4 text-[10px] font-black text-primary hover:underline">ليس لديك حساب؟ انضم الآن</button>
                   </form>
               ) : (
-                  // Registration Steps (simplified for brevity, logic remains the same)
+                  // NEW REGISTRATION WIZARD
                   <div className="space-y-6">
-                    {/* ... (Existing registration steps UI) ... */}
-                    {/* Reusing existing code structure for registration steps */}
+                    {/* Stepper Header */}
                     {regStep < 4 && (
                       <div className="flex justify-between items-center px-4 relative">
                         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 -z-10"></div>
-                        {[{i:0, label: 'البيانات'}, {i:1, label: 'الباقة'}, {i:2, label: 'الدفع'}, {i:3, label: 'التحقق'}].map(step => (
+                        {[{i:0, label: 'البيانات'}, {i:1, label: 'التحقق'}, {i:2, label: 'الباقة'}, {i:3, label: 'الدفع'}].map(step => (
                           <div key={step.i} className={`flex flex-col items-center gap-1 ${regStep >= step.i ? 'text-primary' : 'text-gray-300'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${regStep >= step.i ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200'}`}>{step.i + 1}</div>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${regStep >= step.i ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200'}`}>
+                                {regStep > step.i ? <CheckCircle2 className="w-4 h-4" /> : step.i + 1}
+                            </div>
                             <span className="text-[9px] font-bold">{step.label}</span>
                           </div>
                         ))}
                       </div>
                     )}
+
+                    {/* Step 0: Basic Info */}
                     {regStep === 0 && (
                       <div className="space-y-4 animate-in slide-in-from-right-4">
                          <div className="grid grid-cols-2 gap-4">
@@ -313,14 +374,39 @@ const App: React.FC = () => {
                          <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
                          <div className="flex justify-between items-center pt-4">
                             <button onClick={() => setIsRegister(false)} className="text-xs font-bold text-gray-400">لدي حساب بالفعل</button>
-                            <Button onClick={handleRegisterStep} className="px-8 rounded-xl font-bold">التالي <ArrowLeft className="w-4 h-4 mr-2" /></Button>
+                            <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold">
+                                {authLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>التالي <ArrowLeft className="w-4 h-4 mr-2" /></>}
+                            </Button>
                          </div>
                       </div>
                     )}
-                    {/* ... other steps follow existing logic ... */}
+
+                    {/* Step 1: OTP Verification */}
                     {regStep === 1 && (
+                      <div className="space-y-6 animate-in slide-in-from-right-4 text-center">
+                        <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
+                            <Mail className="w-8 h-8" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-black">تحقق من بريدك</h3>
+                            <p className="text-xs text-gray-500 font-bold">تم إرسال رمز التفعيل إلى {regData.email}</p>
+                        </div>
+                        <Input 
+                            placeholder="أدخل الرمز (6 أرقام)" 
+                            className="text-center text-2xl tracking-[0.5em] font-black h-16 rounded-2xl" 
+                            maxLength={6} 
+                            value={otpCode} 
+                            onChange={e => setOtpCode(e.target.value)} 
+                        />
+                        <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-12 rounded-xl font-bold shadow-xl shadow-primary/20">
+                            {authLoading ? <Loader2 className="animate-spin" /> : 'تفعيل الحساب'}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Step 2: Choose Plan */}
+                    {regStep === 2 && (
                       <div className="space-y-6 animate-in slide-in-from-right-4">
-                        {/* Plan selection logic */}
                         <div className="space-y-4">
                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
                               <div className="flex items-center gap-3">
@@ -349,35 +435,48 @@ const App: React.FC = () => {
                            <span className="font-bold text-sm">الإجمالي التقديري</span>
                            <PriceTag amount={totalAmount} className="text-xl text-primary" />
                         </div>
-                        <div className="flex justify-between items-center pt-4">
-                            <Button variant="ghost" onClick={() => setRegStep(0)}>رجوع</Button>
-                            <Button onClick={handleRegisterStep} className="px-8 rounded-xl font-bold">التالي <ArrowLeft className="w-4 h-4 mr-2" /></Button>
-                        </div>
+                        <Button onClick={handleRegisterStep} className="w-full h-12 rounded-xl font-bold">التالي <ArrowLeft className="w-4 h-4 mr-2" /></Button>
                       </div>
                     )}
-                    {regStep === 2 && (
+
+                    {/* Step 3: Payment */}
+                    {regStep === 3 && (
                       <div className="space-y-6 animate-in slide-in-from-right-4">
                         <div className="grid grid-cols-2 gap-4">
-                           <button onClick={() => setPaymentMethod('card')} className={`h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'card' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100'}`}><CreditCard className="w-6 h-6" /><span className="text-xs font-black">دفع إلكتروني</span></button>
-                           <button onClick={() => setPaymentMethod('cash')} className={`h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100'}`}><Building2 className="w-6 h-6" /><span className="text-xs font-black">تحويل / كاش</span></button>
+                           {hyperPayConfig.enabled && (
+                               <button onClick={() => setPaymentMethod('online')} className={`h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'online' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
+                                   <Globe className="w-8 h-8" />
+                                   <span className="text-xs font-black">HyperPay (Online)</span>
+                               </button>
+                           )}
+                           <button onClick={() => setPaymentMethod('cash')} className={`h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
+                               <Building2 className="w-8 h-8" />
+                               <span className="text-xs font-black">تحويل / كاش</span>
+                           </button>
                         </div>
+                        
+                        <div className="bg-gray-50 p-4 rounded-xl text-[10px] text-gray-500 font-bold leading-relaxed border border-gray-100">
+                            {paymentMethod === 'online' 
+                                ? 'سيتم توجيهك إلى بوابة الدفع الآمنة لإتمام العملية وتفعيل حسابك فوراً.'
+                                : 'سيتم إنشاء حسابك وتعليقه حتى يتم التواصل معك لتحصيل الرسوم.'}
+                        </div>
+
                         <div className="flex justify-between items-center pt-4">
-                            <Button variant="ghost" onClick={() => setRegStep(1)}>رجوع</Button>
-                            <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold shadow-xl shadow-primary/20">{authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}</Button>
+                            <Button variant="ghost" onClick={() => setRegStep(2)}>رجوع</Button>
+                            <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold shadow-xl shadow-primary/20">
+                                {authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}
+                            </Button>
                         </div>
                       </div>
                     )}
-                    {regStep === 3 && (
-                      <div className="space-y-6 animate-in slide-in-from-right-4 text-center">
-                        <Input placeholder="----" className="text-center text-2xl tracking-[0.5em] font-black h-16 rounded-2xl" maxLength={4} value={otpCode} onChange={e => setOtpCode(e.target.value)} />
-                        <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-12 rounded-xl font-bold">{authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد التسجيل'}</Button>
-                      </div>
-                    )}
+
+                    {/* Step 4: Success */}
                     {regStep === 4 && (
                       <div className="text-center space-y-6 animate-in zoom-in-95 py-10">
                          <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-12 h-12" /></div>
                          <h3 className="text-2xl font-black text-gray-900">تم التسجيل بنجاح!</h3>
-                         <Button onClick={() => setShowAuthModal(false)} className="px-10 h-12 rounded-xl font-bold mt-4">إغلاق</Button>
+                         <p className="text-sm text-gray-500 font-bold">شكراً لانضمامك إلينا. يمكنك الآن البدء في إعداد ملفك الشخصي.</p>
+                         <Button onClick={() => { setShowAuthModal(false); fetchProfile((userProfile?.id || ''), true); }} className="px-10 h-12 rounded-xl font-bold mt-4">الدخول للوحة التحكم</Button>
                       </div>
                     )}
                   </div>
