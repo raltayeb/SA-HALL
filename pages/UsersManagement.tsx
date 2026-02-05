@@ -5,7 +5,7 @@ import { UserProfile, Role } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Users, Edit, Trash2, Search, Plus, ShieldAlert, Phone, Building } from 'lucide-react';
+import { Users, Edit, Trash2, Search, Plus, ShieldAlert, Phone, Building, CheckCircle2, Shield } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface FormErrors {
@@ -18,14 +18,10 @@ export const UsersManagement: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
   const { toast } = useToast();
   
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<Partial<UserProfile>>({});
-  
-  // Centralized Error State
   const [errors, setErrors] = useState<FormErrors>({});
 
   const fetchUsers = async () => {
@@ -33,129 +29,77 @@ export const UsersManagement: React.FC = () => {
     const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
     if (!error && data) {
       setUsers(data as UserProfile[]);
-    } else {
-        console.error('Error fetching users:', error);
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
     let isValid = true;
-
-    if (!currentUser.full_name?.trim()) {
-      newErrors.full_name = 'الاسم الكامل مطلوب';
-      isValid = false;
-    }
-
-    if (!currentUser.email?.trim()) {
-      newErrors.email = 'البريد الإلكتروني مطلوب';
-      isValid = false;
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(currentUser.email)) {
-        newErrors.email = 'يرجى إدخال بريد إلكتروني صحيح';
-        isValid = false;
-      }
-    }
-
+    if (!currentUser.full_name?.trim()) { newErrors.full_name = 'الاسم الكامل مطلوب'; isValid = false; }
+    if (!currentUser.email?.trim()) { newErrors.email = 'البريد الإلكتروني مطلوب'; isValid = false; }
     setErrors(newErrors);
     return isValid;
   };
 
   const handleSave = async () => {
     setErrors({});
-    
-    if (!validateForm()) {
-      return;
-    }
-
+    if (!validateForm()) return;
     setLoading(true);
 
     try {
-        // 2. Check if email exists (Only for CREATE operation)
         if (!currentUser.id) {
-            const { data: existingUser, error: checkError } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('email', currentUser.email)
-                .maybeSingle(); 
-
-            if (checkError) {
-                throw new Error('فشل في التحقق من وجود المستخدم: ' + checkError.message);
-            }
-
-            if (existingUser) {
-                throw new Error('هذا البريد الإلكتروني مسجل بالفعل لمستخدم آخر.');
-            }
+            const { data: existing } = await supabase.from('profiles').select('id').eq('email', currentUser.email).maybeSingle(); 
+            if (existing) throw new Error('البريد الإلكتروني مسجل بالفعل.');
         }
 
         let error;
-
-        // 3. Perform Insert or Update
         if (currentUser.id) {
-            // Update
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ 
-                    full_name: currentUser.full_name, 
-                    role: currentUser.role,
-                    phone_number: currentUser.phone_number,
-                    business_name: currentUser.business_name
-                })
-                .eq('id', currentUser.id);
+            const { error: updateError } = await supabase.from('profiles').update({ 
+                full_name: currentUser.full_name, 
+                role: currentUser.role,
+                phone_number: currentUser.phone_number,
+                business_name: currentUser.business_name
+            }).eq('id', currentUser.id);
             error = updateError;
         } else {
-            // Create
             const fakeId = crypto.randomUUID(); 
-            const { error: insertError } = await supabase
-                .from('profiles')
-                .insert([{
-                    id: fakeId,
-                    email: currentUser.email,
-                    full_name: currentUser.full_name,
-                    role: currentUser.role || 'user',
-                    phone_number: currentUser.phone_number,
-                    business_name: currentUser.business_name
-                }]);
+            const { error: insertError } = await supabase.from('profiles').insert([{
+                id: fakeId,
+                email: currentUser.email,
+                full_name: currentUser.full_name,
+                role: currentUser.role || 'user',
+                phone_number: currentUser.phone_number,
+                business_name: currentUser.business_name
+            }]);
             error = insertError;
         }
 
-        if (error) {
-            if (error.message.includes('row-level security')) {
-                throw new Error('ليس لديك صلاحية لإجراء هذا التعديل. تأكد من أن حسابك يمتلك صلاحية "مدير نظام" (Super Admin).');
-            }
-            throw error;
-        }
+        if (error) throw error;
 
-        // Success
         setIsModalOpen(false);
         setCurrentUser({});
         fetchUsers();
-        toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات المستخدم بنجاح', variant: 'success' });
+        toast({ title: 'تم الحفظ', variant: 'success' });
 
     } catch (err: any) {
-        console.error(err);
-        setErrors(prev => ({ ...prev, general: err.message || 'حدث خطأ غير متوقع' }));
+        setErrors(prev => ({ ...prev, general: err.message }));
     } finally {
         setLoading(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا المستخدم؟ سيتم حذف جميع الحجوزات والقاعات المرتبطة به.')) {
+    if (confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
         try {
             const { error } = await supabase.from('profiles').delete().eq('id', id);
             if (error) throw error;
-            
             fetchUsers();
-            toast({ title: 'تم الحذف', description: 'تم حذف المستخدم بنجاح', variant: 'success' });
+            toast({ title: 'تم الحذف', variant: 'success' });
         } catch (err: any) {
-             toast({ title: 'خطأ', description: 'فشل الحذف: ' + err.message, variant: 'destructive' });
+             toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
         }
     }
   };
@@ -166,162 +110,111 @@ export const UsersManagement: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-8 text-right pb-10">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <Users className="w-6 h-6 text-primary" />
-                إدارة المستخدمين
-            </h2>
-            <p className="text-sm text-muted-foreground">عرض وتعديل صلاحيات المستخدمين والبائعين.</p>
+            <h2 className="text-3xl font-ruqaa text-primary">إدارة المستخدمين</h2>
+            <p className="text-sm text-muted-foreground mt-1">التحكم في حسابات المستخدمين والبائعين.</p>
         </div>
-        <Button onClick={() => { setCurrentUser({ role: 'user' }); setErrors({}); setIsModalOpen(true); }} className="gap-2">
-          <Plus className="w-4 h-4" /> إضافة مستخدم
-        </Button>
+        
+        <div className="flex gap-4 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+                <Input 
+                    placeholder="بحث..." 
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-12 rounded-xl bg-white pr-10"
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+            <Button onClick={() => { setCurrentUser({ role: 'user' }); setErrors({}); setIsModalOpen(true); }} className="h-12 px-6 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
+                <Plus className="w-4 h-4" /> إضافة مستخدم
+            </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 bg-card p-2 rounded-lg border max-w-sm">
-        <Search className="w-4 h-4 text-muted-foreground" />
-        <input 
-            type="text" 
-            placeholder="بحث بالاسم أو البريد..." 
-            className="bg-transparent border-none focus:outline-none text-sm w-full"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm text-right">
-                <thead className="bg-muted/50 text-muted-foreground">
-                    <tr>
-                        <th className="p-4 font-medium">المستخدم</th>
-                        <th className="p-4 font-medium">البريد الإلكتروني</th>
-                        <th className="p-4 font-medium">الدور (الصلاحية)</th>
-                        <th className="p-4 font-medium">تاريخ الانضمام</th>
-                        <th className="p-4 font-medium">إجراءات</th>
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-right text-sm">
+            <thead className="bg-gray-50/50 text-gray-500 text-xs font-black uppercase">
+                <tr>
+                    <th className="p-6">المستخدم</th>
+                    <th className="p-6">الدور</th>
+                    <th className="p-6">البيانات</th>
+                    <th className="p-6">تاريخ الانضمام</th>
+                    <th className="p-6 text-center">إجراءات</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+                {loading ? (
+                    <tr><td colSpan={5} className="p-10 text-center animate-pulse">جاري التحميل...</td></tr>
+                ) : filteredUsers.length === 0 ? (
+                    <tr><td colSpan={5} className="p-10 text-center text-gray-400">لا يوجد مستخدمين مطابقين</td></tr>
+                ) : filteredUsers.map(u => (
+                    <tr key={u.id} className="hover:bg-gray-50/30 transition-colors">
+                        <td className="p-6">
+                            <div className="font-bold text-gray-900">{u.full_name}</div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">{u.email}</div>
+                        </td>
+                        <td className="p-6">
+                            <span className={`
+                                inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-black
+                                ${u.role === 'super_admin' ? 'bg-red-50 text-red-600' : 
+                                  u.role === 'vendor' ? 'bg-purple-50 text-purple-600' : 
+                                  'bg-gray-100 text-gray-600'}
+                            `}>
+                                {u.role === 'super_admin' ? <Shield className="w-3 h-3" /> : u.role === 'vendor' ? <Building className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                                {u.role === 'super_admin' ? 'مدير' : u.role === 'vendor' ? 'بائع' : 'مستخدم'}
+                            </span>
+                        </td>
+                        <td className="p-6">
+                            {u.phone_number ? <div className="text-xs font-bold text-gray-600 flex items-center gap-1"><Phone className="w-3 h-3" /> {u.phone_number}</div> : '-'}
+                            {u.business_name && <div className="text-[10px] text-gray-400 mt-1">{u.business_name}</div>}
+                        </td>
+                        <td className="p-6 text-xs text-gray-500 font-bold">
+                            {u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '-'}
+                        </td>
+                        <td className="p-6 text-center">
+                            <div className="flex justify-center gap-2">
+                                <button onClick={() => { setCurrentUser(u); setErrors({}); setIsModalOpen(true); }} className="p-2 bg-gray-50 text-gray-500 rounded-xl hover:text-primary hover:bg-white hover:shadow-sm transition-all"><Edit className="w-4 h-4" /></button>
+                                <button onClick={() => handleDelete(u.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                        </td>
                     </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {loading ? (
-                        <tr><td colSpan={5} className="p-8 text-center">جاري التحميل...</td></tr>
-                    ) : filteredUsers.length === 0 ? (
-                        <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">لا يوجد مستخدمين مطابقين</td></tr>
-                    ) : (
-                        filteredUsers.map(u => (
-                            <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                                <td className="p-4 font-medium">{u.full_name}</td>
-                                <td className="p-4 text-muted-foreground font-mono text-xs">{u.email}</td>
-                                <td className="p-4">
-                                    <span className={`
-                                        inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                        ${u.role === 'super_admin' ? 'bg-destructive/10 text-destructive' : 
-                                          u.role === 'vendor' ? 'bg-primary/10 text-primary' : 
-                                          'bg-secondary text-secondary-foreground'}
-                                    `}>
-                                        {u.role === 'super_admin' ? 'مدير نظام' : u.role === 'vendor' ? 'بائع (قاعات)' : 'مستخدم'}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-muted-foreground">
-                                    {u.created_at ? new Date(u.created_at).toLocaleDateString('ar-SA') : '-'}
-                                </td>
-                                <td className="p-4">
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setCurrentUser(u); setErrors({}); setIsModalOpen(true); }}>
-                                            <Edit className="w-3 h-3" />
-                                        </Button>
-                                        <Button size="sm" variant="destructive" className="h-8 w-8 p-0" onClick={() => handleDelete(u.id)}>
-                                            <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
-        </div>
+                ))}
+            </tbody>
+        </table>
       </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        title={currentUser.id ? 'تعديل بيانات المستخدم' : 'إضافة مستخدم جديد'}
-      >
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-            {errors.general && (
-                <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
-                    {errors.general}
-                </div>
-            )}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={currentUser.id ? 'تعديل البيانات' : 'مستخدم جديد'}>
+        <div className="space-y-4 text-right">
+            {errors.general && <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl font-bold">{errors.general}</div>}
             
-            {!currentUser.id && (
-                 <div className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-3 rounded-md text-xs flex gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <p>ملاحظة: هذا المستخدم لن يتمكن من تسجيل الدخول حتى يتم إنشاء حساب Auth بنفس المعرف (يتطلب تدخل برمجي).</p>
-                 </div>
-            )}
-            
-            <Input 
-                label="الاسم الكامل"
-                value={currentUser.full_name || ''}
-                onChange={e => setCurrentUser({...currentUser, full_name: e.target.value})}
-                error={errors.full_name}
-            />
-            
-            <Input 
-                label="البريد الإلكتروني"
-                type="email"
-                value={currentUser.email || ''}
-                onChange={e => setCurrentUser({...currentUser, email: e.target.value})}
-                disabled={!!currentUser.id} 
-                className={currentUser.id ? 'opacity-50' : ''}
-                error={errors.email}
-            />
+            <Input label="الاسم الكامل" value={currentUser.full_name || ''} onChange={e => setCurrentUser({...currentUser, full_name: e.target.value})} error={errors.full_name} className="h-12 rounded-xl" />
+            <Input label="البريد الإلكتروني" value={currentUser.email || ''} onChange={e => setCurrentUser({...currentUser, email: e.target.value})} disabled={!!currentUser.id} className="h-12 rounded-xl" error={errors.email} />
 
             <div className="grid grid-cols-2 gap-4">
-                <Input 
-                    label="رقم الهاتف"
-                    type="tel"
-                    placeholder="05xxxxxxx"
-                    value={currentUser.phone_number || ''}
-                    onChange={e => setCurrentUser({...currentUser, phone_number: e.target.value})}
-                />
-                <Input 
-                    label="اسم النشاط التجاري"
-                    placeholder="للبائعين فقط"
-                    value={currentUser.business_name || ''}
-                    onChange={e => setCurrentUser({...currentUser, business_name: e.target.value})}
-                />
+                <Input label="رقم الهاتف" value={currentUser.phone_number || ''} onChange={e => setCurrentUser({...currentUser, phone_number: e.target.value})} className="h-12 rounded-xl" />
+                <Input label="اسم النشاط" value={currentUser.business_name || ''} onChange={e => setCurrentUser({...currentUser, business_name: e.target.value})} className="h-12 rounded-xl" />
             </div>
 
             <div className="space-y-2">
-                <label className="text-sm font-medium">نوع الصلاحية</label>
-                <div className="grid grid-cols-3 gap-2">
+                <label className="text-xs font-bold text-gray-500">الصلاحية</label>
+                <div className="flex gap-2">
                     {(['user', 'vendor', 'super_admin'] as Role[]).map((r) => (
-                        <div 
+                        <button 
                             key={r}
                             onClick={() => setCurrentUser({...currentUser, role: r})}
-                            className={`
-                                cursor-pointer rounded-lg border p-2 text-center text-sm transition-all
-                                ${currentUser.role === r 
-                                    ? 'border-primary bg-primary/5 text-primary ring-1 ring-primary' 
-                                    : 'hover:bg-accent'}
-                            `}
+                            className={`flex-1 py-3 rounded-xl text-xs font-black transition-all border ${currentUser.role === r ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white border-gray-200 text-gray-500'}`}
                         >
                             {r === 'super_admin' ? 'مدير' : r === 'vendor' ? 'بائع' : 'مستخدم'}
-                        </div>
+                        </button>
                     ))}
                 </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-6">
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>إلغاء</Button>
-                <Button onClick={handleSave} disabled={loading}>
-                    {loading ? 'جاري المعالجة...' : 'حفظ التغييرات'}
-                </Button>
-            </div>
+            <Button onClick={handleSave} disabled={loading} className="w-full h-12 rounded-xl font-black mt-4 shadow-lg shadow-primary/20">
+                {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
+            </Button>
         </div>
       </Modal>
     </div>

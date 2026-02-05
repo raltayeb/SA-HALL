@@ -8,12 +8,14 @@ import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
 import { 
-  Search, Download, Plus, Edit2, Bell,
-  Calendar, User, CreditCard, Filter, History, CheckCircle2, Clock, PieChart
+  Search, Download, Plus, Bell,
+  Calendar, CreditCard, CheckCircle2, Clock, PieChart,
+  ChevronLeft, ChevronRight, Inbox
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
 
 interface BookingsProps {
   user: UserProfile;
@@ -23,6 +25,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -33,8 +39,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [columnFilters, setColumnFilters] = useState({
     client: '',
     date: '',
-    startTime: '',
-    endTime: '',
     hall: '',
     paymentStatus: 'all',
     status: 'all'
@@ -49,10 +53,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         .from('bookings')
         .select(`
           *,
-          halls:hall_id (*),
-          client:user_id (*),
+          halls:hall_id (name, city),
+          client:user_id (full_name, email, phone_number),
           vendor:vendor_id (*),
-          services:service_id (*)
+          services:service_id (name)
         `);
 
       if (user.role === 'vendor') {
@@ -61,9 +65,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         query = query.eq('user_id', user.id);
       }
 
-      const { data, error } = await query.order('booking_date', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
       if (error) throw error;
-      setBookings(data as Booking[] || []);
+      setBookings(data as any[] || []);
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل الحجوزات.', variant: 'destructive' });
     } finally {
@@ -71,243 +76,243 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     }
   }, [user.id, user.role, toast]);
 
-  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+  // Realtime Subscription
+  useEffect(() => {
+    fetchBookings();
 
-  const exportToExcel = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
-        + "التاريخ,العميل,القاعة,المبلغ,المدفوع,الحالة,حالة الدفع\n"
-        + bookings.map(b => `${b.booking_date},${b.client?.full_name || 'زائر'},${b.halls?.name},${b.total_amount},${b.paid_amount || 0},${b.status},${b.payment_status}`).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "bookings.csv");
-    document.body.appendChild(link);
-    link.click();
+    const channel = supabase.channel('bookings_realtime')
+      .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'bookings',
+          filter: user.role === 'vendor' ? `vendor_id=eq.${user.id}` : `user_id=eq.${user.id}`
+      }, (payload) => {
+          // Fetch full details for the new booking to ensure relations are populated
+          // For simplicity/speed in demo, we append and refetch lazily or just append raw
+          // Best practice: Prepend to list, maybe show notification
+          fetchBookings(); 
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+          audio.play().catch(() => {});
+          toast({ title: 'حجز جديد', description: 'وصلك طلب حجز جديد الآن!', variant: 'success' });
+      })
+      .on('postgres_changes', { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'bookings',
+          filter: user.role === 'vendor' ? `vendor_id=eq.${user.id}` : `user_id=eq.${user.id}`
+      }, (payload) => {
+          setBookings(prev => prev.map(b => b.id === payload.new.id ? { ...b, ...payload.new } : b));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchBookings, user.id, user.role]);
+
+  // Handle Mark as Read
+  const handleBookingClick = async (booking: Booking) => {
+      setSelectedBooking(booking);
+      if (user.role === 'vendor') {
+          setIsEditModalOpen(true);
+          // Mark as read if not already
+          if (!(booking as any).is_read) {
+              const { error } = await supabase.from('bookings').update({ is_read: true }).eq('id', booking.id);
+              if (!error) {
+                  setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, is_read: true } : b));
+              }
+          }
+      } else {
+          setIsInvoiceOpen(true);
+      }
   };
 
   const filteredBookings = bookings.filter(b => {
-    const matchClient = !columnFilters.client || (b.client?.full_name || 'عميل خارجي').toLowerCase().includes(columnFilters.client.toLowerCase()) || (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase());
+    const matchClient = !columnFilters.client || 
+        (b.client?.full_name || b.guest_name || 'عميل خارجي').toLowerCase().includes(columnFilters.client.toLowerCase()) || 
+        (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase());
+    
     const matchDate = !columnFilters.date || b.booking_date.includes(columnFilters.date);
-    const matchStart = !columnFilters.startTime || (b.start_time || '').includes(columnFilters.startTime);
-    const matchEnd = !columnFilters.endTime || (b.end_time || '').includes(columnFilters.endTime);
-    const matchHall = !columnFilters.hall || (b.halls?.name || '').toLowerCase().includes(columnFilters.hall.toLowerCase());
+    const matchHall = !columnFilters.hall || (b.halls?.name || b.services?.name || '').toLowerCase().includes(columnFilters.hall.toLowerCase());
     const matchPayment = columnFilters.paymentStatus === 'all' || b.payment_status === columnFilters.paymentStatus;
     const matchStatus = columnFilters.status === 'all' || b.status === columnFilters.status;
 
-    return matchClient && matchDate && matchStart && matchEnd && matchHall && matchPayment && matchStatus;
+    return matchClient && matchDate && matchHall && matchPayment && matchStatus;
   });
+
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+  const currentData = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getPaymentStatusBadge = (status: string | undefined) => {
     switch (status) {
-      case 'paid':
-        return (
-          <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 w-fit">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="text-xs font-black">مدفوع بالكامل</span>
-          </div>
-        );
-      case 'partial':
-        return (
-          <div className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-100 w-fit">
-            <PieChart className="w-3.5 h-3.5" />
-            <span className="text-xs font-black">مدفوع جزئياً</span>
-          </div>
-        );
-      default:
-        return (
-          <div className="flex items-center gap-1.5 bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 w-fit">
-            <Clock className="w-3.5 h-3.5" />
-            <span className="text-xs font-black">آجل / غير مدفوع</span>
-          </div>
-        );
+      case 'paid': return <div className="flex items-center gap-1 text-emerald-600 font-bold text-[10px]"><CheckCircle2 className="w-3 h-3" /> تم السداد</div>;
+      case 'partial': return <div className="flex items-center gap-1 text-amber-600 font-bold text-[10px]"><PieChart className="w-3 h-3" /> مدفوع جزئياً</div>;
+      default: return <div className="flex items-center gap-1 text-gray-400 font-bold text-[10px]"><Clock className="w-3 h-3" /> آجل / غير مدفوع</div>;
     }
   };
 
   return (
-    <div className="space-y-6 text-right">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans">
+      
       {/* Header */}
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary">
-                <Bell className="w-6 h-6" />
+            <div className="w-14 h-14 bg-primary/5 rounded-2xl flex items-center justify-center text-primary relative">
+                <Inbox className="w-7 h-7" />
+                {bookings.filter(b => !(b as any).is_read).length > 0 && (
+                    <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                )}
             </div>
             <div>
-                <h2 className="text-2xl font-black text-gray-900">إدارة الحجوزات</h2>
-                <p className="text-xs font-bold text-gray-400">تابع حجوزاتك وتفاصيلها المالية بدقة.</p>
+                <h2 className="text-3xl font-bold text-primary">سجل الحجوزات</h2>
+                <p className="text-sm font-bold text-gray-400 mt-1">
+                    لديك <span className="text-primary">{bookings.filter(b => !(b as any).is_read).length}</span> رسائل جديدة بانتظار القراءة.
+                </p>
             </div>
          </div>
-         <div className="flex gap-3">
-            <Button variant="outline" onClick={exportToExcel} className="gap-2 h-12 rounded-xl font-bold border-gray-200 hover:border-primary hover:text-primary transition-all">
-                <Download className="w-4 h-4" /> تصدير
-            </Button>
+         <div className="flex gap-3 w-full md:w-auto">
             {user.role === 'vendor' && (
-                <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-12 rounded-xl font-black shadow-lg shadow-primary/20">
-                    <Plus className="w-4 h-4" /> حجز جديد
+                <Button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none gap-2 h-12 rounded-xl font-bold shadow-lg shadow-primary/20">
+                    <Plus className="w-4 h-4" /> حجز يدوي
                 </Button>
             )}
          </div>
       </div>
 
-      {/* Advanced Table */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+      {/* Inbox Table */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-5 bg-gray-50/50 border-b border-gray-100">
+            <div className="md:col-span-2 relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                    placeholder="بحث باسم العميل..." 
+                    className="w-full h-10 bg-white border border-gray-200 rounded-xl pr-10 pl-4 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
+                    value={columnFilters.client}
+                    onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
+                />
+            </div>
+            <div><input type="date" className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.date} onChange={e => setColumnFilters({...columnFilters, date: e.target.value})} /></div>
+            <div>
+                <select className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.status} onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}>
+                    <option value="all">كل الحالات</option>
+                    <option value="pending">جديد</option>
+                    <option value="confirmed">مؤكد</option>
+                    <option value="cancelled">ملغي</option>
+                </select>
+            </div>
+            <div>
+                <select className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.paymentStatus} onChange={e => setColumnFilters({...columnFilters, paymentStatus: e.target.value})}>
+                    <option value="all">كل الدفعات</option>
+                    <option value="paid">مدفوع</option>
+                    <option value="unpaid">آجل</option>
+                </select>
+            </div>
+        </div>
+
+        {/* Table */}
         <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-right">
-                <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                        <th className="p-4 min-w-[180px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><User className="w-3 h-3" /> العميل</span>
-                                <div className="relative">
-                                    <input 
-                                        placeholder="بحث بالاسم..." 
-                                        className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                        value={columnFilters.client}
-                                        onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
-                                    />
-                                    <Search className="w-3 h-3 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                </div>
-                            </div>
-                        </th>
-                        <th className="p-4 min-w-[150px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Calendar className="w-3 h-3" /> التاريخ</span>
-                                <input 
-                                    type="date"
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.date}
-                                    onChange={e => setColumnFilters({...columnFilters, date: e.target.value})}
-                                />
-                            </div>
-                        </th>
-                        <th className="p-4 min-w-[150px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider">القاعة / الباقة</span>
-                                <input 
-                                    placeholder="فلترة..." 
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.hall}
-                                    onChange={e => setColumnFilters({...columnFilters, hall: e.target.value})}
-                                />
-                            </div>
-                        </th>
-                        <th className="p-4 min-w-[150px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><CreditCard className="w-3 h-3" /> حالة الدفع</span>
-                                <select 
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.paymentStatus}
-                                    onChange={e => setColumnFilters({...columnFilters, paymentStatus: e.target.value})}
-                                >
-                                    <option value="all">الكل</option>
-                                    <option value="paid">مدفوع</option>
-                                    <option value="partial">جزئي</option>
-                                    <option value="unpaid">آجل</option>
-                                </select>
-                            </div>
-                        </th>
-                        <th className="p-4 min-w-[130px]">
-                            <div className="space-y-3">
-                                <span className="text-[10px] font-black uppercase text-primary tracking-wider flex items-center gap-2"><Filter className="w-3 h-3" /> حالة الحجز</span>
-                                <select 
-                                    className="w-full h-9 bg-white border border-gray-200 rounded-lg px-3 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                                    value={columnFilters.status}
-                                    onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}
-                                >
-                                    <option value="all">الكل</option>
-                                    <option value="confirmed">مؤكد</option>
-                                    <option value="pending">قيد الانتظار</option>
-                                    <option value="cancelled">ملغي</option>
-                                </select>
-                            </div>
-                        </th>
-                        <th className="p-4 text-center min-w-[120px]">
-                            <span className="text-[10px] font-black uppercase text-primary tracking-wider">أجراءات</span>
-                        </th>
+            <table className="w-full text-right border-collapse">
+                <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                    <tr>
+                        <th className="p-4 w-[25%]">تفاصيل العميل</th>
+                        <th className="p-4 w-[20%]">الموعد والمكان</th>
+                        <th className="p-4 w-[15%]">الحالة</th>
+                        <th className="p-4 w-[20%]">المالية</th>
+                        <th className="p-4 w-[15%] text-center">وقت الطلب</th>
+                        <th className="p-4 w-[5%] text-center"></th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-100">
                     {loading ? (
-                        <tr><td colSpan={6} className="p-10 text-center animate-pulse text-gray-400 font-bold">جاري تحميل البيانات...</td></tr>
-                    ) : filteredBookings.length === 0 ? (
-                        <tr><td colSpan={6} className="p-10 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة للفلاتر</td></tr>
-                    ) : filteredBookings.map((b) => (
-                        <tr key={b.id} className="hover:bg-gray-50/50 transition-colors group">
-                            <td className="p-4">
-                                <div className="font-bold text-sm text-gray-900">{b.client?.full_name || 'عميل خارجي'}</div>
-                                <div className="text-[10px] text-gray-400 truncate max-w-[150px]">{b.notes?.split('|')[0] || ''}</div>
-                            </td>
-                            <td className="p-4 font-bold text-xs text-gray-600 font-mono">
-                                {format(new Date(b.booking_date), 'yyyy-MM-dd')}
-                                {b.start_time && <div className="text-[10px] text-gray-400 mt-1 dir-ltr">{b.start_time.slice(0,5)} - {b.end_time?.slice(0,5)}</div>}
-                            </td>
-                            <td className="p-4">
-                                <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{b.halls?.name || 'حجز خدمة'}</span>
-                            </td>
-                            <td className="p-4">
-                                {getPaymentStatusBadge(b.payment_status)}
-                            </td>
-                            <td className="p-4">
-                                <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="rounded-lg px-3">
-                                    {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'انتظار' : 'ملغي'}
-                                </Badge>
-                            </td>
-                            <td className="p-4 text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                    <button onClick={() => { setSelectedBooking(b); setIsPaymentModalOpen(true); }} className="text-green-600 hover:bg-green-50 p-2 rounded-lg transition-all" title="سجل الدفعات">
-                                        <History className="w-4 h-4" />
+                        Array.from({length: 5}).map((_, i) => <tr key={i} className="animate-pulse bg-white"><td colSpan={6} className="p-6"><div className="h-4 bg-gray-100 rounded w-full"></div></td></tr>)
+                    ) : currentData.length === 0 ? (
+                        <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة</td></tr>
+                    ) : currentData.map((b) => {
+                        const isRead = (b as any).is_read;
+                        return (
+                            <tr 
+                                key={b.id} 
+                                onClick={() => handleBookingClick(b)}
+                                className={`
+                                    group transition-all cursor-pointer border-l-4
+                                    ${!isRead && user.role === 'vendor'
+                                        ? 'bg-white hover:bg-gray-50 border-l-primary font-bold shadow-sm' 
+                                        : 'bg-gray-50/30 hover:bg-gray-100 text-gray-500 border-l-transparent'}
+                                `}
+                            >
+                                <td className="p-4">
+                                    <div className={`text-sm ${!isRead ? 'text-gray-900' : 'text-gray-600'}`}>
+                                        {b.client?.full_name || b.guest_name || 'عميل خارجي'}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[150px]">
+                                        {b.client?.phone_number || b.guest_phone || 'رقم غير مسجل'}
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`p-1.5 rounded-lg ${!isRead ? 'bg-primary/10 text-primary' : 'bg-gray-200 text-gray-500'}`}>
+                                            <Calendar className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-800">{format(new Date(b.booking_date), 'yyyy-MM-dd')}</div>
+                                            <div className="text-[10px] text-gray-400">{b.halls?.name || b.services?.name}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="p-4">
+                                    <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
+                                        {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'طلب جديد' : 'ملغي'}
+                                    </Badge>
+                                </td>
+                                <td className="p-4">
+                                    <div className="flex flex-col gap-1">
+                                        <div className="text-sm font-bold">
+                                            {b.total_amount.toLocaleString()} <span className="text-[9px] font-normal text-gray-400">ر.س</span>
+                                        </div>
+                                        {getPaymentStatusBadge(b.payment_status)}
+                                    </div>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                                        {format(new Date(b.created_at || ''), 'dd/MM p', { locale: arSA })}
+                                    </span>
+                                </td>
+                                <td className="p-4 text-center">
+                                    <button onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); setIsPaymentModalOpen(true); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-green-600 transition-colors">
+                                        <CreditCard className="w-4 h-4" />
                                     </button>
-                                    <button onClick={() => { setSelectedBooking(b); user.role === 'vendor' ? setIsEditModalOpen(true) : setIsInvoiceOpen(true); }} className="text-gray-400 hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-all" title="تعديل التفاصيل">
-                                        <Edit2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                                </td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
-        <div className="p-4 border-t border-gray-100 text-xs font-bold text-gray-400 text-left">
-            العدد الإجمالي: {filteredBookings.length}
+
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
+            <div className="text-[10px] font-bold text-gray-400">صفحة {currentPage} من {totalPages || 1}</div>
+            <div className="flex gap-2">
+                <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 p-0"><ChevronRight className="w-4 h-4" /></Button>
+                <Button variant="outline" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 p-0"><ChevronLeft className="w-4 h-4" /></Button>
+            </div>
         </div>
       </div>
 
       {selectedBooking && (
         <>
-            <InvoiceModal 
-                isOpen={isInvoiceOpen} 
-                onClose={() => setIsInvoiceOpen(false)} 
-                booking={{
-                    ...selectedBooking,
-                    profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)
-                }} 
-            />
+            <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} booking={{...selectedBooking, profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)}} />
             {user.role === 'vendor' && (
                 <>
-                    <EditBookingDetailsModal
-                        isOpen={isEditModalOpen}
-                        onClose={() => setIsEditModalOpen(false)}
-                        booking={selectedBooking}
-                        onSuccess={fetchBookings}
-                    />
-                    <PaymentHistoryModal 
-                        isOpen={isPaymentModalOpen}
-                        onClose={() => setIsPaymentModalOpen(false)}
-                        booking={selectedBooking}
-                        onUpdate={fetchBookings}
-                    />
+                    <EditBookingDetailsModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} booking={selectedBooking} onSuccess={fetchBookings} />
+                    <PaymentHistoryModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} booking={selectedBooking} onUpdate={fetchBookings} />
                 </>
             )}
         </>
       )}
 
-      {user.role === 'vendor' && (
-        <AddBookingModal 
-            isOpen={isAddModalOpen} 
-            onClose={() => setIsAddModalOpen(false)} 
-            vendorId={user.id}
-            onSuccess={fetchBookings}
-        />
-      )}
+      {user.role === 'vendor' && <AddBookingModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} vendorId={user.id} onSuccess={fetchBookings} />}
     </div>
   );
 };
