@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/Badge';
 import { 
   MapPin, Users, Star, Share2, Heart, ChevronRight, ChevronLeft,
   CheckCircle2, Loader2, Sparkles, 
-  ShieldCheck, Clock, CreditCard, ArrowLeft, X, User, Phone, Wallet
+  ShieldCheck, Clock, CreditCard, ArrowLeft, X, User, Phone, Wallet, Eye
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format, parseISO, startOfDay, isSameDay, isBefore } from 'date-fns';
@@ -27,6 +27,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [isBooking, setIsBooking] = useState(false);
+  const [viewersCount, setViewersCount] = useState(0);
 
   // Data State
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
@@ -56,6 +57,26 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
     }, 5000);
     return () => clearInterval(timer);
   }, [allImages.length]);
+
+  // Fake Viewers Counter - Natural Fluctuation
+  useEffect(() => {
+    // Initial random number between 100 and 380
+    setViewersCount(Math.floor(Math.random() * (380 - 100 + 1)) + 100);
+
+    const interval = setInterval(() => {
+      setViewersCount(prev => {
+        // Randomly add or subtract a small amount (e.g., -3 to +4)
+        const change = Math.floor(Math.random() * 8) - 3;
+        let next = prev + change;
+        // Keep within reasonable bounds
+        if (next < 100) next = 100;
+        if (next > 380) next = 380;
+        return next;
+      });
+    }, 4000); // Update every 4 seconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchDetails = useCallback(async () => {
     if (isHall) {
@@ -267,9 +288,10 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                         <div className="bg-green-50 text-green-700 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-3 border border-green-100">
                            <ShieldCheck className="w-5 h-5" /> ضمان أفضل سعر
                         </div>
-                        <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 space-y-2 text-center">
-                           <p className="text-xs font-bold text-gray-400">سياسة الإلغاء</p>
-                           <p className="text-sm font-black text-gray-800">إلغاء مجاني قبل 48 ساعة من الموعد</p>
+                        
+                        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-red-100 transition-colors duration-500">
+                           <Eye className="w-4 h-4" />
+                           <span>هناك {viewersCount} شخص يشاهد هذه القاعة الآن</span>
                         </div>
                      </div>
 

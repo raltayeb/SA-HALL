@@ -21,14 +21,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const hallPrice = booking.halls?.price_per_night || 0;
   const servicePrice = booking.services?.price || 0;
 
+  // Use vendor's POS config for Tax ID and Business Name
+  const vendorName = booking.vendor?.business_name || booking.profiles?.business_name || 'SA Hall';
+  const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="الفاتورة الضريبية الإلكترونية">
       <div className="space-y-6" id="printable-invoice">
         {/* Header */}
         <div className="flex justify-between items-start border-b pb-4">
           <div>
-            <h2 className="text-xl font-bold text-primary">SA Hall</h2>
-            <p className="text-xs text-muted-foreground">الرقم الضريبي: ٣١٠١٢٢٣٤٥٦٠٠٠٠٣</p>
+            <h2 className="text-xl font-bold text-primary">{vendorName}</h2>
+            <p className="text-xs text-muted-foreground">الرقم الضريبي: {taxId}</p>
           </div>
           <div className="text-left">
             <div className="bg-primary/5 p-2 rounded-lg">
