@@ -76,6 +76,9 @@ export interface Hall {
   vendor_id: string;
   name: string;
   city: string;
+  address?: string; // New
+  latitude?: number;
+  longitude?: number;
   capacity: number;
   price_per_night: number;
   description: string;
@@ -98,20 +101,32 @@ export interface Service {
   created_at?: string;
 }
 
+export interface BookingItem {
+  id: string;
+  name: string;
+  price: number;
+  qty: number;
+  type: 'product' | 'service';
+}
+
 export interface Booking {
   id: string;
   hall_id?: string;
   service_id?: string;
-  user_id: string | null; // Allow null for guests
+  user_id: string | null; 
   vendor_id: string;
   booking_date: string;
   start_time?: string; 
   end_time?: string;   
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
+  booking_type?: 'booking' | 'consultation'; // New
   package_name?: string; 
+  items?: BookingItem[]; // New
   total_amount: number;
   paid_amount?: number; 
   vat_amount: number;
+  discount_amount?: number;
+  applied_coupon?: string;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; 
   guest_name?: string;
   guest_phone?: string;
