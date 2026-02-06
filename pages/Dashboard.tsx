@@ -6,7 +6,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { Button } from '../components/ui/Button';
 import { 
   CalendarCheck, Banknote, Hourglass, Building2, 
-  Loader2, CheckCircle2, XCircle, ArrowRight, TrendingUp, TrendingDown, Wallet, PieChart
+  Loader2, CheckCircle2, XCircle, ArrowRight, TrendingUp, TrendingDown, Wallet, PieChart, ShoppingBag
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis
@@ -36,19 +36,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     setLoading(true);
     try {
       const today = new Date();
-      const sixMonthsAgo = subMonths(today, 5);
-
+      
       // 1. Fetch All Financial Data Sources
       const [bookingsRes, expensesRes, invoicesRes, hallsRes] = await Promise.all([
         supabase.from('bookings').select('*, halls(name), profiles:user_id(full_name)').eq('vendor_id', user.id).neq('status', 'cancelled').order('created_at', { ascending: false }),
         supabase.from('expenses').select('*').eq('vendor_id', user.id),
-        supabase.from('external_invoices').select('*').eq('vendor_id', user.id),
+        supabase.from('external_invoices').select('*, clients(full_name)').eq('vendor_id', user.id).order('created_at', { ascending: false }),
         supabase.from('halls').select('id').eq('vendor_id', user.id).eq('is_active', true)
       ]);
 
       const bookings = (bookingsRes.data as Booking[]) || [];
       const expenses = (expensesRes.data as Expense[]) || [];
-      const invoices = (invoicesRes.data as ExternalInvoice[]) || [];
+      const invoices = (invoicesRes.data as any[]) || [];
 
       // 2. Calculate Totals
       const bookingsIncome = bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
@@ -74,9 +73,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       // 4. Recent Activity (Merge Bookings & Invoices)
       const mixedActivity = [
-        ...bookings.slice(0, 5).map(b => ({ ...b, type: 'booking' })),
-        ...invoices.slice(0, 5).map(i => ({ ...i, type: 'invoice', created_at: i.created_at }))
-      ].sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime()).slice(0, 6);
+        ...bookings.slice(0, 5).map(b => ({ 
+            id: b.id,
+            type: 'booking', 
+            name: b.profiles?.full_name || b.guest_name || 'حجز خارجي', 
+            desc: b.halls?.name || 'حجز قاعة',
+            amount: b.total_amount,
+            date: b.created_at 
+        })),
+        ...invoices.slice(0, 5).map(i => ({ 
+            id: i.id,
+            type: 'invoice', 
+            name: i.clients?.full_name || i.customer_name || 'عميل متجر', 
+            desc: 'فاتورة مبيعات / POS',
+            amount: i.total_amount,
+            date: i.created_at 
+        }))
+      ].sort((a, b) => new Date(b.date || '').getTime() - new Date(a.date || '').getTime()).slice(0, 6);
 
       setStats({
         totalIncome,
@@ -109,7 +122,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10 font-sans text-right">
       
       {/* 1. Welcome & Quick Stats */}
-      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-400 to-pink-300"></div>
         <div>
           <h2 className="text-3xl font-black text-gray-900">لوحة التحكم المركزية</h2>
@@ -129,7 +142,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       {/* 2. Financial Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg transition-all space-y-4 group">
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-green-100 transition-all space-y-4 group">
            <div className="flex items-center justify-between">
               <div className="p-3 bg-green-50 rounded-2xl text-green-600 group-hover:scale-110 transition-transform"><TrendingUp className="w-6 h-6" /></div>
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي الدخل</span>
@@ -140,7 +153,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
            </div>
         </div>
 
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg transition-all space-y-4 group">
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-red-100 transition-all space-y-4 group">
            <div className="flex items-center justify-between">
               <div className="p-3 bg-red-50 rounded-2xl text-red-600 group-hover:scale-110 transition-transform"><TrendingDown className="w-6 h-6" /></div>
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">المصروفات</span>
@@ -151,7 +164,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
            </div>
         </div>
 
-        <div className="bg-primary text-white p-6 rounded-[2rem] shadow-xl shadow-primary/20 space-y-4 relative overflow-hidden">
+        <div className="bg-primary text-white p-6 rounded-[2rem] shadow-none space-y-4 relative overflow-hidden">
            <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
            <div className="flex items-center justify-between relative z-10">
               <div className="p-3 bg-white/20 rounded-2xl text-white backdrop-blur-md"><Wallet className="w-6 h-6" /></div>
@@ -166,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       {/* 3. Charts & Activity */}
       <div className="grid lg:grid-cols-3 gap-8">
-         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8">
             <div className="flex justify-between items-center mb-8">
                <h3 className="font-black text-xl text-gray-900 flex items-center gap-2"><PieChart className="w-5 h-5 text-primary" /> التحليل المالي</h3>
                <div className="flex gap-2">
@@ -200,7 +213,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             </div>
          </div>
 
-         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm flex flex-col">
+         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col">
             <h3 className="font-black text-xl mb-6 text-gray-900">آخر العمليات</h3>
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar max-h-[350px]">
                {recentActivity.length === 0 ? (
@@ -209,21 +222,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                      <p className="text-gray-400 text-xs font-bold">لا توجد عمليات حديثة</p>
                   </div>
                ) : recentActivity.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-colors hover:bg-gray-100">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-colors hover:bg-white hover:shadow-sm">
                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${item.type === 'booking' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
-                           {item.type === 'booking' ? <CalendarCheck className="w-5 h-5" /> : <Banknote className="w-5 h-5" />}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.type === 'booking' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                           {item.type === 'booking' ? <CalendarCheck className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
                         </div>
                         <div>
                            <p className="text-xs font-black text-gray-900 truncate max-w-[120px]">
-                              {item.type === 'booking' ? (item.profiles?.full_name || 'حجز قاعة') : (item.customer_name || 'عميل خارجي')}
+                              {item.name}
                            </p>
-                           <p className="text-[9px] font-bold text-gray-400">
-                              {item.type === 'booking' ? 'حجز منصة' : 'فاتورة POS'}
+                           <p className="text-[9px] font-bold text-gray-400 truncate max-w-[120px]">
+                              {item.desc}
                            </p>
                         </div>
                      </div>
-                     <PriceTag amount={item.total_amount} className="text-xs font-black" />
+                     <PriceTag amount={item.amount} className="text-xs font-black" />
                   </div>
                ))}
             </div>

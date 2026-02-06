@@ -24,6 +24,7 @@ import { Favorites } from './pages/Favorites';
 import { AdminRequests } from './pages/AdminRequests';
 import { VendorAccounting } from './pages/VendorAccounting';
 import { HallDetails } from './pages/HallDetails';
+import { VendorClients } from './pages/VendorClients';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -530,6 +531,7 @@ const App: React.FC = () => {
               {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
               {activeTab === 'my_favorites' && userProfile && <Favorites user={userProfile} />}
               {activeTab === 'my_bookings' && userProfile && <Bookings user={userProfile} />}
+              {activeTab === 'my_clients' && userProfile && <VendorClients user={userProfile} />}
               {activeTab === 'admin_dashboard' && userProfile?.role === 'super_admin' && <AdminDashboard />}
               {activeTab === 'admin_users' && userProfile?.role === 'super_admin' && <UsersManagement />}
               {activeTab === 'admin_requests' && userProfile?.role === 'super_admin' && <AdminRequests />}

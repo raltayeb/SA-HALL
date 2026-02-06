@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList, Search, Ticket, LogOut, 
   Sparkles, Heart, CalendarDays, Settings, Palette, X, ShoppingCart, Tag, 
   ChevronDown, LayoutGrid, FileText, BarChart3, ShieldCheck, Layers, Inbox, Bell,
-  Receipt, Wallet
+  Receipt, Wallet, UserCheck
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -86,6 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
           { id: 'my_halls', label: 'القاعات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'my_services', label: 'الخدمات', icon: <Sparkles className="w-5 h-5" /> },
           { id: 'hall_bookings', label: 'سجل الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
+          { id: 'my_clients', label: 'إدارة العملاء', icon: <UserCheck className="w-5 h-5" /> },
         ]
       },
       {
@@ -113,13 +114,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {isOpen && <div className="fixed inset-0 bg-background/50 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
       
       <aside className={`
-        fixed inset-y-4 right-4 z-50 w-72 bg-white/95 backdrop-blur-md border border-gray-100 rounded-[2.5rem] shadow-2xl transition-transform duration-300 ease-in-out flex flex-col overflow-hidden
+        fixed inset-y-4 right-4 z-50 w-72 bg-white/95 backdrop-blur-md border border-gray-100 rounded-[2.5rem] transition-transform duration-300 ease-in-out flex flex-col overflow-hidden
         ${isOpen ? 'translate-x-0' : 'translate-x-[110%] lg:translate-x-0'}
       `}>
         {/* Header */}
         <div className="h-28 flex items-center px-6 border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white">
           <div className="flex items-center gap-4 w-full">
-            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 flex items-center justify-center p-2 shadow-sm overflow-hidden group">
+            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-100 flex items-center justify-center p-2 overflow-hidden group">
                 <img src={platformLogo || "https://dash.hall.sa/logo.svg"} alt="Logo" className="w-full h-full object-contain group-hover:scale-110 transition-transform" />
             </div>
             <div className="flex flex-col">
@@ -134,8 +135,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
 
         {/* User Info */}
         <div className="px-4 py-6">
-            <div className="bg-gray-50/50 p-4 rounded-[2rem] border border-gray-100 flex items-center gap-3 shadow-inner">
-              <div className="w-10 h-10 rounded-full bg-white border flex items-center justify-center text-sm font-black text-primary uppercase shadow-sm">
+            <div className="bg-gray-50/50 p-4 rounded-[2rem] border border-gray-100 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white border flex items-center justify-center text-sm font-black text-primary uppercase">
                   {user.full_name?.[0]}
               </div>
               <div className="flex-1 min-w-0">
@@ -144,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
               </div>
               <button 
                 onClick={() => { setActiveTab('hall_bookings'); markAllAsRead(); }} 
-                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-white border hover:border-primary/20 transition-colors text-gray-400 hover:text-primary shadow-sm"
+                className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-white border hover:border-primary/20 transition-colors text-gray-400 hover:text-primary"
               >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
@@ -167,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
                     className={`
                         w-full flex items-center gap-3 px-4 py-3.5 rounded-[1.2rem] transition-all duration-300 text-sm font-bold group relative overflow-hidden
                         ${activeTab === item.id 
-                        ? 'bg-primary text-white shadow-lg shadow-primary/30' 
+                        ? 'bg-primary text-white' 
                         : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}
                     `}
                     >

@@ -9,7 +9,7 @@ import { Modal } from '../components/ui/Modal';
 import { 
   ShoppingCart, Plus, Minus, Trash2, Package, Search, PlusCircle, 
   Building2, Loader2, Receipt, Printer, LayoutGrid, ScanBarcode, RefreshCcw, 
-  Boxes, Edit3, AlertTriangle, ArrowLeftRight
+  Boxes, Edit3, AlertTriangle, ArrowLeftRight, CheckCircle2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -145,20 +145,50 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
     setIsProcessing(false);
   };
 
+  // INTEGRATION: Confirm Payment links to Accounting via external_invoices
   const confirmPayment = async () => {
-    // Deduct Stock
-    for (const cartItem of cart) {
-        const newStock = Math.max(0, cartItem.item.stock - cartItem.qty);
-        await supabase.from('pos_items').update({ stock: newStock }).eq('id', cartItem.item.id);
+    setIsProcessing(true);
+    try {
+        // 1. Deduct Stock
+        for (const cartItem of cart) {
+            const newStock = Math.max(0, cartItem.item.stock - cartItem.qty);
+            await supabase.from('pos_items').update({ stock: newStock }).eq('id', cartItem.item.id);
+        }
+
+        // 2. Create Invoice Record (For Accounting)
+        const invoiceItems = cart.map(c => ({
+            description: c.item.name,
+            quantity: c.qty,
+            unit_price: Number(c.item.price),
+            total: Number(c.item.price) * c.qty
+        }));
+
+        await supabase.from('external_invoices').insert([{
+            vendor_id: user.id,
+            customer_name: 'مبيعات المتجر (POS)',
+            hall_id: selectedHallId || null,
+            total_amount: total,
+            vat_amount: taxAmount,
+            items: invoiceItems,
+            status: 'paid',
+            invoice_date: new Date().toISOString().split('T')[0]
+        }]);
+        
+        if (user.pos_config?.auto_print) {
+            setTimeout(() => window.print(), 500);
+        }
+        
+        toast({ title: 'تمت العملية', description: 'تم تسجيل المبيعات في النظام المالي وتحديث المخزون.', variant: 'success' });
+        setCart([]);
+        setPaymentModalOpen(false);
+        fetchItems();
+
+    } catch (error) {
+        console.error(error);
+        toast({ title: 'خطأ', description: 'حدث خطأ أثناء حفظ العملية.', variant: 'destructive' });
+    } finally {
+        setIsProcessing(false);
     }
-    
-    if (user.pos_config?.auto_print) {
-        setTimeout(() => window.print(), 500);
-    }
-    toast({ title: 'تمت العملية', description: 'تم تسجيل عملية البيع وتحديث المخزون.', variant: 'success' });
-    setCart([]);
-    setPaymentModalOpen(false);
-    fetchItems();
   };
 
   const handleSaveItem = async () => {
@@ -190,19 +220,19 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col gap-4 overflow-hidden">
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-6 overflow-hidden bg-[#F8F9FC]">
       
-      {/* Top Bar */}
-      <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm shrink-0">
+      {/* Top Bar - Flat Design */}
+      <div className="flex justify-between items-center bg-white p-4 rounded-[2rem] border border-gray-100 shrink-0">
          <div className="flex items-center gap-4">
-            <div className="flex bg-gray-100 p-1 rounded-xl">
-               <button onClick={() => setActiveTab('pos')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'pos' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>نقطة البيع</button>
-               <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'inventory' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>المخزون</button>
+            <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+               <button onClick={() => setActiveTab('pos')} className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'pos' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-900'}`}>نقطة البيع</button>
+               <button onClick={() => setActiveTab('inventory')} className={`px-6 py-2.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'inventory' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-900'}`}>المخزون</button>
             </div>
-            <div className="h-8 w-[1px] bg-gray-200"></div>
-            <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+            <div className="h-8 w-[1px] bg-gray-200 mx-2"></div>
+            <div className="flex items-center gap-2 bg-gray-50 p-2 px-4 rounded-xl border border-gray-100">
                <Building2 className="w-4 h-4 text-gray-400" />
-               <select className="bg-transparent border-none text-sm font-bold outline-none cursor-pointer min-w-[120px]" value={selectedHallId} onChange={e => setSelectedHallId(e.target.value)}>
+               <select className="bg-transparent border-none text-sm font-bold outline-none cursor-pointer min-w-[140px] text-gray-700" value={selectedHallId} onChange={e => setSelectedHallId(e.target.value)}>
                  {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
                </select>
             </div>
@@ -211,14 +241,14 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="flex-1 relative">
                <input 
                  ref={searchInputRef}
-                 className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-10 text-right font-bold outline-none focus:ring-2 ring-primary/20"
+                 className="w-full h-12 bg-white border border-gray-100 rounded-2xl px-10 text-right font-bold outline-none focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-gray-300"
                  placeholder="بحث أو مسح باركود..."
                  value={searchQuery}
                  onChange={e => setSearchQuery(e.target.value)}
                />
-               <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+               <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5" />
             </div>
-            <Button onClick={() => { setCurrentItem({ category: 'عام', stock: 100 }); setIsItemModalOpen(true); }} className="h-12 w-12 rounded-2xl p-0 flex items-center justify-center bg-gray-900 text-white hover:bg-black shadow-lg">
+            <Button onClick={() => { setCurrentItem({ category: 'عام', stock: 100 }); setIsItemModalOpen(true); }} className="h-12 w-12 rounded-2xl p-0 flex items-center justify-center bg-gray-900 text-white hover:bg-black transition-transform active:scale-95">
                <Plus className="w-6 h-6" />
             </Button>
          </div>
@@ -231,104 +261,104 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
                 {/* Left Side: Product Grid */}
                 <div className="flex-1 flex flex-col gap-4 overflow-hidden">
                     <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 shrink-0">
-                    <button onClick={() => setSelectedCategory('الكل')} className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all shadow-sm ${selectedCategory === 'الكل' ? 'bg-primary text-white shadow-primary/30' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>الكل</button>
+                    <button onClick={() => setSelectedCategory('الكل')} className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all border ${selectedCategory === 'الكل' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'}`}>الكل</button>
                     {POS_CATEGORIES.map(cat => (
-                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all shadow-sm ${selectedCategory === cat ? 'bg-primary text-white shadow-primary/30' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>{cat}</button>
+                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all border ${selectedCategory === cat ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'}`}>{cat}</button>
                     ))}
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pr-2">
+                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-20">
                         {loading ? (
-                            Array.from({length: 10}).map((_,i) => <div key={i} className="aspect-square bg-white rounded-[2rem] animate-pulse"></div>)
+                            Array.from({length: 10}).map((_,i) => <div key={i} className="aspect-square bg-gray-100 rounded-[2rem] animate-pulse"></div>)
                         ) : filteredItems.map(item => (
-                            <div key={item.id} onClick={() => addToCart(item)} className="bg-white border border-gray-100 rounded-[2rem] p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all group relative overflow-hidden aspect-square">
-                                <div className="w-12 h-12 bg-primary/5 rounded-full flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
+                            <div key={item.id} onClick={() => addToCart(item)} className="bg-white border border-gray-100 rounded-[2rem] p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-primary/30 transition-all group relative overflow-hidden aspect-square">
+                                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-400 mb-3 group-hover:text-primary group-hover:bg-primary/5 transition-colors">
                                     <Package className="w-6 h-6" />
                                 </div>
-                                <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1">{item.name}</h3>
+                                <h3 className="font-bold text-gray-900 line-clamp-2 leading-tight mb-1 text-sm">{item.name}</h3>
                                 <PriceTag amount={item.price} className="text-primary font-black" />
-                                <div className={`absolute top-3 right-3 text-[10px] px-2 py-0.5 rounded-full font-bold ${item.stock < 10 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>{item.stock}</div>
+                                <div className={`absolute top-3 right-3 text-[9px] px-2 py-0.5 rounded-full font-bold border ${item.stock < 10 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>{item.stock}</div>
                             </div>
                         ))}
                     </div>
                     </div>
                 </div>
 
-                {/* Right Side: Cart */}
-                <div className="w-[400px] bg-white border border-gray-100 rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden shrink-0 ring-1 ring-black/5">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h3 className="font-black text-xl flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> السلة ({cart.length})</h3>
-                        <button onClick={clearCart} className="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-all"><Trash2 className="w-5 h-5" /></button>
+                {/* Right Side: Cart - Flat Design */}
+                <div className="w-[420px] bg-white border border-gray-100 rounded-[2.5rem] flex flex-col overflow-hidden shrink-0">
+                    <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                        <h3 className="font-black text-xl flex items-center gap-2 text-gray-800"><ShoppingCart className="w-5 h-5 text-primary" /> السلة الحالية</h3>
+                        <button onClick={clearCart} className="text-red-400 hover:text-red-600 p-2 rounded-xl transition-all hover:bg-red-50"><Trash2 className="w-5 h-5" /></button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                         {cart.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4"><Receipt className="w-20 h-20 opacity-20" /><p className="font-bold">ابدأ بإضافة الأصناف</p></div>
+                            <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4 opacity-60"><Receipt className="w-16 h-16" /><p className="font-bold text-sm">أضف منتجات لإتمام البيع</p></div>
                         ) : cart.map((c) => (
-                            <div key={c.item.id} className="flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-gray-900 border">{c.qty}</div>
+                            <div key={c.item.id} className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
+                                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-bold text-gray-900 border border-gray-100 text-sm">{c.qty}</div>
                                 <div className="flex-1 text-right">
                                     <p className="font-bold text-sm text-gray-900 truncate">{c.item.name}</p>
-                                    <p className="text-[10px] text-gray-500 font-bold">{c.item.price} SAR / وحدة</p>
+                                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">{c.item.price} SAR / وحدة</p>
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                    <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-primary hover:text-white transition-colors text-xs font-bold shadow-sm">+</button>
-                                    <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors text-xs font-bold shadow-sm">{c.qty === 1 ? <Trash2 className="w-3 h-3" /> : '-'}</button>
+                                    <button onClick={() => updateQty(c.item.id, 1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors text-xs font-bold border border-gray-100">+</button>
+                                    <button onClick={() => updateQty(c.item.id, -1)} className="w-6 h-6 bg-white rounded-lg flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors text-xs font-bold border border-gray-100">{c.qty === 1 ? <Trash2 className="w-3 h-3" /> : '-'}</button>
                                 </div>
-                                <div className="font-black text-sm w-16 text-left">{(c.item.price * c.qty).toFixed(2)}</div>
+                                <div className="font-black text-sm w-16 text-left text-gray-800">{(c.item.price * c.qty).toFixed(2)}</div>
                             </div>
                         ))}
                     </div>
-                    <div className="p-6 bg-gray-900 text-white space-y-4 rounded-t-[2.5rem]">
-                        <div className="space-y-2 text-sm font-medium opacity-80">
+                    <div className="p-6 bg-gray-50 border-t border-gray-100 space-y-4">
+                        <div className="space-y-2 text-sm font-bold text-gray-500">
                             <div className="flex justify-between"><span>المجموع</span><span>{subtotal.toFixed(2)}</span></div>
                             <div className="flex justify-between"><span>الضريبة ({taxRate}%)</span><span>{taxAmount.toFixed(2)}</span></div>
                         </div>
-                        <div className="flex justify-between text-3xl font-black border-t border-white/20 pt-4">
+                        <div className="flex justify-between text-3xl font-black border-t border-gray-200 pt-4 text-gray-900">
                             <span>الإجمالي</span>
-                            <span>{total.toFixed(2)} <span className="text-xs align-top">SAR</span></span>
+                            <span>{total.toFixed(2)} <span className="text-xs align-top text-gray-400">SAR</span></span>
                         </div>
-                        <Button onClick={handleCheckout} disabled={cart.length === 0 || isProcessing} className="w-full h-16 rounded-[1.8rem] bg-primary text-white font-black text-xl hover:bg-primary/90 shadow-xl shadow-primary/30 transition-transform active:scale-95">
+                        <Button onClick={handleCheckout} disabled={cart.length === 0 || isProcessing} className="w-full h-16 rounded-2xl bg-gray-900 text-white font-black text-lg hover:bg-black transition-transform active:scale-95 shadow-none">
                             {isProcessing ? <Loader2 className="animate-spin" /> : 'دفع وإصدار فاتورة'}
                         </Button>
                     </div>
                 </div>
              </>
          ) : (
-             // INVENTORY TAB
-             <div className="flex-1 bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm overflow-hidden flex flex-col">
-                 <div className="flex items-center gap-2 mb-4 text-gray-400 font-bold text-xs uppercase tracking-widest">
-                     <Boxes className="w-4 h-4" /> إدارة المنتجات والمخزون
+             // INVENTORY TAB - Flat Design
+             <div className="flex-1 bg-white border border-gray-100 rounded-[2.5rem] p-6 flex flex-col">
+                 <div className="flex items-center gap-2 mb-6 text-gray-400 font-bold text-xs uppercase tracking-widest border-b border-gray-50 pb-4">
+                     <Boxes className="w-4 h-4" /> سجل المنتجات والمخزون
                  </div>
-                 <div className="flex-1 overflow-auto">
-                     <table className="w-full text-right">
-                         <thead className="bg-gray-50 text-gray-500 font-bold text-xs sticky top-0">
+                 <div className="flex-1 overflow-auto custom-scrollbar">
+                     <table className="w-full text-right border-separate border-spacing-y-2">
+                         <thead className="text-gray-400 font-bold text-[10px] uppercase">
                              <tr>
-                                 <th className="p-4 rounded-r-xl">اسم المنتج</th>
-                                 <th className="p-4">التصنيف</th>
-                                 <th className="p-4">السعر</th>
-                                 <th className="p-4">المخزون الحالي</th>
-                                 <th className="p-4">الحالة</th>
-                                 <th className="p-4 text-center rounded-l-xl">إجراءات</th>
+                                 <th className="px-4 pb-2">اسم المنتج</th>
+                                 <th className="px-4 pb-2">التصنيف</th>
+                                 <th className="px-4 pb-2">السعر</th>
+                                 <th className="px-4 pb-2">المخزون الحالي</th>
+                                 <th className="px-4 pb-2">الحالة</th>
+                                 <th className="px-4 pb-2 text-center">إجراءات</th>
                              </tr>
                          </thead>
-                         <tbody className="divide-y divide-gray-100">
+                         <tbody>
                              {filteredItems.map(item => (
-                                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                     <td className="p-4 font-bold text-gray-900">{item.name}</td>
-                                     <td className="p-4 text-sm text-gray-500">{item.category}</td>
-                                     <td className="p-4"><PriceTag amount={item.price} className="font-bold" /></td>
-                                     <td className="p-4 font-black text-lg">{item.stock}</td>
-                                     <td className="p-4">
+                                 <tr key={item.id} className="bg-gray-50/50 hover:bg-white transition-all group">
+                                     <td className="p-4 rounded-r-2xl font-bold text-gray-900 border-y border-r border-transparent group-hover:border-gray-100">{item.name}</td>
+                                     <td className="p-4 text-sm text-gray-500 border-y border-transparent group-hover:border-gray-100">{item.category}</td>
+                                     <td className="p-4 border-y border-transparent group-hover:border-gray-100"><PriceTag amount={item.price} className="font-bold text-gray-800" /></td>
+                                     <td className="p-4 font-black text-lg text-gray-800 border-y border-transparent group-hover:border-gray-100">{item.stock}</td>
+                                     <td className="p-4 border-y border-transparent group-hover:border-gray-100">
                                          {item.stock < 10 ? 
-                                            <span className="text-red-500 bg-red-50 px-2 py-1 rounded text-xs font-bold flex w-fit gap-1 items-center"><AlertTriangle className="w-3 h-3" /> منخفض</span> : 
-                                            <span className="text-green-600 bg-green-50 px-2 py-1 rounded text-xs font-bold">متوفر</span>
+                                            <span className="text-red-500 bg-red-50 px-3 py-1 rounded-lg text-[10px] font-bold flex w-fit gap-1 items-center border border-red-100"><AlertTriangle className="w-3 h-3" /> منخفض</span> : 
+                                            <span className="text-green-600 bg-green-50 px-3 py-1 rounded-lg text-[10px] font-bold border border-green-100">متوفر</span>
                                          }
                                      </td>
-                                     <td className="p-4 text-center">
-                                         <div className="flex justify-center gap-2">
-                                             <button onClick={() => { setCurrentItem(item); setIsItemModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><Edit3 className="w-4 h-4" /></button>
-                                             <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button>
+                                     <td className="p-4 text-center rounded-l-2xl border-y border-l border-transparent group-hover:border-gray-100">
+                                         <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                             <button onClick={() => { setCurrentItem(item); setIsItemModalOpen(true); }} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"><Edit3 className="w-4 h-4" /></button>
+                                             <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors"><Trash2 className="w-4 h-4" /></button>
                                          </div>
                                      </td>
                                  </tr>
@@ -351,7 +381,7 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
                <Input label="الباركود (اختياري)" value={currentItem.barcode || ''} onChange={e => setCurrentItem({...currentItem, barcode: e.target.value})} className="h-12 rounded-xl" />
                <div className="space-y-2">
                   <label className="text-xs font-bold text-gray-500">التصنيف</label>
-                  <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})}>
+                  <select className="w-full h-12 border border-gray-200 rounded-xl px-4 font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none" value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})}>
                       {POS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                </div>
@@ -362,13 +392,18 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       <Modal isOpen={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="إتمام العملية">
          <div className="text-center space-y-6">
-            <div className="bg-green-50 text-green-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in">
-               <RefreshCcw className="w-10 h-10" />
+            <div className="bg-green-50 text-green-600 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in border-4 border-green-100">
+               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h3 className="text-2xl font-black">إصدار الفاتورة</h3>
-            <div id="receipt-print" className="bg-white border p-4 w-72 mx-auto text-center font-mono text-xs shadow-lg rounded-none">
+            <div className="space-y-2">
+               <h3 className="text-2xl font-black text-gray-900">إصدار الفاتورة</h3>
+               <p className="text-gray-500 text-sm font-bold">سيتم تسجيل الدفع وتحديث المخزون تلقائياً</p>
+            </div>
+            
+            {/* Receipt Preview */}
+            <div id="receipt-print" className="bg-white border p-6 w-80 mx-auto text-center font-mono text-xs shadow-none border-gray-100 rounded-none hidden print:block">
                <div className="font-bold text-sm mb-2 border-b pb-2">{user.business_name || 'اسم المتجر'}</div>
-               {user.pos_config?.receipt_header && <div className="mb-2">{user.pos_config.receipt_header}</div>}
+               {user.pos_config?.receipt_header && <div className="mb-2 whitespace-pre-wrap">{user.pos_config.receipt_header}</div>}
                <div className="flex justify-between text-[10px] text-gray-500 mb-2">
                   <span>{new Date().toLocaleDateString()}</span>
                   <span>{receiptData?.orderId}</span>
@@ -384,16 +419,17 @@ export const VendorPOS: React.FC<{ user: UserProfile }> = ({ user }) => {
                <div className="pt-2 space-y-1 font-bold">
                   <div className="flex justify-between"><span>Total</span><span>{total.toFixed(2)}</span></div>
                </div>
-               <div className="mt-4 pt-2 border-t text-[10px]">{user.pos_config?.receipt_footer}</div>
-               {user.pos_config?.tax_id && <div className="text-[9px]">VAT: {user.pos_config.tax_id}</div>}
+               <div className="mt-4 pt-2 border-t text-[10px] whitespace-pre-wrap">{user.pos_config?.receipt_footer}</div>
+               {user.pos_config?.tax_id && <div className="text-[9px] mt-1">Tax ID: {user.pos_config.tax_id}</div>}
             </div>
-            <div className="flex gap-3 pt-4">
-               <Button variant="outline" onClick={() => { window.print(); confirmPayment(); }} className="flex-1 h-12 rounded-xl font-bold gap-2"><Printer className="w-4 h-4" /> طباعة وإنهاء</Button>
-               <Button onClick={confirmPayment} className="flex-1 h-12 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white">تأكيد بدون طباعة</Button>
+
+            <div className="flex gap-3 pt-6">
+               <Button variant="outline" onClick={() => { window.print(); confirmPayment(); }} className="flex-1 h-14 rounded-2xl font-bold gap-2 border-2 border-gray-100 hover:border-gray-200"><Printer className="w-5 h-5" /> طباعة وإنهاء</Button>
+               <Button onClick={confirmPayment} className="flex-1 h-14 rounded-2xl font-bold bg-green-600 hover:bg-green-700 text-white shadow-none">تأكيد بدون طباعة</Button>
             </div>
          </div>
       </Modal>
-      <style>{`@media print { body * { visibility: hidden; } #receipt-print, #receipt-print * { visibility: visible; } #receipt-print { position: absolute; left: 0; top: 0; width: 100%; border: none; shadow: none; } }`}</style>
+      <style>{`@media print { body * { visibility: hidden; } #receipt-print, #receipt-print * { visibility: visible; position: absolute; left: 0; top: 0; width: 100%; } }`}</style>
     </div>
   );
 };

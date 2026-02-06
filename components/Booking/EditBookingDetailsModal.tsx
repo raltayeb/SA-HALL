@@ -5,7 +5,7 @@ import { Booking } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Loader2, Save, Calculator, DollarSign, User, Phone, FileText, CheckCircle2, Clock, PieChart, CreditCard, CalendarCheck } from 'lucide-react';
+import { Loader2, Save, Calculator, User, CalendarCheck, CheckCircle2, Clock, PieChart, Lock } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { PriceTag } from '../ui/PriceTag';
 
@@ -53,9 +53,9 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
   const getStatusStyles = () => {
     switch (formData.payment_status) {
         case 'paid':
-            return { bg: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', icon: <CheckCircle2 className="w-5 h-5 text-white" />, label: 'مدفوع بالكامل (تم السداد)' };
+            return { bg: 'bg-emerald-500', lightBg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', icon: <CheckCircle2 className="w-5 h-5 text-white" />, label: 'مدفوع بالكامل' };
         case 'partial':
-            return { bg: 'bg-amber-500', lightBg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', icon: <PieChart className="w-5 h-5 text-white" />, label: 'مدفوع جزئياً (مقدم)' };
+            return { bg: 'bg-amber-500', lightBg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', icon: <PieChart className="w-5 h-5 text-white" />, label: 'مدفوع جزئياً' };
         default:
             return { bg: 'bg-gray-500', lightBg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', icon: <Clock className="w-5 h-5 text-white" />, label: 'آجل / غير مدفوع' };
     }
@@ -66,23 +66,16 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
   const handleSave = async () => {
     setLoading(true);
     try {
-        // Auto update payment status logic if user manually changes amounts
-        let newPaymentStatus = formData.payment_status;
-        if (formData.paid_amount >= formData.total_amount && formData.total_amount > 0) {
-            newPaymentStatus = 'paid';
-        }
-
         const { error } = await supabase
             .from('bookings')
             .update({
                 status: formData.status,
-                payment_status: newPaymentStatus,
-                paid_amount: formData.paid_amount,
                 start_time: formData.start_time,
                 end_time: formData.end_time,
                 notes: formData.notes,
                 guest_name: formData.guest_name,
                 guest_phone: formData.guest_phone
+                // Note: Payment fields removed from update to enforce Accounting section usage
             })
             .eq('id', booking.id);
 
@@ -151,29 +144,19 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                 </div>
 
                 <div className="space-y-6">
-                    {/* Enhanced Financials Section */}
-                    <div className={`p-5 rounded-2xl border space-y-5 ${statusStyle.lightBg} ${statusStyle.border}`}>
+                    {/* Enhanced Financials Section (READ ONLY) */}
+                    <div className={`p-5 rounded-2xl border space-y-5 ${statusStyle.lightBg} ${statusStyle.border} relative overflow-hidden`}>
                         <div className="flex items-center justify-between border-b border-gray-200/50 pb-4">
                             <div className="flex items-center gap-2 text-primary font-bold text-xs">
-                                <Calculator className="w-4 h-4" /> الحسابات المالية
+                                <Calculator className="w-4 h-4" /> الحسابات المالية (للعرض فقط)
                             </div>
-                            {/* Payment Status Banner */}
                             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg shadow-sm ${statusStyle.bg}`}>
                                 {statusStyle.icon}
                                 <span className="text-white text-xs font-black">{statusStyle.label}</span>
                             </div>
                         </div>
                         
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-bold text-gray-500">تحديث حالة الدفع يدوياً</label>
-                            <div className="flex bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
-                                <button onClick={() => setFormData({...formData, payment_status: 'paid'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'paid' ? 'bg-emerald-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>كامل</button>
-                                <button onClick={() => setFormData({...formData, payment_status: 'partial'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'partial' ? 'bg-amber-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>جزئي</button>
-                                <button onClick={() => setFormData({...formData, payment_status: 'unpaid'})} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${formData.payment_status === 'unpaid' ? 'bg-gray-500 text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}>آجل</button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
+                        <div className="space-y-4 opacity-80 pointer-events-none">
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-gray-500">إجمالي المبلغ</label>
                                 <div className="h-11 bg-white border border-gray-200 rounded-xl flex items-center px-4 font-black">
@@ -184,8 +167,8 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                                 label="المدفوع حتى الآن" 
                                 type="number" 
                                 value={formData.paid_amount} 
-                                onChange={e => setFormData({...formData, paid_amount: Number(e.target.value)})}
-                                className="bg-white border-gray-200 focus:border-primary font-bold"
+                                readOnly
+                                className="bg-white border-gray-200 font-bold text-gray-500"
                             />
                         </div>
 
@@ -193,11 +176,16 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                             <span className="text-xs font-bold text-gray-600">المبلغ المتبقي للتحصيل:</span>
                             <PriceTag amount={remainingAmount} className={`text-xl font-black ${remainingAmount > 0 ? 'text-red-500' : 'text-green-600'}`} />
                         </div>
+
+                        <div className="bg-white/80 p-2 text-center text-[10px] font-bold text-primary border border-primary/20 rounded-xl flex items-center justify-center gap-2">
+                            <Lock className="w-3 h-3" />
+                            <span>التعديلات المالية تتم من قسم "المالية" فقط</span>
+                        </div>
                     </div>
 
                     {/* Notes Section */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><FileText className="w-3 h-3" /> ملاحظات إضافية</label>
+                        <label className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"> ملاحظات إضافية</label>
                         <textarea 
                             className="w-full h-[100px] border rounded-xl p-3 text-sm font-bold bg-white resize-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                             value={formData.notes}
@@ -208,10 +196,13 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                 </div>
             </div>
 
-            <Button onClick={handleSave} disabled={loading} className="w-full h-14 rounded-2xl font-black shadow-xl shadow-primary/20 gap-2 text-lg">
-                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
-                حفظ التعديلات
-            </Button>
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <Button variant="outline" onClick={onClose} className="rounded-xl h-12 px-6 font-bold">إلغاء</Button>
+                <Button onClick={handleSave} disabled={loading} className="rounded-xl h-12 px-8 font-black shadow-xl shadow-primary/20 gap-2">
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    حفظ التغييرات
+                </Button>
+            </div>
         </div>
     </Modal>
   );

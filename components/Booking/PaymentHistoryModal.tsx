@@ -6,7 +6,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { PriceTag } from '../ui/PriceTag';
-import { Loader2, Plus, History, Trash2, CalendarDays, CreditCard, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, History, Trash2, CalendarDays, CreditCard, AlertCircle, Lock } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { format } from 'date-fns';
 
@@ -15,9 +15,10 @@ interface PaymentHistoryModalProps {
   onClose: () => void;
   booking: Booking;
   onUpdate: () => void;
+  readOnly?: boolean; // New Prop
 }
 
-export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen, onClose, booking, onUpdate }) => {
+export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen, onClose, booking, onUpdate, readOnly = false }) => {
   const [logs, setLogs] = useState<PaymentLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -111,9 +112,9 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen
                 </div>
             </div>
 
-            {/* Add Payment Form */}
-            {remaining > 0 ? (
-                <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-3">
+            {/* Add Payment Form (Conditional based on readOnly) */}
+            {!readOnly && remaining > 0 ? (
+                <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 space-y-3 animate-in fade-in">
                     <h4 className="text-xs font-black text-primary flex items-center gap-2"><Plus className="w-4 h-4" /> تسجيل دفعة جديدة</h4>
                     <div className="grid grid-cols-2 gap-3">
                         <Input type="number" placeholder="المبلغ" value={newPayment.amount || ''} onChange={e => setNewPayment({...newPayment, amount: Number(e.target.value)})} className="bg-white font-bold" />
@@ -127,6 +128,10 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen
                     <Button onClick={handleAddPayment} disabled={adding || newPayment.amount <= 0} className="w-full h-10 rounded-xl font-bold shadow-md shadow-primary/20">
                         {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ الدفعة'}
                     </Button>
+                </div>
+            ) : readOnly && remaining > 0 ? (
+                <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100 flex items-center justify-center gap-2 text-yellow-700 font-bold text-xs">
+                    <Lock className="w-4 h-4" /> التسجيل المالي متاح فقط من قسم المالية
                 </div>
             ) : (
                 <div className="bg-green-50 p-3 rounded-xl border border-green-100 flex items-center justify-center gap-2 text-green-700 font-bold text-xs">
@@ -155,9 +160,11 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({ isOpen
                                 {log.notes && <span className="text-[10px] text-gray-500 font-bold">• {log.notes}</span>}
                             </div>
                         </div>
-                        <button onClick={() => handleDeleteLog(log.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!readOnly && (
+                            <button onClick={() => handleDeleteLog(log.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100">
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
                 ))}
             </div>

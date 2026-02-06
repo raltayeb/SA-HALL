@@ -36,6 +36,19 @@ export interface UserProfile {
   pos_config?: POSConfig;
 }
 
+export interface VendorClient {
+  id: string;
+  vendor_id: string;
+  full_name: string;
+  phone_number?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  is_vip?: boolean;
+  profile_id?: string;
+  created_at?: string;
+}
+
 export interface SystemSettings {
   site_name: string;
   commission_rate: number;
@@ -137,6 +150,7 @@ export interface Booking {
   services?: Service;
   client?: UserProfile;
   vendor?: UserProfile;
+  is_read?: boolean;
 }
 
 export interface PaymentLog {
@@ -166,12 +180,16 @@ export interface ExternalInvoice {
   id: string;
   vendor_id: string;
   customer_name: string;
+  client_id?: string; // New
+  hall_id?: string; // New
   invoice_date: string;
   items: { description: string; quantity: number; unit_price: number; total: number }[];
   total_amount: number;
   vat_amount: number;
   status: 'paid' | 'unpaid';
   created_at?: string;
+  clients?: VendorClient; // Joined
+  halls?: Hall; // Joined
 }
 
 export interface Notification {

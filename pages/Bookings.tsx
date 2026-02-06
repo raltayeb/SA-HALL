@@ -1,16 +1,14 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Booking, UserProfile } from '../types';
+import { Booking, UserProfile, Hall } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
 import { 
-  Search, Download, Plus, Bell,
-  Calendar, CreditCard, CheckCircle2, Clock, PieChart,
-  ChevronLeft, ChevronRight, Inbox
+  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
@@ -23,6 +21,7 @@ interface BookingsProps {
 
 export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [halls, setHalls] = useState<Hall[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Pagination State
@@ -39,7 +38,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [columnFilters, setColumnFilters] = useState({
     client: '',
     date: '',
-    hall: '',
+    hall: 'all',
     paymentStatus: 'all',
     status: 'all'
   });
@@ -49,6 +48,12 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
+      // Fetch Halls first for filter
+      if (user.role === 'vendor') {
+          const { data: hData } = await supabase.from('halls').select('id, name').eq('vendor_id', user.id);
+          setHalls(hData || []);
+      }
+
       let query = supabase
         .from('bookings')
         .select(`
@@ -82,26 +87,12 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
     const channel = supabase.channel('bookings_realtime')
       .on('postgres_changes', { 
-          event: 'INSERT', 
+          event: '*', 
           schema: 'public', 
           table: 'bookings',
           filter: user.role === 'vendor' ? `vendor_id=eq.${user.id}` : `user_id=eq.${user.id}`
-      }, (payload) => {
-          // Fetch full details for the new booking to ensure relations are populated
-          // For simplicity/speed in demo, we append and refetch lazily or just append raw
-          // Best practice: Prepend to list, maybe show notification
+      }, () => {
           fetchBookings(); 
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-          audio.play().catch(() => {});
-          toast({ title: 'حجز جديد', description: 'وصلك طلب حجز جديد الآن!', variant: 'success' });
-      })
-      .on('postgres_changes', { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'bookings',
-          filter: user.role === 'vendor' ? `vendor_id=eq.${user.id}` : `user_id=eq.${user.id}`
-      }, (payload) => {
-          setBookings(prev => prev.map(b => b.id === payload.new.id ? { ...b, ...payload.new } : b));
       })
       .subscribe();
 
@@ -130,10 +121,13 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const filteredBookings = bookings.filter(b => {
     const matchClient = !columnFilters.client || 
         (b.client?.full_name || b.guest_name || 'عميل خارجي').toLowerCase().includes(columnFilters.client.toLowerCase()) || 
-        (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase());
+        (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase()) || 
+        b.id.toLowerCase().includes(columnFilters.client.toLowerCase()); // Search by ID too
     
     const matchDate = !columnFilters.date || b.booking_date.includes(columnFilters.date);
-    const matchHall = !columnFilters.hall || (b.halls?.name || b.services?.name || '').toLowerCase().includes(columnFilters.hall.toLowerCase());
+    // Hall Filter Logic
+    const matchHall = columnFilters.hall === 'all' || b.hall_id === columnFilters.hall;
+    
     const matchPayment = columnFilters.paymentStatus === 'all' || b.payment_status === columnFilters.paymentStatus;
     const matchStatus = columnFilters.status === 'all' || b.status === columnFilters.status;
 
@@ -186,12 +180,24 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
             <div className="md:col-span-2 relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
-                    placeholder="بحث باسم العميل..." 
+                    placeholder="بحث برقم الحجز أو اسم العميل..." 
                     className="w-full h-10 bg-white border border-gray-200 rounded-xl pr-10 pl-4 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
                     value={columnFilters.client}
                     onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
                 />
             </div>
+            {user.role === 'vendor' && (
+                <div>
+                    <select 
+                        className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" 
+                        value={columnFilters.hall} 
+                        onChange={e => setColumnFilters({...columnFilters, hall: e.target.value})}
+                    >
+                        <option value="all">كل القاعات</option>
+                        {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                    </select>
+                </div>
+            )}
             <div><input type="date" className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.date} onChange={e => setColumnFilters({...columnFilters, date: e.target.value})} /></div>
             <div>
                 <select className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.status} onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}>
@@ -245,8 +251,9 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                     <div className={`text-sm ${!isRead ? 'text-gray-900' : 'text-gray-600'}`}>
                                         {b.client?.full_name || b.guest_name || 'عميل خارجي'}
                                     </div>
-                                    <div className="text-[10px] text-gray-400 mt-0.5 truncate max-w-[150px]">
-                                        {b.client?.phone_number || b.guest_phone || 'رقم غير مسجل'}
+                                    <div className="flex gap-2 items-center mt-1">
+                                        <span className="text-[9px] font-mono bg-gray-100 px-1 rounded text-gray-500">#{b.id.slice(0,8)}</span>
+                                        <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{b.client?.phone_number || b.guest_phone}</span>
                                     </div>
                                 </td>
                                 <td className="p-4">
@@ -306,7 +313,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
             {user.role === 'vendor' && (
                 <>
                     <EditBookingDetailsModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} booking={selectedBooking} onSuccess={fetchBookings} />
-                    <PaymentHistoryModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} booking={selectedBooking} onUpdate={fetchBookings} />
+                    <PaymentHistoryModal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} booking={selectedBooking} onUpdate={fetchBookings} readOnly={true} />
                 </>
             )}
         </>
