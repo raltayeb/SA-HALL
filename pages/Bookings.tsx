@@ -50,8 +50,9 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     try {
       // Fetch Halls first for filter
       if (user.role === 'vendor') {
-          const { data: hData } = await supabase.from('halls').select('id, name').eq('vendor_id', user.id);
-          setHalls(hData || []);
+          // Fix: Select all fields (*) so the returned data matches the Hall interface
+          const { data: hData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
+          setHalls(hData as Hall[] || []);
       }
 
       let query = supabase
