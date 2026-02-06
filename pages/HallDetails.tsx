@@ -8,10 +8,9 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { Badge } from '../components/ui/Badge';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
-  MapPin, Users, Star, Share2, Heart, ChevronRight, ChevronLeft,
-  CheckCircle2, Loader2, Sparkles, 
-  ShieldCheck, Clock, CreditCard, ArrowLeft, X, User, Phone, Wallet, Eye,
-  Briefcase, ShoppingBag, Plus, Package, Store, Ticket, MessageCircle, AlertCircle, Minus
+  MapPin, CheckCircle2, Loader2, Sparkles, 
+  Briefcase, ArrowLeft, X, User, Phone, Wallet,
+  Package, Store, Ticket, MessageCircle, CreditCard, Flame, Eye
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format, parseISO, startOfDay, isSameDay, isBefore } from 'date-fns';
@@ -39,7 +38,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [vendorServices, setVendorServices] = useState<Service[]>([]);
   const [storeItems, setStoreItems] = useState<POSItem[]>([]);
-  const [partnerServices, setPartnerServices] = useState<(Service & { vendor?: { business_name: string } })[]>([]);
   
   // Booking Form State
   const [bookingDate, setBookingDate] = useState<Date | undefined>(undefined);
@@ -79,7 +77,15 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   }, [allImages.length]);
 
   useEffect(() => {
-    setViewersCount(Math.floor(Math.random() * (380 - 100 + 1)) + 100);
+    // Random viewers between 15 and 50
+    setViewersCount(Math.floor(Math.random() * (50 - 15 + 1)) + 15);
+    
+    // Update viewers randomly every 10 seconds to simulate live activity
+    const viewerInterval = setInterval(() => {
+        setViewersCount(prev => Math.max(12, prev + Math.floor(Math.random() * 5) - 2));
+    }, 10000);
+    
+    return () => clearInterval(viewerInterval);
   }, []);
 
   const fetchDetails = useCallback(async () => {
@@ -92,9 +98,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
 
       const { data: vStore } = await supabase.from('pos_items').select('*').eq('vendor_id', item.vendor_id);
       setStoreItems(vStore || []);
-
-      const { data: pServices } = await supabase.from('services').select('*, vendor:vendor_id(business_name)').neq('vendor_id', item.vendor_id).eq('is_active', true).limit(4);
-      setPartnerServices(pServices as any || []);
     }
   }, [item.id, item.vendor_id, isHall]);
 
@@ -258,7 +261,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
       const { data, error } = await supabase.from('bookings').insert([payload]).select().single();
       if (error) throw error;
 
-      // Prepare data for invoice modal (Need to augment with hall/vendor details since insert result is lean)
+      // Prepare data for invoice modal
       const fullBookingDetails = {
           ...data,
           halls: isHall ? hall : undefined,
@@ -272,7 +275,8 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
       toast({ title: 'تمت العملية بنجاح', variant: 'success' });
 
     } catch (err: any) {
-      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+      console.error(err);
+      toast({ title: 'خطأ', description: err.message || 'حدث خطأ غير متوقع', variant: 'destructive' });
     } finally {
       setIsBooking(false);
     }
@@ -282,6 +286,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
     <div className="bg-[#F8F9FC] min-h-screen animate-in fade-in duration-500 pt-24 pb-20">
       <main className="max-w-7xl mx-auto px-4 lg:px-8 relative z-10">
          
+         {/* Hero Gallery */}
          <div className="relative w-full aspect-[16/9] md:h-[500px] md:aspect-auto rounded-[2.5rem] overflow-hidden bg-black group mb-10 shadow-2xl">
             {allImages.map((img, i) => (
                <div key={i} className={`absolute inset-0 transition-opacity duration-1000 ${i === activeSlide ? 'opacity-100' : 'opacity-0'}`}>
@@ -329,7 +334,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                )}
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar with Live Viewers */}
             <div className="lg:col-span-4 relative">
                <div className="sticky top-24 space-y-6">
                   <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-xl shadow-gray-200/50 space-y-6">
@@ -340,9 +345,21 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                         </div>
                         <span className="text-xs font-bold text-gray-400">/{isHall ? 'الليلة' : 'الخدمة'}</span>
                      </div>
+                     
+                     {/* Enhanced Fake View Counter */}
+                     <div className="flex items-center justify-center gap-2 text-red-500 bg-red-50 p-3 rounded-2xl border border-red-100 animate-pulse">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        </span>
+                        <span className="text-xs font-black">{viewersCount} شخص يشاهد هذه القاعة الآن</span>
+                     </div>
+
                      <Button onClick={() => { setStep(1); setIsWizardOpen(true); }} className="w-full h-16 rounded-[1.5rem] text-xl font-black shadow-xl shadow-primary/20 bg-primary text-white">
                         احجز موعدك الآن
                      </Button>
+                     
+                     <p className="text-[10px] text-center text-gray-400 font-bold">الحجز مؤمن ومضمون 100%</p>
                   </div>
                </div>
             </div>
