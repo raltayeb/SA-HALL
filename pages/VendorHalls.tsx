@@ -9,7 +9,7 @@ import { Modal } from '../components/ui/Modal';
 import { 
   Plus, MapPin, Users, X, CheckSquare, Square, 
   Loader2, Building2, Lock, Send, BarChart3, TrendingUp, 
-  CalendarCheck, Star, ArrowUpRight, DollarSign, PieChart, Filter
+  CalendarCheck, Star, ArrowUpRight, DollarSign, PieChart, Filter, Upload, Trash2
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { 
@@ -47,11 +47,9 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Halls
       const { data: hallsData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
       setHalls(hallsData || []);
 
-      // Fetch Bookings (for analytics)
       const { data: bookingsData } = await supabase
         .from('bookings')
         .select('*')
@@ -59,13 +57,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         .neq('status', 'cancelled');
       setAllBookings(bookingsData as Booking[] || []);
 
-      // Fetch Reviews (Mocking logic or fetching if table exists)
       const { data: reviewsData } = await supabase.from('reviews').select('hall_id, rating');
       if (reviewsData) {
          setReviewsSummary(reviewsData as any);
       }
 
-      // Check Requests
       const { data: requests } = await supabase.from('upgrade_requests').select('*').eq('vendor_id', user.id).eq('request_type', 'hall').eq('status', 'pending');
       if (requests && requests.length > 0) setHasPendingRequest(true);
       
@@ -79,20 +75,15 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // --- 2. Real-Time Analytics Calculations ---
+  // --- 2. Analytics ---
   const analytics = useMemo(() => {
-    // Filter based on selection
     const filteredHalls = selectedHallId === 'all' ? halls : halls.filter(h => h.id === selectedHallId);
     const filteredBookings = selectedHallId === 'all' ? allBookings : allBookings.filter(b => b.hall_id === selectedHallId);
     
-    // 1. Total Revenue
     const totalRevenue = filteredBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-    
-    // 2. Occupancy / Booking Count
     const totalBookingsCount = filteredBookings.length;
     const confirmedBookings = filteredBookings.filter(b => b.status === 'confirmed').length;
     
-    // 3. Average Rating
     let avgRating = 0;
     if (selectedHallId === 'all') {
         const ratings = reviewsSummary.map(r => r.rating);
@@ -102,7 +93,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         avgRating = hallRatings.length ? hallRatings.reduce((a, b) => a + b, 0) / hallRatings.length : 0;
     }
 
-    // 4. Chart Data: Monthly Revenue (Last 6 Months or Current Year)
     const months = eachMonthOfInterval({
         start: subMonths(new Date(), 5),
         end: new Date()
@@ -122,7 +112,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         totalRevenue,
         totalBookingsCount,
         confirmedBookings,
-        avgRating: avgRating || 5.0, // Default to 5 if no ratings
+        avgRating: avgRating || 5.0,
         chartData,
         activeHallsCount: filteredHalls.filter(h => h.is_active).length,
         filteredHallsList: filteredHalls
@@ -218,13 +208,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       
-      {/* 1. Header & Context Selector */}
+      {/* 1. Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
         <div>
            <h2 className="text-3xl font-black text-primary">إدارة القاعات</h2>
-           <p className="text-sm text-muted-foreground mt-1 font-bold">
-              لوحة التحكم والتحليلات الخاصة بقاعاتك.
-           </p>
+           <p className="text-sm text-muted-foreground mt-1 font-bold">لوحة التحكم والتحليلات الخاصة بقاعاتك.</p>
         </div>
         
         <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-200">
@@ -235,24 +223,20 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                 onChange={(e) => setSelectedHallId(e.target.value)}
             >
                 <option value="all">كافة القاعات ({halls.length})</option>
-                {halls.map(h => (
-                    <option key={h.id} value={h.id}>{h.name}</option>
-                ))}
+                {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
             <Building2 className="w-5 h-5 text-primary ml-2" />
         </div>
       </div>
 
-      {/* 2. Real Analytics Dashboard */}
+      {/* 2. Analytics Dashboard */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Revenue Card */}
         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm group hover:border-primary/20 transition-all relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-purple-400"></div>
             <div className="flex justify-between items-start mb-4">
                 <div className="p-3 bg-primary/5 rounded-2xl text-primary"><DollarSign className="w-6 h-6" /></div>
-                <span className="text-[10px] font-black bg-green-50 text-green-600 px-2 py-1 rounded-lg flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" /> ممتاز
-                </span>
+                <span className="text-[10px] font-black bg-green-50 text-green-600 px-2 py-1 rounded-lg flex items-center gap-1"><TrendingUp className="w-3 h-3" /> ممتاز</span>
             </div>
             <div className="space-y-1">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">إجمالي الإيرادات</p>
@@ -284,7 +268,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
             </div>
         </div>
 
-        {/* Active Halls / Capacity */}
+        {/* Active Halls */}
         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm group hover:border-purple-500/20 transition-all relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 to-pink-400"></div>
             <div className="flex justify-between items-start mb-4">
@@ -354,9 +338,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       <div className="flex justify-between items-center text-right flex-row-reverse border-t border-gray-200 pt-8 mt-4">
         <div>
            <h2 className="text-2xl font-black">إدارة وتعديل القاعات</h2>
-           <p className="text-sm text-muted-foreground mt-1">
-              لديك {halls.length} من أصل {user.hall_limit} قاعات مسموحة.
-           </p>
+           <p className="text-sm text-muted-foreground mt-1">لديك {halls.length} من أصل {user.hall_limit} قاعات مسموحة.</p>
         </div>
         {!isEditing && (
           <Button onClick={handleAddNew} className={`rounded-2xl h-12 px-8 font-black gap-2 transition-all hover:scale-105 ${halls.length >= user.hall_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 shadow-none hover:text-primary' : 'shadow-xl shadow-primary/20'}`}>
@@ -366,7 +348,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         )}
       </div>
 
-      {/* 5. Hall Cards Grid (Filtered) */}
+      {/* 5. Hall Cards Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           [1, 2, 3].map(i => <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>)
@@ -403,12 +385,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
             </div>
             <div className="space-y-2">
                 <h3 className="text-xl font-black">لقد وصلت للحد الأقصى</h3>
-                <p className="text-sm text-gray-500 font-bold leading-relaxed max-w-xs mx-auto">باقة اشتراكك الحالية تسمح بـ {user.hall_limit} قاعات فقط. يمكنك إرسال طلب للإدارة لزيادة الحد المسموح.</p>
+                <p className="text-sm text-gray-500 font-bold leading-relaxed max-w-xs mx-auto">باقة اشتراكك الحالية تسمح بـ {user.hall_limit} قاعات فقط.</p>
             </div>
-            
             {hasPendingRequest ? (
                 <div className="bg-yellow-50 p-4 rounded-2xl border border-yellow-100 text-yellow-800 font-bold text-sm">
-                    يوجد طلب قيد المراجعة حالياً. سيتم إشعارك عند الموافقة.
+                    يوجد طلب قيد المراجعة حالياً.
                 </div>
             ) : (
                 <Button onClick={handleRequestUpgrade} className="w-full h-14 rounded-2xl font-black shadow-xl shadow-primary/20 gap-2 text-lg">
@@ -418,70 +399,73 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
          </div>
       </Modal>
 
-      {/* Edit Hall Modal (Full Screen Overlay style) */}
+      {/* Improved Edit Hall Modal - Fully Responsive */}
       {isEditing && (
-        <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-md flex justify-end animate-in slide-in-from-left-10">
-            <div className="w-full max-w-3xl bg-white h-full shadow-2xl border-r border-gray-200 overflow-y-auto p-10">
-              <div className="flex justify-between items-center mb-10">
-                <div>
-                    <h3 className="font-black text-3xl text-primary">{currentHall.id ? 'تعديل القاعة' : 'إضافة قاعة جديدة'}</h3>
-                    <p className="text-sm text-muted-foreground font-bold mt-1">أكمل البيانات لعرض قاعتك للعملاء.</p>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="w-full md:max-w-3xl h-full bg-white shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
+              
+              {/* Modal Header */}
+              <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10">
+                <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-50 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"><X className="w-5 h-5" /></button>
+                <div className="text-right">
+                    <h3 className="font-black text-2xl text-primary">{currentHall.id ? 'تعديل القاعة' : 'إضافة قاعة جديدة'}</h3>
+                    <p className="text-xs text-muted-foreground font-bold mt-1">أكمل البيانات لعرض قاعتك للعملاء</p>
                 </div>
-                <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"><X className="w-5 h-5" /></button>
               </div>
               
-              <div className="space-y-8">
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar">
                  {/* Basic Info */}
                  <div className="space-y-6">
-                    <h4 className="text-sm font-black uppercase text-gray-400 tracking-widest border-b pb-2">البيانات الأساسية</h4>
-                    <div className="space-y-4">
-                      <Input label="اسم القاعة" value={currentHall.name || ''} onChange={e => setCurrentHall({...currentHall, name: e.target.value})} className="h-14 rounded-2xl text-right font-bold text-lg" />
-                      <div className="grid grid-cols-2 gap-6">
-                         <Input label="السعر لليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-14 rounded-2xl text-right font-bold" />
-                         <Input label="السعة (شخص)" type="number" value={currentHall.capacity || ''} onChange={e => setCurrentHall({...currentHall, capacity: Number(e.target.value)})} className="h-14 rounded-2xl text-right font-bold" />
+                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2 text-right">البيانات الأساسية</h4>
+                    <div className="space-y-4 text-right">
+                      <Input label="اسم القاعة" value={currentHall.name || ''} onChange={e => setCurrentHall({...currentHall, name: e.target.value})} className="h-12 rounded-2xl font-bold" />
+                      <div className="grid grid-cols-2 gap-4">
+                         <Input label="السعر لليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-12 rounded-2xl font-bold" />
+                         <Input label="السعة (شخص)" type="number" value={currentHall.capacity || ''} onChange={e => setCurrentHall({...currentHall, capacity: Number(e.target.value)})} className="h-12 rounded-2xl font-bold" />
                       </div>
                       <div className="space-y-2">
                          <label className="text-xs font-bold text-gray-500">المدينة</label>
-                         <select className="w-full h-14 border rounded-2xl px-6 bg-gray-50 outline-none text-right font-bold appearance-none" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
+                         <select className="w-full h-12 border rounded-2xl px-4 bg-gray-50 outline-none text-right font-bold appearance-none" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
                             {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                          </select>
                       </div>
                       <div className="space-y-2">
                          <label className="text-xs font-bold text-gray-500">وصف القاعة</label>
-                         <textarea className="w-full h-40 border rounded-2xl p-6 bg-gray-50 outline-none text-right resize-none font-bold text-sm leading-relaxed" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} placeholder="اكتب وصفاً جذاباً للقاعة..." />
+                         <textarea className="w-full h-32 border rounded-2xl p-4 bg-gray-50 outline-none text-right resize-none font-bold text-sm leading-relaxed" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} placeholder="اكتب وصفاً جذاباً للقاعة..." />
                       </div>
                     </div>
                  </div>
 
                  {/* Images */}
-                 <div className="space-y-6">
-                    <h4 className="text-sm font-black uppercase text-gray-400 tracking-widest border-b pb-2">معرض الصور</h4>
-                    <div className="grid grid-cols-3 gap-4">
+                 <div className="space-y-6 text-right">
+                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2">معرض الصور</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {currentHall.images?.map((img, i) => (
-                            <div key={i} className="aspect-square rounded-3xl overflow-hidden relative group border border-gray-100 shadow-sm">
+                            <div key={i} className="aspect-square rounded-2xl overflow-hidden relative group border border-gray-100 shadow-sm">
                                 <img src={img} className="w-full h-full object-cover" />
-                                <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, idx) => idx !== i)})} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"><X className="w-3 h-3" /></button>
+                                <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, idx) => idx !== i)})} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"><Trash2 className="w-3 h-3" /></button>
                             </div>
                         ))}
-                        <div onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-3xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all group">
+                        <div onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all group">
                             {uploading ? <Loader2 className="w-8 h-8 animate-spin text-primary" /> : <Plus className="w-8 h-8 text-gray-300 group-hover:text-primary transition-colors" />}
-                            <span className="text-xs font-bold text-gray-400 mt-3 group-hover:text-primary">إضافة صورة</span>
+                            <span className="text-[10px] font-bold text-gray-400 mt-2 group-hover:text-primary">إضافة صورة</span>
                         </div>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
                     </div>
                  </div>
 
                  {/* Amenities */}
-                 <div className="space-y-6 pb-20">
-                    <h4 className="text-sm font-black uppercase text-gray-400 tracking-widest border-b pb-2">المرافق والخدمات</h4>
+                 <div className="space-y-6 pb-10 text-right">
+                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2">المرافق والخدمات</h4>
                     <div className="grid grid-cols-2 gap-3">
                         {HALL_AMENITIES.map(amenity => (
                             <button 
                             key={amenity}
                             onClick={() => toggleAmenity(amenity)}
-                            className={`flex items-center gap-3 p-4 rounded-2xl border text-xs font-bold transition-all text-right ${currentHall.amenities?.includes(amenity) ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' : 'bg-white border-gray-100 text-gray-500 hover:border-primary/30'}`}
+                            className={`flex items-center gap-2 p-3 rounded-2xl border text-[11px] font-bold transition-all text-right ${currentHall.amenities?.includes(amenity) ? 'bg-primary text-white border-primary shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:border-primary/30'}`}
                             >
-                                {currentHall.amenities?.includes(amenity) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                                {currentHall.amenities?.includes(amenity) ? <CheckSquare className="w-4 h-4 shrink-0" /> : <Square className="w-4 h-4 shrink-0" />}
                                 {amenity}
                             </button>
                         ))}
@@ -489,9 +473,10 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  </div>
               </div>
 
-              <div className="fixed bottom-0 right-0 w-full max-w-3xl bg-white border-t p-6 flex gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-                <Button variant="outline" onClick={() => setIsEditing(false)} className="h-14 px-10 rounded-2xl font-bold flex-1">إلغاء</Button>
-                <Button onClick={handleSave} disabled={saving} className="h-14 px-10 rounded-2xl font-black text-lg flex-[2] shadow-xl shadow-primary/20">
+              {/* Sticky Footer */}
+              <div className="p-6 border-t border-gray-100 bg-white z-10 flex gap-4 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+                <Button variant="outline" onClick={() => setIsEditing(false)} className="h-12 px-8 rounded-xl font-bold flex-1">إلغاء</Button>
+                <Button onClick={handleSave} disabled={saving} className="h-12 px-8 rounded-xl font-black text-sm flex-[2] shadow-xl shadow-primary/20">
                     {saving ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ ونشر القاعة'}
                 </Button>
               </div>

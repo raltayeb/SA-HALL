@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking, Expense, ExternalInvoice, EXPENSE_CATEGORIES } from '../types';
 import { PriceTag } from '../components/ui/PriceTag';
@@ -7,23 +7,32 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { 
-  Receipt, TrendingUp, TrendingDown, ArrowUpRight, 
+  Receipt, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft,
   Wallet, Plus, Trash2, Filter, 
-  BarChart3, FileText, CheckCircle2, Clock, Loader2
+  BarChart3, FileText, CheckCircle2, Clock, Loader2, Calendar, Search, ArrowDown
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell 
-} from 'recharts';
 
 interface VendorAccountingProps {
   user: UserProfile;
 }
 
+// Helper type for the unified ledger
+interface LedgerItem {
+  id: string;
+  type: 'income_booking' | 'income_invoice' | 'expense';
+  date: string;
+  description: string;
+  amount: number;
+  status: 'paid' | 'pending' | 'unpaid';
+  category?: string;
+  referenceId?: string; // e.g. Booking ID
+}
+
 export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'invoices'>('overview');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'expenses' | 'invoices'>('ledger');
   
   // Data State
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -32,11 +41,16 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
-  // Date Filter State
+  // Filters
   const [dateFilter, setDateFilter] = useState({
     start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
     end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
   });
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Refs for Date Pickers
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
 
   // Modals
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -48,7 +62,7 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
 
   const { toast } = useToast();
 
-  // --- 1. Robust Data Fetching ---
+  // --- 1. Fetching & Realtime ---
   const fetchData = useCallback(async () => {
     try {
         const [bData, eData, iData] = await Promise.all([
@@ -67,33 +81,19 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
     }
   }, [user.id]);
 
-  // --- 2. Realtime Subscription (Optimized) ---
   useEffect(() => {
     fetchData();
-
-    // Listen to changes and update local state incrementally to avoid full reload flickering
-    const channel = supabase.channel('accounting_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'expenses', filter: `vendor_id=eq.${user.id}` }, (payload) => {
-          setExpenses(prev => [payload.new as Expense, ...prev]);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'expenses', filter: `vendor_id=eq.${user.id}` }, (payload) => {
-          setExpenses(prev => prev.filter(e => e.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'external_invoices', filter: `vendor_id=eq.${user.id}` }, (payload) => {
-          setExternalInvoices(prev => [payload.new as ExternalInvoice, ...prev]);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'external_invoices', filter: `vendor_id=eq.${user.id}` }, (payload) => {
-          setExternalInvoices(prev => prev.filter(i => i.id !== payload.old.id));
-      })
+    const channel = supabase.channel('accounting_unified')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `vendor_id=eq.${user.id}` }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'external_invoices', filter: `vendor_id=eq.${user.id}` }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `vendor_id=eq.${user.id}` }, () => fetchData())
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [fetchData, user.id]);
 
-  // --- 3. Strict Date Filtering Logic ---
-  const filteredData = useMemo(() => {
+  // --- 2. Unified Ledger Logic ---
+  const ledgerData = useMemo<LedgerItem[]>(() => {
     const startDate = startOfDay(new Date(dateFilter.start));
     const endDate = endOfDay(new Date(dateFilter.end));
 
@@ -103,84 +103,109 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
         return isWithinInterval(d, { start: startDate, end: endDate });
     };
 
-    return {
-        fBookings: bookings.filter(b => checkDate(b.booking_date)),
-        fExpenses: expenses.filter(e => checkDate(e.expense_date)),
-        fInvoices: externalInvoices.filter(i => checkDate(i.created_at?.split('T')[0] || ''))
-    };
-  }, [bookings, expenses, externalInvoices, dateFilter]);
+    const items: LedgerItem[] = [];
 
-  // --- 4. Analytics Calculations & Chart Data ---
-  const stats = useMemo(() => {
-    const { fBookings, fExpenses, fInvoices } = filteredData;
-
-    const bookingRevenue = fBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-    const invoiceRevenue = fInvoices.reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
-    const totalRevenue = bookingRevenue + invoiceRevenue;
-    
-    const totalExpenses = fExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
-
-    const collectedBooking = fBookings.reduce((sum, b) => sum + (Number(b.paid_amount) || 0), 0);
-    const collectedInvoice = fInvoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
-    const totalCollected = collectedBooking + collectedInvoice;
-
-    return { totalRevenue, totalExpenses, netProfit, totalCollected };
-  }, [filteredData]);
-
-  // Generate Daily Data for Charts
-  const chartData = useMemo(() => {
-    const start = parseISO(dateFilter.start);
-    const end = parseISO(dateFilter.end);
-    
-    // Prevent huge loops if dates are invalid
-    if (start > end) return [];
-
-    const days = eachDayOfInterval({ start, end });
-
-    return days.map(day => {
-        const dayStr = format(day, 'yyyy-MM-dd');
-        
-        const dayIncome = 
-            bookings.filter(b => b.booking_date === dayStr).reduce((s, b) => s + (Number(b.total_amount)||0), 0) +
-            externalInvoices.filter(i => i.created_at?.startsWith(dayStr)).reduce((s, i) => s + (Number(i.total_amount)||0), 0);
-            
-        const dayExpense = expenses.filter(e => e.expense_date === dayStr).reduce((s, e) => s + (Number(e.amount)||0), 0);
-
-        return {
-            name: format(day, 'dd MMM', { locale: arSA }),
-            income: dayIncome,
-            expense: dayExpense,
-            profit: dayIncome - dayExpense
-        };
+    // 1. Bookings -> Income
+    bookings.forEach(b => {
+        if (checkDate(b.booking_date)) {
+            items.push({
+                id: b.id,
+                type: 'income_booking',
+                date: b.booking_date,
+                description: `حجز: ${b.halls?.name || 'قاعة'} - ${b.guest_name || 'عميل'}`,
+                amount: b.total_amount,
+                status: b.payment_status === 'paid' ? 'paid' : b.payment_status === 'partial' ? 'pending' : 'unpaid',
+                category: 'حجوزات',
+                referenceId: b.id
+            });
+        }
     });
+
+    // 2. External Invoices -> Income
+    externalInvoices.forEach(inv => {
+        const date = inv.created_at?.split('T')[0] || '';
+        if (checkDate(date)) {
+            items.push({
+                id: inv.id,
+                type: 'income_invoice',
+                date: date,
+                description: `فاتورة خارجية: ${inv.customer_name}`,
+                amount: inv.total_amount,
+                status: inv.status === 'paid' ? 'paid' : 'unpaid',
+                category: 'خدمات خارجية',
+                referenceId: inv.id
+            });
+        }
+    });
+
+    // 3. Expenses -> Expense
+    expenses.forEach(exp => {
+        if (checkDate(exp.expense_date)) {
+            items.push({
+                id: exp.id,
+                type: 'expense',
+                date: exp.expense_date,
+                description: exp.title,
+                amount: exp.amount,
+                status: 'paid', // Expenses are usually paid out
+                category: exp.category,
+                referenceId: exp.id
+            });
+        }
+    });
+
+    // Sort by date descending
+    return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [bookings, expenses, externalInvoices, dateFilter]);
 
-  // --- 5. Handlers ---
+  // --- 3. Financial Calculations ---
+  const financials = useMemo(() => {
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let receivedCash = 0;
+    let pendingCash = 0;
 
-  const handleAddExpense = async () => {
-      if (!newExpense.title || !newExpense.amount) {
-          toast({ title: 'بيانات ناقصة', description: 'يرجى إدخال العنوان والمبلغ.', variant: 'destructive' });
-          return;
-      }
+    ledgerData.forEach(item => {
+        if (item.type === 'expense') {
+            totalExpense += Number(item.amount);
+        } else {
+            totalIncome += Number(item.amount);
+            if (item.status === 'paid') receivedCash += Number(item.amount);
+            else pendingCash += Number(item.amount);
+        }
+    });
+
+    return { 
+        totalIncome, 
+        totalExpense, 
+        netProfit: totalIncome - totalExpense,
+        receivedCash,
+        pendingCash,
+        cashFlow: receivedCash - totalExpense // Real liquidity
+    };
+  }, [ledgerData]);
+
+  // --- Handlers ---
+  const handleDelete = async (table: 'expenses' | 'external_invoices', id: string) => {
+      if(!confirm('هل أنت متأكد من الحذف؟ سيتم تحديث الحسابات فوراً.')) return;
+      await supabase.from(table).delete().eq('id', id);
+      toast({ title: 'تم الحذف', variant: 'success' });
+  };
+
+  const handleSaveExpense = async () => {
+      if (!newExpense.title || !newExpense.amount) return;
       setProcessing(true);
       const { error } = await supabase.from('expenses').insert([{ ...newExpense, vendor_id: user.id }]);
       setProcessing(false);
-      
       if (!error) {
-          toast({ title: 'تم الحفظ', variant: 'success' });
+          toast({ title: 'تم تسجيل المصروف', variant: 'success' });
           setIsExpenseModalOpen(false);
           setNewExpense({ expense_date: new Date().toISOString().split('T')[0], category: 'other' });
-      } else {
-          toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
       }
   };
 
-  const handleAddInvoice = async () => {
-      if (!newInvoice.customer_name || !newInvoice.total_amount) {
-          toast({ title: 'بيانات ناقصة', description: 'يرجى إدخال اسم العميل والمبلغ.', variant: 'destructive' });
-          return;
-      }
+  const handleSaveInvoice = async () => {
+      if (!newInvoice.customer_name || !newInvoice.total_amount) return;
       setProcessing(true);
       const vat = newInvoice.total_amount * 0.15; 
       const { error } = await supabase.from('external_invoices').insert([{
@@ -192,261 +217,186 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
           status: 'unpaid'
       }]);
       setProcessing(false);
-
       if (!error) {
-          toast({ title: 'تم إنشاء الفاتورة', variant: 'success' });
+          toast({ title: 'تم إصدار الفاتورة', variant: 'success' });
           setIsInvoiceModalOpen(false);
           setNewInvoice({ customer_name: '', total_amount: 0, items_desc: '' });
-      } else {
-          toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
-      }
-  };
-
-  const handleDelete = async (table: 'expenses' | 'external_invoices', id: string) => {
-      if(!confirm('هل أنت متأكد من الحذف؟')) return;
-      const { error } = await supabase.from(table).delete().eq('id', id);
-      if(error) {
-          toast({ title: 'خطأ', description: 'لم يتم الحذف، حاول مرة أخرى.', variant: 'destructive' });
       }
   };
 
   if (loading) return <div className="flex justify-center items-center h-96"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans text-right">
       
-      {/* 1. Header & Filters */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-        <div>
-          <h2 className="text-3xl font-bold text-primary flex items-center gap-2">
-             <Receipt className="w-8 h-8" /> النظام المحاسبي
-          </h2>
-          <p className="text-muted-foreground mt-1 font-bold text-sm">متابعة دقيقة للأداء المالي، الإيرادات، والمصروفات.</p>
-        </div>
-        
-        <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
-            <div className="flex items-center bg-gray-50 p-2 rounded-2xl border border-gray-200">
-                <Filter className="w-5 h-5 text-gray-400 mr-2" />
-                <input 
-                    type="date" 
-                    value={dateFilter.start} 
-                    onChange={e => setDateFilter({...dateFilter, start: e.target.value})}
-                    className="bg-transparent border-none text-xs font-bold focus:ring-0 outline-none w-32 cursor-pointer text-gray-600"
-                />
-                <span className="text-gray-400 mx-2 font-bold">إلى</span>
-                <input 
-                    type="date" 
-                    value={dateFilter.end} 
-                    onChange={e => setDateFilter({...dateFilter, end: e.target.value})}
-                    className="bg-transparent border-none text-xs font-bold focus:ring-0 outline-none w-32 cursor-pointer text-gray-600"
-                />
+      {/* 1. Top Control Bar */}
+      <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-4">
+         <div className="flex items-center gap-4 w-full lg:w-auto">
+            <div className="bg-primary/5 p-3 rounded-2xl text-primary"><Receipt className="w-6 h-6" /></div>
+            <div>
+               <h2 className="text-xl font-black text-gray-900">النظام المالي الموحد</h2>
+               <p className="text-xs font-bold text-gray-400">إدارة شاملة للمداخيل والمصروفات</p>
             </div>
-            
-            <div className="flex bg-gray-100 p-1.5 rounded-2xl">
-                {['overview', 'expenses', 'invoices'].map((tab) => (
-                    <button 
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)} 
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === tab ? 'bg-white shadow text-primary' : 'text-gray-500 hover:text-gray-900'}`}
-                    >
-                        {tab === 'overview' ? 'نظرة عامة' : tab === 'expenses' ? 'المصروفات' : 'الفواتير'}
-                    </button>
-                ))}
+         </div>
+
+         <div className="flex items-center gap-3 w-full lg:w-auto bg-gray-50 p-2 rounded-2xl border border-gray-200 hover:border-primary/30 transition-colors">
+            <button onClick={() => startDateRef.current?.showPicker()} className="p-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-sm">
+                <Calendar className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+               <input 
+                 ref={startDateRef}
+                 type="date" 
+                 value={dateFilter.start} 
+                 onChange={e => setDateFilter({...dateFilter, start: e.target.value})} 
+                 className="bg-transparent text-xs font-black outline-none w-auto cursor-pointer text-gray-700"
+                 onClick={(e) => e.currentTarget.showPicker()}
+               />
+               <span className="text-gray-400">-</span>
+               <input 
+                 ref={endDateRef}
+                 type="date" 
+                 value={dateFilter.end} 
+                 onChange={e => setDateFilter({...dateFilter, end: e.target.value})} 
+                 className="bg-transparent text-xs font-black outline-none w-auto cursor-pointer text-gray-700"
+                 onClick={(e) => e.currentTarget.showPicker()}
+               />
             </div>
-        </div>
+         </div>
+
+         <div className="flex gap-2 w-full lg:w-auto">
+            <Button onClick={() => setIsExpenseModalOpen(true)} variant="outline" className="flex-1 lg:flex-none border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold gap-2 rounded-xl h-11">
+               <ArrowUpRight className="w-4 h-4" /> مصروف
+            </Button>
+            <Button onClick={() => setIsInvoiceModalOpen(true)} variant="outline" className="flex-1 lg:flex-none border-green-100 text-green-600 hover:bg-green-50 hover:text-green-700 font-bold gap-2 rounded-xl h-11">
+               <ArrowDownLeft className="w-4 h-4" /> فاتورة
+            </Button>
+         </div>
       </div>
 
-      {activeTab === 'overview' && (
-          <div className="space-y-8 animate-in slide-in-from-bottom-2">
-            {/* KPI Cards */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm group hover:border-green-200 transition-all relative overflow-hidden">
-                    <div className="flex justify-between items-start mb-4 relative z-10">
-                        <div className="p-3 bg-green-50 text-green-600 rounded-2xl"><TrendingUp className="w-6 h-6" /></div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">إجمالي الإيرادات</span>
-                    </div>
-                    <PriceTag amount={stats.totalRevenue} className="text-3xl font-bold text-gray-900 relative z-10" />
-                    <p className="text-[10px] text-green-600 font-bold mt-1">السيولة المحصلة: {stats.totalCollected.toLocaleString()} ر.س</p>
-                </div>
-
-                <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm group hover:border-red-200 transition-all relative overflow-hidden">
-                    <div className="flex justify-between items-start mb-4 relative z-10">
-                        <div className="p-3 bg-red-50 text-red-600 rounded-2xl"><TrendingDown className="w-6 h-6" /></div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">المصروفات</span>
-                    </div>
-                    <PriceTag amount={stats.totalExpenses} className="text-3xl font-bold text-red-600 relative z-10" />
-                </div>
-
-                <div className="bg-primary text-white p-6 rounded-[2.5rem] shadow-xl shadow-primary/20 relative overflow-hidden col-span-1 md:col-span-2">
-                    <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                    <div className="flex justify-between items-center relative z-10 h-full">
-                        <div>
-                            <p className="text-primary-foreground/80 font-bold text-sm mb-2 uppercase tracking-widest">صافي الربح (Net Profit)</p>
-                            <PriceTag amount={stats.netProfit} className="text-5xl font-black text-white" iconSize={24} />
-                        </div>
-                        <div className="bg-white/20 backdrop-blur-md p-4 rounded-3xl">
-                            <Wallet className="w-10 h-10 text-white" />
-                        </div>
-                    </div>
-                </div>
+      {/* 2. Financial Summary Cards (Logic Connected) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-2">
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">إجمالي الدخل</span>
+            <div className="flex items-center justify-between">
+               <PriceTag amount={financials.totalIncome} className="text-2xl font-black text-gray-900" />
+               <div className="p-2 bg-green-50 text-green-600 rounded-xl"><TrendingUp className="w-5 h-5" /></div>
             </div>
-            
-            {/* Logic-Corrected Chart */}
-            <div className="grid lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                    <h3 className="font-bold text-xl mb-8 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-primary" /> التدفق النقدي اليومي</h3>
-                    <div className="h-[300px]" dir="ltr">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#4B0082" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#4B0082" stopOpacity={0}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="name" tick={{fontSize: 10, fill: '#9CA3AF', fontWeight: 700}} axisLine={false} tickLine={false} />
-                                <YAxis tick={{fontSize: 10, fill: '#9CA3AF', fontWeight: 700}} axisLine={false} tickLine={false} />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.1)'}} />
-                                <Area type="monotone" dataKey="income" stroke="#4B0082" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} name="الإيرادات" />
-                                <Area type="monotone" dataKey="expense" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpense)" strokeWidth={2} name="المصروفات" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Quick Actions */}
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm">
-                        <h3 className="font-bold text-sm text-gray-400 uppercase tracking-widest mb-4">إجراءات سريعة</h3>
-                        <div className="space-y-3">
-                            <button onClick={() => setIsExpenseModalOpen(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition-colors">
-                                <span>تسجيل مصروف</span>
-                                <Plus className="w-5 h-5" />
-                            </button>
-                            <button onClick={() => setIsInvoiceModalOpen(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-green-50 text-green-600 font-bold hover:bg-green-100 transition-colors">
-                                <span>فاتورة خارجية</span>
-                                <FileText className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Mini Ledger */}
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-sm flex flex-col h-[260px]">
-                        <h3 className="font-bold text-sm text-gray-400 uppercase tracking-widest mb-4">أحدث العمليات</h3>
-                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-3">
-                            {filteredData.fBookings.slice(0, 3).map(b => (
-                                <div key={b.id} className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
-                                    <span className="text-green-600">+{b.paid_amount || 0}</span>
-                                    <span className="text-gray-500">حجز {b.halls?.name}</span>
-                                </div>
-                            ))}
-                            {filteredData.fExpenses.slice(0, 3).map(e => (
-                                <div key={e.id} className="flex justify-between items-center text-xs font-bold border-b border-gray-50 pb-2">
-                                    <span className="text-red-500">-{e.amount}</span>
-                                    <span className="text-gray-500">{e.title}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+            <div className="text-[10px] font-bold text-gray-400">
+               محصل: <span className="text-green-600">{financials.receivedCash.toLocaleString()}</span> • آجل: <span className="text-orange-500">{financials.pendingCash.toLocaleString()}</span>
             </div>
-          </div>
-      )}
+         </div>
 
-      {activeTab === 'expenses' && (
-          <div className="space-y-6 animate-in slide-in-from-left-4">
-              <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xl text-gray-800">سجل المصروفات التفصيلي</h3>
-                  <Button onClick={() => setIsExpenseModalOpen(true)} className="rounded-xl h-11 gap-2 font-bold shadow-lg shadow-primary/20"><Plus className="w-4 h-4" /> تسجيل مصروف</Button>
-              </div>
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-                  <table className="w-full text-right text-sm">
-                        <thead className="bg-gray-50/50 text-gray-500 font-bold text-xs uppercase tracking-widest sticky top-0">
-                            <tr>
-                                <th className="p-6">البند / الوصف</th>
-                                <th className="p-6">التصنيف</th>
-                                <th className="p-6">المبلغ</th>
-                                <th className="p-6">التاريخ</th>
-                                <th className="p-6">ملاحظات</th>
-                                <th className="p-6 text-center">حذف</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {filteredData.fExpenses.length === 0 ? <tr><td colSpan={6} className="p-12 text-center font-bold text-gray-400">لا توجد مصروفات في هذه الفترة</td></tr> : 
-                            filteredData.fExpenses.map(e => (
-                                <tr key={e.id} className="hover:bg-gray-50 transition-colors group">
-                                    <td className="p-6 font-bold text-gray-900">{e.title}</td>
-                                    <td className="p-6"><span className="bg-gray-100 px-3 py-1 rounded-lg text-xs font-bold text-gray-600">{e.category}</span></td>
-                                    <td className="p-6"><PriceTag amount={e.amount} className="text-red-500 font-bold" /></td>
-                                    <td className="p-6 text-gray-500 font-mono text-xs font-bold">{e.expense_date}</td>
-                                    <td className="p-6 text-gray-400 text-xs">{e.notes || '-'}</td>
-                                    <td className="p-6 text-center">
-                                        <button onClick={() => handleDelete('expenses', e.id)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                  </table>
-              </div>
-          </div>
-      )}
+         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-2">
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">المصروفات</span>
+            <div className="flex items-center justify-between">
+               <PriceTag amount={financials.totalExpense} className="text-2xl font-black text-red-600" />
+               <div className="p-2 bg-red-50 text-red-600 rounded-xl"><TrendingDown className="w-5 h-5" /></div>
+            </div>
+            <div className="text-[10px] font-bold text-gray-400">نسبة للمبيعات: {financials.totalIncome > 0 ? ((financials.totalExpense/financials.totalIncome)*100).toFixed(1) : 0}%</div>
+         </div>
 
-      {activeTab === 'invoices' && (
-          <div className="space-y-6 animate-in slide-in-from-left-4">
-              <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-xl text-gray-800">فواتير الإيرادات الخارجية</h3>
-                  <Button onClick={() => setIsInvoiceModalOpen(true)} className="rounded-xl h-11 gap-2 font-bold shadow-lg shadow-primary/20"><Plus className="w-4 h-4" /> فاتورة جديدة</Button>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                  {filteredData.fInvoices.map(inv => (
-                      <div key={inv.id} className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col gap-4 group hover:border-primary/30 transition-all">
-                          <div className="flex justify-between items-start">
-                              <div>
-                                  <h4 className="font-bold text-lg text-gray-900">{inv.customer_name}</h4>
-                                  <p className="text-xs text-gray-400 font-mono font-bold mt-1">#{inv.id.slice(0,8)}</p>
-                              </div>
-                              <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1 ${inv.status === 'paid' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'}`}>
-                                  {inv.status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                  {inv.status === 'paid' ? 'مدفوعة' : 'غير مدفوعة'}
+         <div className="bg-primary text-white p-6 rounded-[2rem] shadow-xl shadow-primary/20 space-y-2 col-span-2 lg:col-span-1 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <span className="text-xs font-black text-white/80 uppercase tracking-widest relative z-10">صافي الربح (Net Profit)</span>
+            <div className="flex items-center justify-between relative z-10">
+               <PriceTag amount={financials.netProfit} className="text-3xl font-black text-white" />
+               <Wallet className="w-8 h-8 text-white/80" />
+            </div>
+         </div>
+
+         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-2 lg:col-span-1">
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">السيولة النقدية (Cash Flow)</span>
+            <div className="flex items-center justify-between">
+               <PriceTag amount={financials.cashFlow} className={`text-2xl font-black ${financials.cashFlow >= 0 ? 'text-blue-600' : 'text-red-500'}`} />
+               <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><ArrowDown className="w-5 h-5" /></div>
+            </div>
+            <div className="text-[10px] font-bold text-gray-400">الكاش الفعلي المتوفر بعد المصروفات</div>
+         </div>
+      </div>
+
+      {/* 3. Main Ledger Table (Unified) */}
+      <div className="w-full">
+         <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+            <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+               <div className="flex gap-2 bg-gray-50 p-1 rounded-xl w-full sm:w-auto">
+                  <button onClick={() => setActiveTab('ledger')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'ledger' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>الكل</button>
+                  <button onClick={() => setActiveTab('expenses')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'expenses' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>مصروفات</button>
+                  <button onClick={() => setActiveTab('invoices')} className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'invoices' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>إيرادات</button>
+               </div>
+               <div className="relative w-full sm:w-64">
+                  <input 
+                    placeholder="بحث في المعاملات..." 
+                    className="w-full h-10 bg-gray-50 border-none rounded-xl px-10 text-xs font-bold focus:ring-1 ring-primary/20 outline-none"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+               </div>
+            </div>
+
+            <div className="flex-1 overflow-x-auto">
+               <table className="w-full text-right text-sm">
+                  <thead className="bg-gray-50/50 text-gray-500 font-bold text-[10px] uppercase tracking-widest sticky top-0">
+                     <tr>
+                        <th className="p-4 w-[15%]">التاريخ</th>
+                        <th className="p-4 w-[35%]">الوصف / البيان</th>
+                        <th className="p-4 w-[15%]">التصنيف</th>
+                        <th className="p-4 w-[15%]">الحالة</th>
+                        <th className="p-4 w-[15%]">المبلغ</th>
+                        <th className="p-4 w-[5%]"></th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                     {ledgerData
+                        .filter(item => activeTab === 'ledger' || (activeTab === 'expenses' && item.type === 'expense') || (activeTab === 'invoices' && item.type.startsWith('income')))
+                        .filter(item => item.description.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map((item) => (
+                        <tr key={`${item.type}-${item.id}`} className={`hover:bg-gray-50 transition-colors group ${item.type === 'expense' ? 'bg-red-50/5' : ''}`}>
+                           <td className="p-4 font-mono text-xs font-bold text-gray-500">{item.date}</td>
+                           <td className="p-4">
+                              <div className="font-bold text-gray-900">{item.description}</div>
+                              <div className="text-[10px] text-gray-400 mt-0.5 font-mono">ID: {item.id.slice(0, 8)}</div>
+                           </td>
+                           <td className="p-4">
+                              <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-lg text-[10px] font-bold">{item.category}</span>
+                           </td>
+                           <td className="p-4">
+                              {item.status === 'paid' && <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg w-fit"><CheckCircle2 className="w-3 h-3" /> مدفوع</span>}
+                              {item.status === 'pending' && <span className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded-lg w-fit"><Clock className="w-3 h-3" /> جزئي</span>}
+                              {item.status === 'unpaid' && <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-lg w-fit"><Clock className="w-3 h-3" /> آجل</span>}
+                           </td>
+                           <td className="p-4">
+                              <span className={`font-black text-sm flex items-center gap-1 ${item.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
+                                 {item.type === 'expense' ? '-' : '+'}
+                                 {item.amount.toLocaleString()}
                               </span>
-                          </div>
-                          
-                          <div className="bg-gray-50 p-3 rounded-xl">
-                             {inv.items?.map((item: any, idx: number) => (
-                                 <div key={idx} className="flex justify-between text-xs font-bold text-gray-600">
-                                     <span>{item.description}</span>
-                                     <span>{item.total}</span>
-                                 </div>
-                             ))}
-                          </div>
-
-                          <div className="flex justify-between items-end border-t border-gray-100 pt-4 mt-auto">
-                              <div className="text-xs text-gray-400 font-bold">
-                                  {new Date(inv.created_at || '').toLocaleDateString('ar-SA')}
-                              </div>
-                              <div className="flex items-center gap-4">
-                                  <button onClick={() => handleDelete('external_invoices', inv.id)} className="text-red-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                                  <PriceTag amount={inv.total_amount} className="text-xl font-bold text-primary" />
-                              </div>
-                          </div>
-                      </div>
-                  ))}
-                  {filteredData.fInvoices.length === 0 && <div className="col-span-full py-20 text-center font-bold text-gray-400 border-2 border-dashed rounded-[2.5rem] opacity-60">لا توجد فواتير خارجية في هذه الفترة</div>}
-              </div>
-          </div>
-      )}
+                           </td>
+                           <td className="p-4 text-center">
+                              {item.type !== 'income_booking' && (
+                                 <button 
+                                    onClick={() => handleDelete(item.type === 'expense' ? 'expenses' : 'external_invoices', item.id)}
+                                    className="p-2 text-gray-300 hover:text-red-500 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                                 >
+                                    <Trash2 className="w-4 h-4" />
+                                 </button>
+                              )}
+                           </td>
+                        </tr>
+                     ))}
+                     {ledgerData.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-gray-400 font-bold">لا توجد بيانات مالية في هذه الفترة</td></tr>}
+                  </tbody>
+               </table>
+            </div>
+         </div>
+      </div>
 
       {/* Modals */}
       <Modal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} title="تسجيل مصروف جديد">
           <div className="space-y-4 text-right">
-              <Input label="عنوان المصروف" value={newExpense.title || ''} onChange={e => setNewExpense({...newExpense, title: e.target.value})} className="h-12 rounded-xl" />
+              <Input label="عنوان المصروف" value={newExpense.title || ''} onChange={e => setNewExpense({...newExpense, title: e.target.value})} className="h-12 rounded-xl font-bold" />
               <div className="grid grid-cols-2 gap-4">
-                  <Input label="المبلغ" type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="h-12 rounded-xl" />
+                  <Input label="المبلغ" type="number" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="h-12 rounded-xl font-bold" />
                   <div className="space-y-2">
                       <label className="text-xs font-bold text-gray-500">التصنيف</label>
                       <select className="w-full h-12 border rounded-xl px-3 bg-white font-bold text-sm" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value as any})}>
@@ -454,20 +404,19 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
                       </select>
                   </div>
               </div>
-              <Input label="ملاحظات" value={newExpense.notes || ''} onChange={e => setNewExpense({...newExpense, notes: e.target.value})} className="h-12 rounded-xl" />
-              <Button onClick={handleAddExpense} disabled={processing} className="w-full h-12 rounded-xl font-bold mt-2 shadow-lg shadow-primary/20">
+              <Button onClick={handleSaveExpense} disabled={processing} className="w-full h-12 rounded-xl font-bold mt-2 shadow-lg shadow-primary/20">
                   {processing ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ المصروف'}
               </Button>
           </div>
       </Modal>
 
-      <Modal isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} title="إنشاء فاتورة إيراد">
+      <Modal isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} title="إضافة إيراد خارجي">
           <div className="space-y-4 text-right">
-              <Input label="اسم العميل / الجهة" value={newInvoice.customer_name} onChange={e => setNewInvoice({...newInvoice, customer_name: e.target.value})} className="h-12 rounded-xl" />
-              <Input label="وصف الخدمة / المنتج" value={newInvoice.items_desc} onChange={e => setNewInvoice({...newInvoice, items_desc: e.target.value})} className="h-12 rounded-xl" />
-              <Input label="المبلغ الإجمالي (شامل الضريبة)" type="number" value={newInvoice.total_amount || ''} onChange={e => setNewInvoice({...newInvoice, total_amount: Number(e.target.value)})} className="h-12 rounded-xl" />
-              <Button onClick={handleAddInvoice} disabled={processing} className="w-full h-12 rounded-xl font-bold mt-2 shadow-lg shadow-primary/20">
-                  {processing ? <Loader2 className="animate-spin w-5 h-5" /> : 'إصدار الفاتورة'}
+              <Input label="اسم العميل / الجهة" value={newInvoice.customer_name} onChange={e => setNewInvoice({...newInvoice, customer_name: e.target.value})} className="h-12 rounded-xl font-bold" />
+              <Input label="وصف الفاتورة" value={newInvoice.items_desc} onChange={e => setNewInvoice({...newInvoice, items_desc: e.target.value})} className="h-12 rounded-xl font-bold" />
+              <Input label="المبلغ الإجمالي" type="number" value={newInvoice.total_amount || ''} onChange={e => setNewInvoice({...newInvoice, total_amount: Number(e.target.value)})} className="h-12 rounded-xl font-bold" />
+              <Button onClick={handleSaveInvoice} disabled={processing} className="w-full h-12 rounded-xl font-bold mt-2 shadow-lg shadow-primary/20">
+                  {processing ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ الفاتورة'}
               </Button>
           </div>
       </Modal>
