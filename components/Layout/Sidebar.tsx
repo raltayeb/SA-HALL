@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList, Search, Ticket, LogOut, 
   Sparkles, Heart, CalendarDays, Settings, Palette, X, ShoppingCart, Tag, 
   ChevronDown, LayoutGrid, FileText, BarChart3, ShieldCheck, Layers, Inbox, Bell,
-  Receipt, Wallet, UserCheck
+  Receipt, Wallet, UserCheck, Store
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -52,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         items: [
           { id: 'admin_users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
           { id: 'subscriptions', label: 'الشركاء والاشتراكات', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> }, // Moved here
         ]
       },
       {
@@ -73,17 +74,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         ]
       },
       {
-        title: "المالية",
+        title: "المالية والمشتريات",
         items: [
           { id: 'accounting', label: 'الفواتير والحسابات', icon: <Receipt className="w-5 h-5" /> },
-          { id: 'pos', label: 'نقاط البيع (POS)', icon: <ShoppingCart className="w-5 h-5" /> },
+          { id: 'vendor_marketplace', label: 'متجر المنصة', icon: <ShoppingCart className="w-5 h-5" /> }, // New
           { id: 'coupons', label: 'العروض والخصم', icon: <Tag className="w-5 h-5" /> },
         ]
       },
       {
         title: "إدارة الأصول",
         items: [
-          { id: 'my_halls', label: 'القاعات', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'my_halls', label: 'القاعات والشاليهات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'my_services', label: 'الخدمات', icon: <Sparkles className="w-5 h-5" /> },
           { id: 'hall_bookings', label: 'سجل الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
           { id: 'my_clients', label: 'إدارة العملاء', icon: <UserCheck className="w-5 h-5" /> },

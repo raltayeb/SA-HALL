@@ -14,7 +14,8 @@ import { UsersManagement } from './pages/UsersManagement';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ContentCMS } from './pages/ContentCMS';
 import { ServiceCategories } from './pages/ServiceCategories'; 
-import { VendorPOS } from './pages/VendorPOS';
+import { AdminStore } from './pages/AdminStore'; 
+import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorCoupons } from './pages/VendorCoupons';
 import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorServices } from './pages/VendorServices';
@@ -30,7 +31,7 @@ import { Input } from './components/ui/Input';
 import { 
   Loader2, X, Clock, AlertOctagon, User, Building2, 
   CreditCard, CheckCircle2, ShieldCheck, Mail, ArrowLeft, ArrowRight,
-  Globe, Lock
+  Globe, Lock, Sparkles, LogIn
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -45,14 +46,12 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [authLoading, setAuthLoading] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const [browseFilters, setBrowseFilters] = useState<any>(null);
   const [selectedEntity, setSelectedEntity] = useState<{ item: any, type: 'hall' | 'service' } | null>(null);
   
   const profileIdRef = useRef<string | null>(null);
   const activeTabRef = useRef(activeTab);
   
-  const [isRegister, setIsRegister] = useState(false);
   const [regStep, setRegStep] = useState<RegStep>(0);
   
   const [regData, setRegData] = useState({
@@ -79,16 +78,8 @@ const App: React.FC = () => {
   const vatAmount = subtotal * VAT_RATE;
   const totalAmount = subtotal + vatAmount;
 
-  const openAuth = (mode: 'login' | 'register') => {
-    setIsRegister(mode === 'register');
-    setRegStep(0);
-    setShowAuthModal(true);
-    setOtpCode('');
-  };
-
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
+  // Sync ref
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   const fetchProfile = async (id: string, isInitialLoad = false) => {
     if (profileIdRef.current === id && !isInitialLoad) {
@@ -105,7 +96,7 @@ const App: React.FC = () => {
 
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
-            if (currentTab === 'home' || currentTab === 'browse' || currentTab === 'hall_details') {
+            if (['home', 'browse', 'hall_details', 'login', 'register'].includes(currentTab)) {
                // Stay on public pages
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
@@ -166,7 +157,7 @@ const App: React.FC = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: regData.email, password: regData.password });
       if (error) throw error;
-      setShowAuthModal(false);
+      // Success will trigger auth state change
     } catch (err: any) {
       toast({ title: 'خطأ في الدخول', description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.', variant: 'destructive' });
     } finally { setAuthLoading(false); }
@@ -177,14 +168,12 @@ const App: React.FC = () => {
     setAuthLoading(true);
     try {
         if (regStep === 0) {
-            // Step 0: Create User (Trigger sends email)
             if (!regData.fullName || !regData.email || !regData.password || !regData.businessName) {
                 toast({ title: 'نقص بيانات', description: 'يرجى ملء كافة الحقول.', variant: 'destructive' });
                 setAuthLoading(false);
                 return;
             }
             
-            // Sign Up with Metadata
             const { error } = await supabase.auth.signUp({ 
                 email: regData.email, 
                 password: regData.password, 
@@ -194,7 +183,7 @@ const App: React.FC = () => {
                         business_name: regData.businessName,
                         phone: regData.phone,
                         role: 'vendor',
-                        status: 'pending', // Starts pending, updated after payment
+                        status: 'pending',
                         payment_status: 'unpaid'
                     } 
                 } 
@@ -208,11 +197,10 @@ const App: React.FC = () => {
                 }
             } else {
                 toast({ title: 'تم إنشاء الحساب', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
-                setRegStep(1); // Move to OTP
+                setRegStep(1); 
             }
 
         } else if (regStep === 1) {
-            // Step 1: Verify OTP
             if (!otpCode) {
                 toast({ title: 'رمز مفقود', description: 'يرجى إدخال رمز التحقق.', variant: 'destructive' });
                 setAuthLoading(false);
@@ -225,34 +213,26 @@ const App: React.FC = () => {
                 toast({ title: 'رمز غير صحيح', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
             } else if (data.user) {
                 toast({ title: 'تم التحقق', description: 'تم تفعيل البريد الإلكتروني بنجاح.', variant: 'success' });
-                setRegStep(2); // Move to Plan
+                setRegStep(2); 
             }
 
         } else if (regStep === 2) {
-            // Step 2: Confirm Plan Selection
-            setRegStep(3); // Move to Payment
+            setRegStep(3); 
 
         } else if (regStep === 3) {
-            // Step 3: Payment Processing
             const user = (await supabase.auth.getUser()).data.user;
             if (!user) throw new Error('User not found');
 
-            // Simulate Payment Logic
             if (paymentMethod === 'online') {
-                // Here we would integrate HyperPay iframe/redirect
-                // For demo, we simulate success
                 await new Promise(r => setTimeout(r, 2000)); 
             }
 
-            // Update Profile with Plan & Payment Status
             const { error: updateError } = await supabase
                 .from('profiles')
                 .update({
                     hall_limit: planData.halls,
                     service_limit: planData.services,
                     payment_status: paymentMethod === 'online' ? 'paid' : 'unpaid',
-                    // If online paid => approved immediately (or keep pending for manual check)
-                    // If cash => pending
                     status: paymentMethod === 'online' ? 'approved' : 'pending',
                     subscription_plan: 'custom'
                 })
@@ -260,15 +240,14 @@ const App: React.FC = () => {
 
             if (updateError) throw updateError;
 
-            // Send notification to Admin
             await supabase.from('notifications').insert([{
-                user_id: user.id, // Notification for self
+                user_id: user.id,
                 title: 'اكتمال التسجيل',
                 message: paymentMethod === 'online' ? 'تم الدفع وتفعيل الحساب بنجاح.' : 'تم استلام الطلب، بانتظار تحصيل الرسوم لتفعيل الحساب.',
                 type: 'system'
             }]);
 
-            setRegStep(4); // Success Screen
+            setRegStep(4);
         }
     } catch (err: any) {
         toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
@@ -290,24 +269,25 @@ const App: React.FC = () => {
     </div>
   );
 
-  const isPublicPage = activeTab === 'home' || activeTab === 'browse' || activeTab === 'hall_details';
+  const isPublicPage = ['home', 'browse', 'hall_details', 'login', 'register'].includes(activeTab);
 
-  // Render Logic
   return (
     <NotificationProvider userId={userProfile?.id}>
       <div className="min-h-screen bg-[#F8F9FC] text-gray-900 font-sans" dir="rtl">
         
-        {/* Unified Public Navbar */}
+        {/* Unified Public Navbar (Available on all public pages, including Login/Register) */}
         {isPublicPage && (
             <PublicNavbar 
                 user={userProfile}
-                onLoginClick={() => openAuth('login')}
-                onRegisterClick={() => openAuth('register')}
+                onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
+                onRegisterClick={() => { setActiveTab('register'); window.scrollTo(0,0); }}
                 onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
                 onNavigate={(tab) => {
                     if (tab === 'home') setActiveTab('home');
                     else if (tab === 'browse') { setBrowseFilters(null); setActiveTab('browse'); }
                     else if (tab === 'dashboard') setActiveTab('dashboard');
+                    else if (tab === 'login') setActiveTab('login');
+                    else if (tab === 'register') setActiveTab('register');
                 }}
                 activeTab={activeTab}
             />
@@ -322,177 +302,225 @@ const App: React.FC = () => {
           />
         )}
 
-        {/* Auth Modal */}
-        {showAuthModal && (
-          <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-            <div className="w-full max-w-[600px] bg-white rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in-95 my-auto max-h-[90vh] overflow-y-auto">
-              <button onClick={() => setShowAuthModal(false)} className="absolute top-6 left-6 text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
-              
-              <div className="text-center mb-6">
-                  <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-16 mx-auto mb-2 object-contain" />
-                  <div className="text-2xl font-ruqaa text-primary mb-1">القاعة</div>
-                  <h2 className="text-xl font-black text-gray-900">
-                    {!isRegister ? 'بوابة الشركاء' : 'إنشاء حساب بائع جديد'}
-                  </h2>
-              </div>
-
-              {!isRegister ? (
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
-                    <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} required className="h-12 rounded-xl bg-gray-50 border-none px-5 font-bold" />
-                    <Button type="submit" className="w-full h-12 rounded-xl font-black text-base" disabled={authLoading}>
-                      {authLoading ? <Loader2 className="animate-spin" /> : 'دخول'}
-                    </Button>
-                    <button type="button" onClick={() => setIsRegister(true)} className="w-full mt-4 text-[10px] font-black text-primary hover:underline">ليس لديك حساب؟ انضم الآن</button>
-                  </form>
-              ) : (
-                  // NEW REGISTRATION WIZARD
-                  <div className="space-y-6">
-                    {/* Stepper Header */}
-                    {regStep < 4 && (
-                      <div className="flex justify-between items-center px-4 relative">
-                        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 -z-10"></div>
-                        {[{i:0, label: 'البيانات'}, {i:1, label: 'التحقق'}, {i:2, label: 'الباقة'}, {i:3, label: 'الدفع'}].map(step => (
-                          <div key={step.i} className={`flex flex-col items-center gap-1 ${regStep >= step.i ? 'text-primary' : 'text-gray-300'}`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${regStep >= step.i ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200'}`}>
-                                {regStep > step.i ? <CheckCircle2 className="w-4 h-4" /> : step.i + 1}
-                            </div>
-                            <span className="text-[9px] font-bold">{step.label}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Step 0: Basic Info */}
-                    {regStep === 0 && (
-                      <div className="space-y-4 animate-in slide-in-from-right-4">
-                         <div className="grid grid-cols-2 gap-4">
-                            <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} />
-                            <Input placeholder="اسم النشاط التجاري" value={regData.businessName} onChange={e => setRegData({...regData, businessName: e.target.value})} />
-                         </div>
-                         <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} />
-                         <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} />
-                         <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} />
-                         <div className="flex justify-between items-center pt-4">
-                            <button onClick={() => setIsRegister(false)} className="text-xs font-bold text-gray-400">لدي حساب بالفعل</button>
-                            <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold">
-                                {authLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>التالي <ArrowLeft className="w-4 h-4 mr-2" /></>}
-                            </Button>
-                         </div>
-                      </div>
-                    )}
-
-                    {/* Step 1: OTP Verification */}
-                    {regStep === 1 && (
-                      <div className="space-y-6 animate-in slide-in-from-right-4 text-center">
-                        <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
-                            <Mail className="w-8 h-8" />
-                        </div>
-                        <div className="space-y-2">
-                            <h3 className="text-lg font-black">تحقق من بريدك</h3>
-                            <p className="text-xs text-gray-500 font-bold">تم إرسال رمز التفعيل إلى {regData.email}</p>
-                        </div>
-                        <Input 
-                            placeholder="أدخل الرمز (6 أرقام)" 
-                            className="text-center text-2xl tracking-[0.5em] font-black h-16 rounded-2xl" 
-                            maxLength={6} 
-                            value={otpCode} 
-                            onChange={e => setOtpCode(e.target.value)} 
-                        />
-                        <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-12 rounded-xl font-bold shadow-xl shadow-primary/20">
-                            {authLoading ? <Loader2 className="animate-spin" /> : 'تفعيل الحساب'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Step 2: Choose Plan */}
-                    {regStep === 2 && (
-                      <div className="space-y-6 animate-in slide-in-from-right-4">
-                        <div className="space-y-4">
-                           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                              <div className="flex items-center gap-3">
-                                 <div className="p-2 bg-white rounded-lg border shadow-sm text-primary"><Building2 className="w-5 h-5" /></div>
-                                 <div className="text-right"><p className="font-bold text-sm">عدد القاعات</p><p className="text-[10px] text-gray-400">{systemFees.hallFee} ر.س / قاعة</p></div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                 <button onClick={() => setPlanData(p => ({...p, halls: Math.max(1, p.halls - 1)}))} className="w-8 h-8 rounded-full bg-white border flex items-center justify-center hover:bg-gray-100">-</button>
-                                 <span className="font-black w-4 text-center">{planData.halls}</span>
-                                 <button onClick={() => setPlanData(p => ({...p, halls: p.halls + 1}))} className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90">+</button>
-                              </div>
-                           </div>
-                           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                              <div className="flex items-center gap-3">
-                                 <div className="p-2 bg-white rounded-lg border shadow-sm text-primary"><ShieldCheck className="w-5 h-5" /></div>
-                                 <div className="text-right"><p className="font-bold text-sm">عدد الخدمات</p><p className="text-[10px] text-gray-400">{systemFees.serviceFee} ر.س / خدمة</p></div>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                 <button onClick={() => setPlanData(p => ({...p, services: Math.max(0, p.services - 1)}))} className="w-8 h-8 rounded-full bg-white border flex items-center justify-center hover:bg-gray-100">-</button>
-                                 <span className="font-black w-4 text-center">{planData.services}</span>
-                                 <button onClick={() => setPlanData(p => ({...p, services: p.services + 1}))} className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90">+</button>
-                              </div>
-                           </div>
-                        </div>
-                        <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 flex justify-between items-center">
-                           <span className="font-bold text-sm">الإجمالي التقديري</span>
-                           <PriceTag amount={totalAmount} className="text-xl text-primary" />
-                        </div>
-                        <Button onClick={handleRegisterStep} className="w-full h-12 rounded-xl font-bold">التالي <ArrowLeft className="w-4 h-4 mr-2" /></Button>
-                      </div>
-                    )}
-
-                    {/* Step 3: Payment */}
-                    {regStep === 3 && (
-                      <div className="space-y-6 animate-in slide-in-from-right-4">
-                        <div className="grid grid-cols-2 gap-4">
-                           {hyperPayConfig.enabled && (
-                               <button onClick={() => setPaymentMethod('online')} className={`h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'online' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
-                                   <Globe className="w-8 h-8" />
-                                   <span className="text-xs font-black">HyperPay (Online)</span>
-                               </button>
-                           )}
-                           <button onClick={() => setPaymentMethod('cash')} className={`h-28 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400'}`}>
-                               <Building2 className="w-8 h-8" />
-                               <span className="text-xs font-black">تحويل / كاش</span>
-                           </button>
-                        </div>
-                        
-                        <div className="bg-gray-50 p-4 rounded-xl text-[10px] text-gray-500 font-bold leading-relaxed border border-gray-100">
-                            {paymentMethod === 'online' 
-                                ? 'سيتم توجيهك إلى بوابة الدفع الآمنة لإتمام العملية وتفعيل حسابك فوراً.'
-                                : 'سيتم إنشاء حسابك وتعليقه حتى يتم التواصل معك لتحصيل الرسوم.'}
-                        </div>
-
-                        <div className="flex justify-between items-center pt-4">
-                            <Button variant="ghost" onClick={() => setRegStep(2)}>رجوع</Button>
-                            <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold shadow-xl shadow-primary/20">
-                                {authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}
-                            </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Step 4: Success */}
-                    {regStep === 4 && (
-                      <div className="text-center space-y-6 animate-in zoom-in-95 py-10">
-                         <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 className="w-12 h-12" /></div>
-                         <h3 className="text-2xl font-black text-gray-900">تم التسجيل بنجاح!</h3>
-                         <p className="text-sm text-gray-500 font-bold">شكراً لانضمامك إلينا. يمكنك الآن البدء في إعداد ملفك الشخصي.</p>
-                         <Button onClick={() => { setShowAuthModal(false); fetchProfile((userProfile?.id || ''), true); }} className="px-10 h-12 rounded-xl font-bold mt-4">الدخول للوحة التحكم</Button>
-                      </div>
-                    )}
-                  </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Main Content Area */}
         <main className={`${!isPublicPage && userProfile ? 'lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8' : ''}`}>
-          {/* Active Tab Routing */}
+          
+          {/* ========== LOGIN PAGE ========== */}
+          {activeTab === 'login' && (
+            <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
+                {/* Right Column: Form */}
+                <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 animate-in slide-in-from-right-4 duration-500">
+                    <div className="w-full max-w-md space-y-8">
+                        <div className="text-center lg:text-right">
+                            <h2 className="text-3xl font-black text-gray-900">تسجيل الدخول</h2>
+                            <p className="mt-2 text-sm font-bold text-gray-500">مرحباً بعودتك! الرجاء إدخال بياناتك للمتابعة.</p>
+                        </div>
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            <Input type="email" label="البريد الإلكتروني" placeholder="name@example.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold focus:ring-2 focus:ring-primary/20" />
+                            <Input type="password" label="كلمة المرور" placeholder="••••••••" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold focus:ring-2 focus:ring-primary/20" />
+                            
+                            <div className="flex justify-between items-center text-xs font-bold">
+                                <label className="flex items-center gap-2 cursor-pointer text-gray-500">
+                                    <input type="checkbox" className="accent-primary rounded" /> تذكرني
+                                </label>
+                                <a href="#" className="text-primary hover:underline">نسيت كلمة المرور؟</a>
+                            </div>
+
+                            <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 hover:scale-[1.02] transition-transform" disabled={authLoading}>
+                                {authLoading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}
+                            </Button>
+                            
+                            <div className="text-center pt-4">
+                                <span className="text-xs font-bold text-gray-400">ليس لديك حساب؟ </span>
+                                <button type="button" onClick={() => { setActiveTab('register'); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {/* Left Column: Brand (Hidden on mobile) */}
+                <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
+                    
+                    <div className="relative z-10 space-y-10 max-w-lg">
+                        <div className="w-40 h-40 bg-white/20 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mx-auto border border-white/30 shadow-2xl">
+                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto brightness-0 invert" />
+                        </div>
+                        <div className="space-y-6">
+                            <h2 className="text-5xl font-ruqaa leading-tight">بوابتك لعالم <br/> المناسبات الفاخرة</h2>
+                            <p className="text-white/80 font-bold text-xl leading-relaxed">
+                                سجل دخولك لإدارة حجوزاتك، متابعة عملائك، والوصول لأدوات التحكم المتقدمة.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )}
+
+          {/* ========== REGISTER PAGE ========== */}
+          {activeTab === 'register' && (
+            <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
+                {/* Right Column: Form */}
+                <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 animate-in slide-in-from-right-4 duration-500">
+                    <div className="w-full max-w-md space-y-8">
+                        <div className="text-center lg:text-right">
+                            <h2 className="text-3xl font-black text-gray-900">انضم كشريك نجاح</h2>
+                            <p className="mt-2 text-sm font-bold text-gray-500">سجل منشأتك وابدأ في استقبال الحجوزات اليوم.</p>
+                        </div>
+
+                        {/* Stepper */}
+                        {regStep < 4 && (
+                          <div className="flex justify-between items-center px-2 relative mb-8">
+                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 -z-10"></div>
+                            {[{i:0, label: 'البيانات'}, {i:1, label: 'التحقق'}, {i:2, label: 'الباقة'}, {i:3, label: 'الدفع'}].map(step => (
+                              <div key={step.i} className={`flex flex-col items-center gap-1 ${regStep >= step.i ? 'text-primary' : 'text-gray-300'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${regStep >= step.i ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200'}`}>
+                                    {regStep > step.i ? <CheckCircle2 className="w-4 h-4" /> : step.i + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Step 0: Basic Info */}
+                        {regStep === 0 && (
+                          <div className="space-y-4 animate-in slide-in-from-right-4">
+                             <div className="grid grid-cols-2 gap-4">
+                                <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-12 rounded-xl" />
+                                <Input placeholder="اسم النشاط التجاري" value={regData.businessName} onChange={e => setRegData({...regData, businessName: e.target.value})} className="h-12 rounded-xl" />
+                             </div>
+                             <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-12 rounded-xl" />
+                             <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-12 rounded-xl" />
+                             <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-12 rounded-xl" />
+                             <div className="flex justify-between items-center pt-4">
+                                <button onClick={() => { setActiveTab('login'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-primary">لدي حساب بالفعل</button>
+                                <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold h-12 shadow-lg shadow-primary/20">
+                                    {authLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>التالي <ArrowLeft className="w-4 h-4 mr-2" /></>}
+                                </Button>
+                             </div>
+                          </div>
+                        )}
+
+                        {/* Step 1: OTP Verification */}
+                        {regStep === 1 && (
+                          <div className="space-y-6 animate-in slide-in-from-right-4 text-center">
+                            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
+                                <Mail className="w-10 h-10" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="text-xl font-black">تحقق من بريدك</h3>
+                                <p className="text-sm text-gray-500 font-bold">تم إرسال رمز التفعيل إلى {regData.email}</p>
+                            </div>
+                            <Input 
+                                placeholder="أدخل الرمز (6 أرقام)" 
+                                className="text-center text-3xl tracking-[0.5em] font-black h-20 rounded-3xl border-2 focus:border-primary" 
+                                maxLength={6} 
+                                value={otpCode} 
+                                onChange={e => setOtpCode(e.target.value)} 
+                            />
+                            <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-14 rounded-2xl font-bold shadow-xl shadow-primary/20 text-lg">
+                                {authLoading ? <Loader2 className="animate-spin" /> : 'تفعيل الحساب'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Step 2: Plan */}
+                        {regStep === 2 && (
+                            <div className="space-y-6 animate-in slide-in-from-right-4">
+                                <div className="text-center mb-4"><h4 className="font-black text-xl">صمم باقتك</h4><p className="text-gray-400 font-bold text-sm">ادفع فقط مقابل ما تحتاج</p></div>
+                                <div className="flex items-center justify-between p-6 bg-gray-50 rounded-[2rem] border border-gray-100 shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-white rounded-xl border shadow-sm text-primary"><Building2 className="w-6 h-6" /></div>
+                                        <div className="text-right"><p className="font-bold text-base">عدد القاعات</p><p className="text-xs text-gray-400 font-bold">{systemFees.hallFee} ر.س / قاعة</p></div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => setPlanData(p => ({...p, halls: Math.max(1, p.halls - 1)}))} className="w-10 h-10 rounded-xl bg-white border flex items-center justify-center font-bold text-lg hover:bg-gray-100 transition-colors">-</button>
+                                        <span className="font-black w-6 text-center text-lg">{planData.halls}</span>
+                                        <button onClick={() => setPlanData(p => ({...p, halls: p.halls + 1}))} className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-lg shadow-lg hover:bg-primary/90 transition-colors">+</button>
+                                    </div>
+                                </div>
+                                <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/10 flex justify-between items-center">
+                                    <span className="font-bold text-base">الإجمالي التقديري</span>
+                                    <PriceTag amount={totalAmount} className="text-2xl text-primary" />
+                                </div>
+                                <Button onClick={handleRegisterStep} className="w-full h-14 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20">التالي <ArrowLeft className="w-5 h-5 mr-2" /></Button>
+                            </div>
+                        )}
+
+                        {/* Step 3: Payment */}
+                        {regStep === 3 && (
+                            <div className="space-y-6 animate-in slide-in-from-right-4">
+                                <div className="text-center mb-4"><h4 className="font-black text-xl">اختر طريقة الدفع</h4></div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button onClick={() => setPaymentMethod('online')} className={`h-32 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-3 transition-all ${paymentMethod === 'online' ? 'border-primary bg-primary/5 text-primary shadow-lg ring-2 ring-primary/20' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
+                                        <Globe className="w-8 h-8" /> <span className="text-sm font-black">أونلاين</span>
+                                    </button>
+                                    <button onClick={() => setPaymentMethod('cash')} className={`h-32 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-3 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary shadow-lg ring-2 ring-primary/20' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
+                                        <Building2 className="w-8 h-8" /> <span className="text-sm font-black">تحويل / كاش</span>
+                                    </button>
+                                </div>
+                                <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Step 4: Success */}
+                        {regStep === 4 && (
+                          <div className="text-center space-y-8 animate-in zoom-in-95 py-10">
+                             <div className="w-32 h-32 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-xl"><CheckCircle2 className="w-16 h-16" /></div>
+                             <div className="space-y-2">
+                                <h3 className="text-3xl font-black text-gray-900">تم التسجيل بنجاح!</h3>
+                                <p className="text-base text-gray-500 font-bold max-w-xs mx-auto">شكراً لانضمامك إلينا. حسابك الآن قيد التفعيل، يمكنك البدء بإعداد ملفك.</p>
+                             </div>
+                             <Button onClick={() => { fetchProfile((userProfile?.id || ''), true); }} className="px-12 h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">الدخول للوحة التحكم</Button>
+                          </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Left Column: Brand */}
+                <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
+                    
+                    <div className="relative z-10 space-y-10 max-w-lg">
+                        <div className="w-40 h-40 bg-white/20 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mx-auto border border-white/30 shadow-2xl">
+                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto brightness-0 invert" />
+                        </div>
+                        <div className="space-y-6">
+                            <h2 className="text-5xl font-ruqaa leading-tight">انضم لنخبة قاعات <br/> المملكة العربية السعودية</h2>
+                            <p className="text-white/80 font-bold text-xl leading-relaxed">
+                                منصة متكاملة لإدارة الحجوزات، التسويق، والوصول لأكبر شريحة من العملاء الباحثين عن التميز.
+                            </p>
+                        </div>
+                        <div className="flex justify-center gap-8 pt-8">
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><Sparkles className="w-8 h-8" /></div>
+                                <span className="text-xs font-black uppercase tracking-widest">فخامة</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><ShieldCheck className="w-8 h-8" /></div>
+                                <span className="text-xs font-black uppercase tracking-widest">أمان</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-3">
+                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><Globe className="w-8 h-8" /></div>
+                                <span className="text-xs font-black uppercase tracking-widest">انتشار</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )}
+
+          {/* Other Pages */}
           {activeTab === 'home' && (
             <Home 
-              user={userProfile} onLoginClick={() => openAuth('login')} 
-              onRegisterClick={() => openAuth('register')}
+              user={userProfile} onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
+              onRegisterClick={() => { setActiveTab('register'); window.scrollTo(0,0); }}
               onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
               onNavigate={navigateToDetails} onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
             />
@@ -518,14 +546,14 @@ const App: React.FC = () => {
           )}
 
           {/* Dashboard Routes */}
-          {activeTab !== 'home' && activeTab !== 'browse' && activeTab !== 'hall_details' && (
+          {activeTab !== 'home' && activeTab !== 'browse' && activeTab !== 'hall_details' && activeTab !== 'login' && activeTab !== 'register' && (
             <div className="mx-auto w-full max-w-[1600px]">
               {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
               {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
               {activeTab === 'my_services' && userProfile && <VendorServices user={userProfile} />}
               {activeTab === 'calendar' && userProfile && <CalendarBoard user={userProfile} />}
               {activeTab === 'hall_bookings' && userProfile && <Bookings user={userProfile} />}
-              {activeTab === 'pos' && userProfile && <VendorPOS user={userProfile} />}
+              {activeTab === 'vendor_marketplace' && userProfile && <VendorMarketplace user={userProfile} />}
               {activeTab === 'coupons' && userProfile && <VendorCoupons user={userProfile} />}
               {activeTab === 'accounting' && userProfile && <VendorAccounting user={userProfile} />}
               {activeTab === 'brand_settings' && userProfile && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
@@ -537,6 +565,7 @@ const App: React.FC = () => {
               {activeTab === 'admin_requests' && userProfile?.role === 'super_admin' && <AdminRequests />}
               {activeTab === 'admin_categories' && userProfile?.role === 'super_admin' && <ServiceCategories />}
               {activeTab === 'admin_cms' && userProfile?.role === 'super_admin' && <ContentCMS />}
+              {activeTab === 'admin_store' && userProfile?.role === 'super_admin' && <AdminStore user={userProfile} />}
               {activeTab === 'subscriptions' && userProfile?.role === 'super_admin' && <VendorSubscriptions />}
               {activeTab === 'settings' && userProfile?.role === 'super_admin' && <SystemSettings />}
             </div>

@@ -89,7 +89,8 @@ export interface Hall {
   vendor_id: string;
   name: string;
   city: string;
-  address?: string; // New
+  type?: 'hall' | 'chalet' | 'resort' | 'lounge'; // New Type
+  address?: string; 
   latitude?: number;
   longitude?: number;
   capacity: number;
@@ -132,9 +133,9 @@ export interface Booking {
   start_time?: string; 
   end_time?: string;   
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
-  booking_type?: 'booking' | 'consultation'; // New
+  booking_type?: 'booking' | 'consultation'; 
   package_name?: string; 
-  items?: BookingItem[]; // New
+  items?: BookingItem[]; 
   total_amount: number;
   paid_amount?: number; 
   vat_amount: number;
@@ -180,16 +181,16 @@ export interface ExternalInvoice {
   id: string;
   vendor_id: string;
   customer_name: string;
-  client_id?: string; // New
-  hall_id?: string; // New
+  client_id?: string; 
+  hall_id?: string; 
   invoice_date: string;
   items: { description: string; quantity: number; unit_price: number; total: number }[];
   total_amount: number;
   vat_amount: number;
   status: 'paid' | 'unpaid';
   created_at?: string;
-  clients?: VendorClient; // Joined
-  halls?: Hall; // Joined
+  clients?: VendorClient; 
+  halls?: Hall; 
 }
 
 export interface Notification {
@@ -228,6 +229,15 @@ export interface Coupon {
   end_date: string;
   is_active: boolean;
   created_at?: string;
+}
+
+export interface StoreOrder {
+  id: string;
+  vendor_id: string;
+  items: { product_id: string; name: string; price: number; qty: number }[];
+  total_amount: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  created_at: string;
 }
 
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك', 'حائل', 'القصيم', 'جازان', 'نجران', 'الجوف', 'عرعر'];

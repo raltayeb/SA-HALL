@@ -63,8 +63,8 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             <div className="hidden lg:flex items-center gap-4">
               {!user ? (
                 <div className="flex items-center gap-4">
-                  <button onClick={onLoginClick} className="text-sm font-bold text-gray-600 hover:text-primary transition-colors">بوابة الشركاء</button>
-                  <Button onClick={onRegisterClick} className="rounded-xl px-6 h-11 text-xs font-black bg-[#111827] hover:bg-black text-white shadow-lg shadow-black/10">
+                  <button onClick={() => onNavigate('login')} className={`text-sm font-bold transition-colors ${activeTab === 'login' ? 'text-primary' : 'text-gray-600 hover:text-primary'}`}>بوابة الشركاء</button>
+                  <Button onClick={() => onNavigate('register')} className="rounded-xl px-6 h-11 text-xs font-black bg-[#111827] hover:bg-black text-white shadow-lg shadow-black/10">
                     كن شريك نجاح
                   </Button>
                 </div>
@@ -125,8 +125,8 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     <div className="h-px bg-gray-100 my-2"></div>
                     {!user ? (
                         <>
-                            <button onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }} className="w-full text-right px-4 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">بوابة الشركاء</button>
-                            <button onClick={() => { onRegisterClick(); setIsMobileMenuOpen(false); }} className="w-full text-center py-3 rounded-xl text-sm font-bold bg-[#111827] text-white">كن شريك نجاح</button>
+                            <button onClick={() => { onNavigate('login'); setIsMobileMenuOpen(false); }} className="w-full text-right px-4 py-3 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">بوابة الشركاء</button>
+                            <button onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} className="w-full text-center py-3 rounded-xl text-sm font-bold bg-[#111827] text-white">كن شريك نجاح</button>
                         </>
                     ) : (
                         <>
