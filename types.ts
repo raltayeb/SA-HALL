@@ -88,14 +88,18 @@ export interface Hall {
   id: string;
   vendor_id: string;
   name: string;
+  name_en?: string; // New
   city: string;
-  type?: 'hall' | 'chalet' | 'resort' | 'lounge'; // New Type
+  type?: 'hall' | 'chalet' | 'resort' | 'lounge'; 
   address?: string; 
   latitude?: number;
   longitude?: number;
   capacity: number;
+  capacity_men?: number; // New
+  capacity_women?: number; // New
   price_per_night: number;
   description: string;
+  description_en?: string; // New
   image_url: string;
   images: string[];
   amenities: string[];

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { UserProfile, VAT_RATE } from './types';
+import { UserProfile, VAT_RATE, SAUDI_CITIES, HALL_AMENITIES, SERVICE_CATEGORIES } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
 import { PublicNavbar } from './components/Layout/PublicNavbar';
 import { Dashboard } from './pages/Dashboard';
@@ -29,16 +29,15 @@ import { VendorClients } from './pages/VendorClients';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
-  Loader2, X, Clock, AlertOctagon, User, Building2, 
-  CreditCard, CheckCircle2, ShieldCheck, Mail, ArrowLeft, ArrowRight,
-  Globe, Lock, Sparkles, LogIn
+  Loader2, CheckCircle2, Mail, ArrowLeft,
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { PriceTag } from './components/ui/PriceTag';
-import { formatCurrency } from './utils/currency';
 
-// Steps: 0=Info, 1=OTP, 2=Plan, 3=Payment, 4=Success
+// Registration Steps: 
+// 0: Info -> 1: OTP -> 2: Password -> 3: Welcome Selection -> 4: Setup & Pay
 type RegStep = 0 | 1 | 2 | 3 | 4;
 
 const App: React.FC = () => {
@@ -51,35 +50,50 @@ const App: React.FC = () => {
   
   const profileIdRef = useRef<string | null>(null);
   const activeTabRef = useRef(activeTab);
+  const regStepRef = useRef<RegStep>(0); // Ref to track step inside callbacks
   
+  // Registration State
   const [regStep, setRegStep] = useState<RegStep>(0);
-  
   const [regData, setRegData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     fullName: '',
-    businessName: '',
     phone: '',
   });
-
-  const [planData, setPlanData] = useState({
-    halls: 1,
-    services: 3
+  const [otpCode, setOtpCode] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // Visibility Toggle
+  
+  // Selection & Asset Setup State
+  const [selectedType, setSelectedType] = useState<'hall' | 'chalet' | 'service' | null>(null);
+  const [assetData, setAssetData] = useState({
+    name: '',
+    price: '',
+    city: SAUDI_CITIES[0],
+    category: SERVICE_CATEGORIES[0],
+    description: ''
+  });
+  const [paymentData, setPaymentData] = useState({
+    number: '',
+    expiry: '',
+    cvc: '',
+    holder: ''
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cash'>('online');
-  const [otpCode, setOtpCode] = useState('');
-  
   const [systemFees, setSystemFees] = useState({ hallFee: 500, serviceFee: 200 });
-  const [hyperPayConfig, setHyperPayConfig] = useState({ enabled: false });
   const { toast } = useToast();
 
-  const subtotal = (planData.halls * systemFees.hallFee) + (planData.services * systemFees.serviceFee);
-  const vatAmount = subtotal * VAT_RATE;
-  const totalAmount = subtotal + vatAmount;
+  // Password Validation
+  const passValidations = {
+    length: regData.password.length >= 8,
+    match: regData.password && regData.password === regData.confirmPassword,
+    filled: regData.password.length > 0
+  };
 
-  // Sync ref
-  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { 
+      activeTabRef.current = activeTab; 
+      regStepRef.current = regStep;
+  }, [activeTab, regStep]);
 
   const fetchProfile = async (id: string, isInitialLoad = false) => {
     if (profileIdRef.current === id && !isInitialLoad) {
@@ -93,6 +107,30 @@ const App: React.FC = () => {
           const profile = data as UserProfile;
           setUserProfile(profile);
           profileIdRef.current = profile.id;
+
+          // --- STRICT ONBOARDING GATE ---
+          // Prevent redirecting if user is currently in the middle of registration flow (Step 1 or 2)
+          // This fixes the issue where verifying OTP (Step 1 -> 2) triggers a profile fetch that jumps to Step 3.
+          if (activeTabRef.current === 'register' && regStepRef.current > 0 && regStepRef.current < 3) {
+              setLoading(false);
+              return;
+          }
+
+          // Check if vendor has fully completed setup (Paid & Added Asset)
+          if (profile.role === 'vendor') {
+             const [ { count: hallCount }, { count: serviceCount } ] = await Promise.all([
+                supabase.from('halls').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id),
+                supabase.from('services').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id)
+             ]);
+             
+             // If no assets or payment not confirmed -> FORCE REGISTRATION FLOW (Step 3: Welcome)
+             if ((hallCount === 0 && serviceCount === 0) || profile.payment_status !== 'paid') {
+                 setActiveTab('register');
+                 setRegStep(3); // Force to "Welcome/Selection" screen
+                 setLoading(false);
+                 return; // Stop execution here, don't allow dashboard access
+             }
+          }
 
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
@@ -134,20 +172,6 @@ const App: React.FC = () => {
       }
     });
 
-    const fetchSystemSettings = async () => {
-      const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
-      if (data?.value) {
-        setSystemFees({
-          hallFee: Number(data.value.hall_listing_fee) || 500,
-          serviceFee: Number(data.value.service_listing_fee) || 200
-        });
-        if (data.value.payment_gateways) {
-            setHyperPayConfig({ enabled: data.value.payment_gateways.hyperpay_enabled });
-        }
-      }
-    };
-    fetchSystemSettings();
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -157,98 +181,139 @@ const App: React.FC = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: regData.email, password: regData.password });
       if (error) throw error;
-      // Success will trigger auth state change
     } catch (err: any) {
-      toast({ title: 'خطأ في الدخول', description: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.', variant: 'destructive' });
+      toast({ title: 'خطأ في الدخول', description: 'البيانات غير صحيحة.', variant: 'destructive' });
     } finally { setAuthLoading(false); }
   };
 
-  // Improved Vendor Registration Flow
-  const handleRegisterStep = async () => {
+  const handleLogout = async () => {
+      await supabase.auth.signOut();
+      window.location.reload();
+  };
+
+  // --- NEW REGISTRATION FLOW ---
+
+  const sendOtp = async () => {
+    if (!regData.fullName || !regData.email || !regData.phone) {
+        toast({ title: 'بيانات ناقصة', description: 'يرجى تعبئة جميع الحقول.', variant: 'destructive' });
+        return;
+    }
+    setAuthLoading(true);
+    
+    const { error } = await supabase.auth.signInWithOtp({ 
+        email: regData.email,
+        options: {
+            data: {
+                full_name: regData.fullName,
+                phone: regData.phone,
+                role: 'vendor'
+            }
+        }
+    });
+
+    if (error) {
+        toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } else {
+        toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني للحصول على الكود.', variant: 'success' });
+        setRegStep(1);
+    }
+    setAuthLoading(false);
+  };
+
+  const verifyOtp = async () => {
+    if (!otpCode) return;
+    setAuthLoading(true);
+    const { data, error } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'magiclink' }); 
+    
+    if (error) {
+       // Allow verifying signup specifically 
+       const { error: signUpError } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'signup' });
+       if (signUpError) {
+           toast({ title: 'كود خاطئ', description: 'تأكد من الكود وحاول مرة أخرى', variant: 'destructive' });
+           setAuthLoading(false);
+           return;
+       }
+    }
+    
+    // Move to Step 2 (Password Creation) immediately
+    setRegStep(2);
+    setAuthLoading(false);
+  };
+
+  const setPassword = async () => {
+    if (!passValidations.match || !passValidations.length) {
+        toast({ title: 'خطأ', description: 'كلمة المرور غير مطابقة للشروط.', variant: 'destructive' });
+        return;
+    }
+    setAuthLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: regData.password });
+    
+    if (error) {
+        toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } else {
+        // Ensure profile exists/updated
+        const user = (await supabase.auth.getUser()).data.user;
+        if (user) {
+            await supabase.from('profiles').upsert({
+                id: user.id,
+                email: regData.email,
+                full_name: regData.fullName,
+                business_name: regData.fullName, // Default business name to Full Name initially
+                phone_number: regData.phone,
+                role: 'vendor',
+                status: 'pending'
+            });
+        }
+        setRegStep(3); // Go to Welcome Selection ONLY after password is set
+    }
+    setAuthLoading(false);
+  };
+
+  const handleAssetSetupAndPay = async () => {
     setAuthLoading(true);
     try {
-        if (regStep === 0) {
-            if (!regData.fullName || !regData.email || !regData.password || !regData.businessName) {
-                toast({ title: 'نقص بيانات', description: 'يرجى ملء كافة الحقول.', variant: 'destructive' });
-                setAuthLoading(false);
-                return;
-            }
-            
-            const { error } = await supabase.auth.signUp({ 
-                email: regData.email, 
-                password: regData.password, 
-                options: { 
-                    data: { 
-                        full_name: regData.fullName, 
-                        business_name: regData.businessName,
-                        phone: regData.phone,
-                        role: 'vendor',
-                        status: 'pending',
-                        payment_status: 'unpaid'
-                    } 
-                } 
-            });
+        const user = (await supabase.auth.getUser()).data.user;
+        if (!user) throw new Error("No user");
 
-            if (error) {
-                if (error.message.includes('already registered')) {
-                    toast({ title: 'الحساب مسجل', description: 'البريد الإلكتروني مسجل مسبقاً، حاول تسجيل الدخول.', variant: 'warning' });
-                } else {
-                    toast({ title: 'فشل التسجيل', description: error.message, variant: 'destructive' });
-                }
-            } else {
-                toast({ title: 'تم إنشاء الحساب', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
-                setRegStep(1); 
-            }
+        // 1. Simulate Payment
+        await new Promise(r => setTimeout(r, 1500));
 
-        } else if (regStep === 1) {
-            if (!otpCode) {
-                toast({ title: 'رمز مفقود', description: 'يرجى إدخال رمز التحقق.', variant: 'destructive' });
-                setAuthLoading(false);
-                return;
-            }
-
-            const { data, error } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'signup' });
-            
-            if (error) {
-                toast({ title: 'رمز غير صحيح', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
-            } else if (data.user) {
-                toast({ title: 'تم التحقق', description: 'تم تفعيل البريد الإلكتروني بنجاح.', variant: 'success' });
-                setRegStep(2); 
-            }
-
-        } else if (regStep === 2) {
-            setRegStep(3); 
-
-        } else if (regStep === 3) {
-            const user = (await supabase.auth.getUser()).data.user;
-            if (!user) throw new Error('User not found');
-
-            if (paymentMethod === 'online') {
-                await new Promise(r => setTimeout(r, 2000)); 
-            }
-
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({
-                    hall_limit: planData.halls,
-                    service_limit: planData.services,
-                    payment_status: paymentMethod === 'online' ? 'paid' : 'unpaid',
-                    status: paymentMethod === 'online' ? 'approved' : 'pending',
-                    subscription_plan: 'custom'
-                })
-                .eq('id', user.id);
-
-            if (updateError) throw updateError;
-
-            await supabase.from('notifications').insert([{
-                user_id: user.id,
-                title: 'اكتمال التسجيل',
-                message: paymentMethod === 'online' ? 'تم الدفع وتفعيل الحساب بنجاح.' : 'تم استلام الطلب، بانتظار تحصيل الرسوم لتفعيل الحساب.',
-                type: 'system'
+        // 2. Insert Asset based on selection
+        if (selectedType === 'hall' || selectedType === 'chalet') {
+            await supabase.from('halls').insert([{
+                vendor_id: user.id,
+                name: assetData.name,
+                price_per_night: Number(assetData.price),
+                city: assetData.city,
+                type: selectedType === 'chalet' ? 'chalet' : 'hall',
+                description: assetData.description,
+                is_active: true
             }]);
-
-            setRegStep(4);
+        } else if (selectedType === 'service') {
+            await supabase.from('services').insert([{
+                vendor_id: user.id,
+                name: assetData.name,
+                price: Number(assetData.price),
+                category: assetData.category,
+                description: assetData.description,
+                is_active: true
+            }]);
         }
+
+        // 3. Update Profile status to approved (since paid) & set limits
+        await supabase.from('profiles').update({
+            status: 'approved',
+            payment_status: 'paid',
+            business_name: assetData.name, // Update business name to the asset name
+            hall_limit: selectedType === 'service' ? 0 : 1, 
+            service_limit: selectedType === 'service' ? 1 : 0
+        }).eq('id', user.id);
+
+        toast({ title: 'تم بنجاح', description: 'تم تفعيل حسابك وإضافة الخدمة.', variant: 'success' });
+        
+        // Reload to enter dashboard
+        window.location.reload(); 
+
     } catch (err: any) {
         toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally {
@@ -270,45 +335,46 @@ const App: React.FC = () => {
   );
 
   const isPublicPage = ['home', 'browse', 'hall_details', 'login', 'register'].includes(activeTab);
+  
+  // Is the user "locked" in onboarding?
+  const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
 
   return (
     <NotificationProvider userId={userProfile?.id}>
       <div className="min-h-screen bg-[#F8F9FC] text-gray-900 font-sans" dir="rtl">
         
-        {/* Unified Public Navbar (Available on all public pages, including Login/Register) */}
-        {isPublicPage && (
+        {/* Navbar - Hide if user is locked in onboarding */}
+        {isPublicPage && !isLocked && (
             <PublicNavbar 
                 user={userProfile}
                 onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
-                onRegisterClick={() => { setActiveTab('register'); window.scrollTo(0,0); }}
-                onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
+                onRegisterClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }}
+                onLogout={handleLogout}
                 onNavigate={(tab) => {
                     if (tab === 'home') setActiveTab('home');
                     else if (tab === 'browse') { setBrowseFilters(null); setActiveTab('browse'); }
                     else if (tab === 'dashboard') setActiveTab('dashboard');
                     else if (tab === 'login') setActiveTab('login');
-                    else if (tab === 'register') setActiveTab('register');
+                    else if (tab === 'register') { setActiveTab('register'); setRegStep(0); }
                 }}
                 activeTab={activeTab}
             />
         )}
 
-        {/* Sidebar Navigation (Dashboard) */}
-        {!isPublicPage && userProfile && (
+        {/* Dashboard Sidebar */}
+        {!isPublicPage && userProfile && !isLocked && (
           <Sidebar 
             user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
-            onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }} isOpen={false} setIsOpen={() => {}}
+            onLogout={handleLogout} isOpen={false} setIsOpen={() => {}}
             platformLogo={userProfile.role === 'vendor' ? userProfile.custom_logo_url : "https://dash.hall.sa/logo.svg"}
           />
         )}
 
-        {/* Main Content Area */}
-        <main className={`${!isPublicPage && userProfile ? 'lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8' : ''}`}>
+        <main className={`${!isPublicPage && userProfile && !isLocked ? 'lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8' : ''}`}>
           
-          {/* ========== LOGIN PAGE ========== */}
+          {/* LOGIN PAGE */}
           {activeTab === 'login' && (
             <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
-                {/* Right Column: Form */}
                 <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 animate-in slide-in-from-right-4 duration-500">
                     <div className="w-full max-w-md space-y-8">
                         <div className="text-center lg:text-right">
@@ -317,7 +383,21 @@ const App: React.FC = () => {
                         </div>
                         <form onSubmit={handleLogin} className="space-y-6">
                             <Input type="email" label="البريد الإلكتروني" placeholder="name@example.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold focus:ring-2 focus:ring-primary/20" />
-                            <Input type="password" label="كلمة المرور" placeholder="••••••••" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold focus:ring-2 focus:ring-primary/20" />
+                            
+                            <div className="relative">
+                                <Input 
+                                    type={showPassword ? "text" : "password"} 
+                                    label="كلمة المرور" 
+                                    placeholder="••••••••" 
+                                    value={regData.password} 
+                                    onChange={e => setRegData({...regData, password: e.target.value})} 
+                                    required 
+                                    className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold focus:ring-2 focus:ring-primary/20" 
+                                />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-10 text-gray-400 hover:text-primary transition-colors">
+                                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                </button>
+                            </div>
                             
                             <div className="flex justify-between items-center text-xs font-bold">
                                 <label className="flex items-center gap-2 cursor-pointer text-gray-500">
@@ -332,25 +412,22 @@ const App: React.FC = () => {
                             
                             <div className="text-center pt-4">
                                 <span className="text-xs font-bold text-gray-400">ليس لديك حساب؟ </span>
-                                <button type="button" onClick={() => { setActiveTab('register'); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
+                                <button type="button" onClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
                             </div>
                         </form>
                     </div>
                 </div>
-
-                {/* Left Column: Brand (Hidden on mobile) */}
+                {/* Unified Left Brand Column */}
                 <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                     <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
                     <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
                     
-                    <div className="relative z-10 space-y-10 max-w-lg">
-                        <div className="w-40 h-40 bg-white/20 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mx-auto border border-white/30 shadow-2xl">
-                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto brightness-0 invert" />
-                        </div>
+                    <div className="relative z-10 space-y-12 max-w-xl">
+                        <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-64 w-auto mx-auto brightness-0 invert drop-shadow-xl hover:scale-105 transition-transform duration-500" />
                         <div className="space-y-6">
-                            <h2 className="text-5xl font-ruqaa leading-tight">بوابتك لعالم <br/> المناسبات الفاخرة</h2>
-                            <p className="text-white/80 font-bold text-xl leading-relaxed">
+                            <h2 className="text-6xl font-ruqaa leading-tight">بوابتك لعالم <br/> المناسبات الفاخرة</h2>
+                            <p className="text-white/90 font-bold text-2xl leading-relaxed">
                                 سجل دخولك لإدارة حجوزاتك، متابعة عملائك، والوصول لأدوات التحكم المتقدمة.
                             </p>
                         </div>
@@ -359,160 +436,235 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* ========== REGISTER PAGE ========== */}
+          {/* REGISTER PAGE */}
           {activeTab === 'register' && (
             <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
-                {/* Right Column: Form */}
-                <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 animate-in slide-in-from-right-4 duration-500">
-                    <div className="w-full max-w-md space-y-8">
-                        <div className="text-center lg:text-right">
-                            <h2 className="text-3xl font-black text-gray-900">انضم كشريك نجاح</h2>
-                            <p className="mt-2 text-sm font-bold text-gray-500">سجل منشأتك وابدأ في استقبال الحجوزات اليوم.</p>
+                {regStep < 3 ? (
+                    <>
+                    <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24">
+                        <div className="w-full max-w-md space-y-8">
+                            <div className="text-center lg:text-right">
+                                <h2 className="text-3xl font-black text-gray-900">انضم كشريك نجاح</h2>
+                                <p className="mt-2 text-sm font-bold text-gray-500">سجل منشأتك وابدأ في استقبال الحجوزات اليوم.</p>
+                            </div>
+
+                            {/* Step 0: Basic Info (Business Name Removed) */}
+                            {regStep === 0 && (
+                            <div className="space-y-4 animate-in slide-in-from-right-8 duration-500">
+                                <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                
+                                <Button onClick={sendOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل ومتابعة'}
+                                </Button>
+                                
+                                <div className="flex justify-center pt-4">
+                                    <button onClick={() => { setActiveTab('login'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-primary">لدي حساب بالفعل</button>
+                                </div>
+                            </div>
+                            )}
+
+                            {/* Step 1: OTP */}
+                            {regStep === 1 && (
+                            <div className="space-y-6 animate-in slide-in-from-right-8 duration-500 text-center">
+                                <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary relative">
+                                    <Mail className="w-10 h-10" />
+                                    <div className="absolute -top-1 -right-1 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-xs">🔔</div>
+                                </div>
+                                <div className="space-y-2">
+                                    <h3 className="text-xl font-black">رمز التحقق</h3>
+                                    <p className="text-sm text-gray-500 font-bold">أدخل الكود المرسل إلى {regData.email}</p>
+                                </div>
+                                <Input 
+                                    placeholder="0 0 0 0 0 0" 
+                                    className="text-center text-3xl tracking-[0.5em] font-black h-20 rounded-3xl border-2 focus:border-primary transition-all" 
+                                    maxLength={6} 
+                                    value={otpCode} 
+                                    onChange={e => setOtpCode(e.target.value)} 
+                                />
+                                <Button onClick={verifyOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-bold shadow-xl shadow-primary/20 text-lg">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'تحقق'}
+                                </Button>
+                                <button onClick={() => setRegStep(0)} className="text-xs font-bold text-gray-400 hover:text-primary mt-4">تغيير البريد الإلكتروني</button>
+                            </div>
+                            )}
+
+                            {/* Step 2: Password (Mandatory) */}
+                            {regStep === 2 && (
+                            <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
+                                <div className="text-center space-y-2">
+                                    <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary"><Lock className="w-8 h-8" /></div>
+                                    <h3 className="text-xl font-black">تأمين الحساب</h3>
+                                    <p className="text-sm text-gray-500 font-bold">قم بإنشاء كلمة مرور قوية لحماية حسابك</p>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور الجديدة" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-4 text-gray-400 hover:text-primary transition-colors">
+                                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        </button>
+                                    </div>
+                                    <Input type={showPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                </div>
+
+                                {/* Password Rules Animation */}
+                                <div className="flex gap-2 justify-center text-[10px] font-bold">
+                                    <span className={`px-3 py-1 rounded-full transition-all duration-300 ${passValidations.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>8 خانات على الأقل</span>
+                                    <span className={`px-3 py-1 rounded-full transition-all duration-300 ${passValidations.match && passValidations.filled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>تطابق الكلمتين</span>
+                                </div>
+
+                                <Button onClick={setPassword} disabled={authLoading || !passValidations.length || !passValidations.match} className="w-full h-14 rounded-2xl font-bold shadow-xl shadow-primary/20 text-lg">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'إنشاء الحساب ومتابعة'}
+                                </Button>
+                            </div>
+                            )}
                         </div>
-
-                        {/* Stepper */}
-                        {regStep < 4 && (
-                          <div className="flex justify-between items-center px-2 relative mb-8">
-                            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-100 -z-10"></div>
-                            {[{i:0, label: 'البيانات'}, {i:1, label: 'التحقق'}, {i:2, label: 'الباقة'}, {i:3, label: 'الدفع'}].map(step => (
-                              <div key={step.i} className={`flex flex-col items-center gap-1 ${regStep >= step.i ? 'text-primary' : 'text-gray-300'}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${regStep >= step.i ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200'}`}>
-                                    {regStep > step.i ? <CheckCircle2 className="w-4 h-4" /> : step.i + 1}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Step 0: Basic Info */}
-                        {regStep === 0 && (
-                          <div className="space-y-4 animate-in slide-in-from-right-4">
-                             <div className="grid grid-cols-2 gap-4">
-                                <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-12 rounded-xl" />
-                                <Input placeholder="اسم النشاط التجاري" value={regData.businessName} onChange={e => setRegData({...regData, businessName: e.target.value})} className="h-12 rounded-xl" />
-                             </div>
-                             <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-12 rounded-xl" />
-                             <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-12 rounded-xl" />
-                             <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-12 rounded-xl" />
-                             <div className="flex justify-between items-center pt-4">
-                                <button onClick={() => { setActiveTab('login'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-primary">لدي حساب بالفعل</button>
-                                <Button onClick={handleRegisterStep} disabled={authLoading} className="px-8 rounded-xl font-bold h-12 shadow-lg shadow-primary/20">
-                                    {authLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <>التالي <ArrowLeft className="w-4 h-4 mr-2" /></>}
-                                </Button>
-                             </div>
-                          </div>
-                        )}
-
-                        {/* Step 1: OTP Verification */}
-                        {regStep === 1 && (
-                          <div className="space-y-6 animate-in slide-in-from-right-4 text-center">
-                            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
-                                <Mail className="w-10 h-10" />
-                            </div>
-                            <div className="space-y-2">
-                                <h3 className="text-xl font-black">تحقق من بريدك</h3>
-                                <p className="text-sm text-gray-500 font-bold">تم إرسال رمز التفعيل إلى {regData.email}</p>
-                            </div>
-                            <Input 
-                                placeholder="أدخل الرمز (6 أرقام)" 
-                                className="text-center text-3xl tracking-[0.5em] font-black h-20 rounded-3xl border-2 focus:border-primary" 
-                                maxLength={6} 
-                                value={otpCode} 
-                                onChange={e => setOtpCode(e.target.value)} 
-                            />
-                            <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-14 rounded-2xl font-bold shadow-xl shadow-primary/20 text-lg">
-                                {authLoading ? <Loader2 className="animate-spin" /> : 'تفعيل الحساب'}
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Step 2: Plan */}
-                        {regStep === 2 && (
-                            <div className="space-y-6 animate-in slide-in-from-right-4">
-                                <div className="text-center mb-4"><h4 className="font-black text-xl">صمم باقتك</h4><p className="text-gray-400 font-bold text-sm">ادفع فقط مقابل ما تحتاج</p></div>
-                                <div className="flex items-center justify-between p-6 bg-gray-50 rounded-[2rem] border border-gray-100 shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white rounded-xl border shadow-sm text-primary"><Building2 className="w-6 h-6" /></div>
-                                        <div className="text-right"><p className="font-bold text-base">عدد القاعات</p><p className="text-xs text-gray-400 font-bold">{systemFees.hallFee} ر.س / قاعة</p></div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <button onClick={() => setPlanData(p => ({...p, halls: Math.max(1, p.halls - 1)}))} className="w-10 h-10 rounded-xl bg-white border flex items-center justify-center font-bold text-lg hover:bg-gray-100 transition-colors">-</button>
-                                        <span className="font-black w-6 text-center text-lg">{planData.halls}</span>
-                                        <button onClick={() => setPlanData(p => ({...p, halls: p.halls + 1}))} className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-lg shadow-lg hover:bg-primary/90 transition-colors">+</button>
-                                    </div>
-                                </div>
-                                <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/10 flex justify-between items-center">
-                                    <span className="font-bold text-base">الإجمالي التقديري</span>
-                                    <PriceTag amount={totalAmount} className="text-2xl text-primary" />
-                                </div>
-                                <Button onClick={handleRegisterStep} className="w-full h-14 rounded-2xl font-bold text-lg shadow-xl shadow-primary/20">التالي <ArrowLeft className="w-5 h-5 mr-2" /></Button>
-                            </div>
-                        )}
-
-                        {/* Step 3: Payment */}
-                        {regStep === 3 && (
-                            <div className="space-y-6 animate-in slide-in-from-right-4">
-                                <div className="text-center mb-4"><h4 className="font-black text-xl">اختر طريقة الدفع</h4></div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => setPaymentMethod('online')} className={`h-32 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-3 transition-all ${paymentMethod === 'online' ? 'border-primary bg-primary/5 text-primary shadow-lg ring-2 ring-primary/20' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
-                                        <Globe className="w-8 h-8" /> <span className="text-sm font-black">أونلاين</span>
-                                    </button>
-                                    <button onClick={() => setPaymentMethod('cash')} className={`h-32 rounded-[2rem] border-2 flex flex-col items-center justify-center gap-3 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary shadow-lg ring-2 ring-primary/20' : 'border-gray-100 text-gray-400 hover:bg-gray-50'}`}>
-                                        <Building2 className="w-8 h-8" /> <span className="text-sm font-black">تحويل / كاش</span>
-                                    </button>
-                                </div>
-                                <Button onClick={handleRegisterStep} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">
-                                    {authLoading ? <Loader2 className="animate-spin" /> : 'تأكيد ودفع'}
-                                </Button>
-                            </div>
-                        )}
-
-                        {/* Step 4: Success */}
-                        {regStep === 4 && (
-                          <div className="text-center space-y-8 animate-in zoom-in-95 py-10">
-                             <div className="w-32 h-32 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-xl"><CheckCircle2 className="w-16 h-16" /></div>
-                             <div className="space-y-2">
-                                <h3 className="text-3xl font-black text-gray-900">تم التسجيل بنجاح!</h3>
-                                <p className="text-base text-gray-500 font-bold max-w-xs mx-auto">شكراً لانضمامك إلينا. حسابك الآن قيد التفعيل، يمكنك البدء بإعداد ملفك.</p>
-                             </div>
-                             <Button onClick={() => { fetchProfile((userProfile?.id || ''), true); }} className="px-12 h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">الدخول للوحة التحكم</Button>
-                          </div>
-                        )}
                     </div>
-                </div>
-
-                {/* Left Column: Brand */}
-                <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
-                    
-                    <div className="relative z-10 space-y-10 max-w-lg">
-                        <div className="w-40 h-40 bg-white/20 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mx-auto border border-white/30 shadow-2xl">
-                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto brightness-0 invert" />
-                        </div>
-                        <div className="space-y-6">
-                            <h2 className="text-5xl font-ruqaa leading-tight">انضم لنخبة قاعات <br/> المملكة العربية السعودية</h2>
-                            <p className="text-white/80 font-bold text-xl leading-relaxed">
-                                منصة متكاملة لإدارة الحجوزات، التسويق، والوصول لأكبر شريحة من العملاء الباحثين عن التميز.
-                            </p>
-                        </div>
-                        <div className="flex justify-center gap-8 pt-8">
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><Sparkles className="w-8 h-8" /></div>
-                                <span className="text-xs font-black uppercase tracking-widest">فخامة</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><ShieldCheck className="w-8 h-8" /></div>
-                                <span className="text-xs font-black uppercase tracking-widest">أمان</span>
-                            </div>
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-sm border border-white/20"><Globe className="w-8 h-8" /></div>
-                                <span className="text-xs font-black uppercase tracking-widest">انتشار</span>
+                    {/* Unified Left Brand Column (Exact copy of Login to match 100%) */}
+                    <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+                        <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -ml-20 -mb-20"></div>
+                        
+                        <div className="relative z-10 space-y-12 max-w-xl">
+                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-64 w-auto mx-auto brightness-0 invert drop-shadow-xl hover:scale-105 transition-transform duration-500" />
+                            <div className="space-y-6">
+                                <h2 className="text-6xl font-ruqaa leading-tight">بوابتك لعالم <br/> المناسبات الفاخرة</h2>
+                                <p className="text-white/90 font-bold text-2xl leading-relaxed">
+                                    سجل دخولك لإدارة حجوزاتك، متابعة عملائك، والوصول لأدوات التحكم المتقدمة.
+                                </p>
                             </div>
                         </div>
                     </div>
-                </div>
+                    </>
+                ) : regStep === 3 ? (
+                    // WELCOME SELECTION SCREEN (LOCKED UNTIL PAID)
+                    <div className="w-full flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-700 relative overflow-hidden">
+                        
+                        {/* Logout for Locked State */}
+                        <div className="absolute top-6 left-6 z-50">
+                           <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2 text-gray-500 hover:text-red-500 transition-colors">
+                              <LogOut className="w-4 h-4" /> تسجيل الخروج
+                           </Button>
+                        </div>
+
+                        <div className="absolute top-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
+                        
+                        <div className="text-center space-y-6 max-w-4xl z-10">
+                            {/* Bigger Logo as requested */}
+                            <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-56 w-auto mx-auto mb-10 drop-shadow-2xl hover:scale-105 transition-transform duration-500" />
+                            
+                            <h1 className="text-6xl font-ruqaa text-primary leading-tight">مرحباً ألف</h1>
+                            <p className="text-xl text-gray-500 font-bold max-w-lg mx-auto">سعداء بانضمامك لعائلتنا. يجب اختيار نوع نشاطك وتفعيل الاشتراك للوصول إلى المنصة.</p>
+                            
+                            <div className="grid md:grid-cols-3 gap-8 mt-12">
+                                <button onClick={() => { setSelectedType('hall'); setRegStep(4); }} className="group bg-white border-2 border-gray-100 hover:border-primary rounded-[3rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all duration-300 w-full md:w-64">
+                                    <div className="w-24 h-24 bg-purple-50 rounded-full flex items-center justify-center text-primary group-hover:scale-110 transition-transform"><Building2 className="w-10 h-10" /></div>
+                                    <div className="text-center"><h3 className="text-xl font-black text-gray-800">إضافة قاعة</h3><p className="text-xs text-gray-400 mt-2 font-bold">لقصور الأفراح والمناسبات</p></div>
+                                </button>
+                                <button onClick={() => { setSelectedType('chalet'); setRegStep(4); }} className="group bg-white border-2 border-gray-100 hover:border-primary rounded-[3rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all duration-300 w-full md:w-64">
+                                    <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform"><Palmtree className="w-10 h-10" /></div>
+                                    <div className="text-center"><h3 className="text-xl font-black text-gray-800">إضافة شاليه</h3><p className="text-xs text-gray-400 mt-2 font-bold">للمنتجعات والاستراحات</p></div>
+                                </button>
+                                <button onClick={() => { setSelectedType('service'); setRegStep(4); }} className="group bg-white border-2 border-gray-100 hover:border-primary rounded-[3rem] p-8 flex flex-col items-center gap-6 hover:shadow-2xl transition-all duration-300 w-full md:w-64">
+                                    <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 group-hover:scale-110 transition-transform"><Sparkles className="w-10 h-10" /></div>
+                                    <div className="text-center"><h3 className="text-xl font-black text-gray-800">إضافة خدمة</h3><p className="text-xs text-gray-400 mt-2 font-bold">للضيافة والتجهيزات</p></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    // SETUP & PAY SCREEN (Step 4)
+                    <div className="w-full flex items-center justify-center p-4 bg-gray-50">
+                        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-8 duration-500">
+                            
+                            {/* Column 1: Personal Info */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-fit">
+                                <h3 className="text-lg font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2"><User className="w-5 h-5" /> البيانات الشخصية</h3>
+                                <div className="space-y-4 opacity-70 pointer-events-none">
+                                    <Input label="الاسم" value={regData.fullName} readOnly className="bg-gray-50 border-none font-bold" />
+                                    <Input label="البريد" value={regData.email} readOnly className="bg-gray-50 border-none font-bold" />
+                                    <Input label="الجوال" value={regData.phone} readOnly className="bg-gray-50 border-none font-bold" />
+                                </div>
+                                <div className="mt-6 pt-6 border-t border-gray-100">
+                                    <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-xl">
+                                        <CheckCircle2 className="w-5 h-5" /> <span className="text-xs font-bold">تم التحقق من الحساب</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Column 2: Asset Info */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-fit">
+                                <h3 className="text-lg font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    {selectedType === 'service' ? <Sparkles className="w-5 h-5" /> : <Building2 className="w-5 h-5" />} 
+                                    بيانات {selectedType === 'hall' ? 'القاعة' : selectedType === 'chalet' ? 'الشاليه' : 'الخدمة'}
+                                </h3>
+                                <div className="space-y-4">
+                                    <Input label="الاسم التجاري" placeholder="مثال: قاعة الملوك" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl font-bold" />
+                                    {selectedType === 'service' ? (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500">التصنيف</label>
+                                            <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={assetData.category} onChange={e => setAssetData({...assetData, category: e.target.value})}>
+                                                {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500">المدينة</label>
+                                            <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={assetData.city} onChange={e => setAssetData({...assetData, city: e.target.value})}>
+                                                {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <Input label="السعر المبدئي" type="number" value={assetData.price} onChange={e => setAssetData({...assetData, price: e.target.value})} className="h-12 rounded-xl font-bold" />
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-gray-500">نبذة مختصرة</label>
+                                        <textarea className="w-full h-24 border rounded-xl p-3 font-bold text-sm resize-none" placeholder="وصف يجذب العملاء..." value={assetData.description} onChange={e => setAssetData({...assetData, description: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Column 3: Payment */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl h-fit border-t-4 border-t-primary">
+                                <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> إتمام الاشتراك</h3>
+                                
+                                <div className="bg-gray-50 p-6 rounded-2xl mb-6 space-y-4 border border-gray-100">
+                                    <div className="flex justify-between text-sm font-bold text-gray-500">
+                                        <span>رسوم التسجيل</span>
+                                        <span>{selectedType === 'service' ? systemFees.serviceFee : systemFees.hallFee} ر.س</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm font-bold text-gray-500">
+                                        <span>الضريبة (15%)</span>
+                                        <span>{(selectedType === 'service' ? systemFees.serviceFee : systemFees.hallFee) * 0.15} ر.س</span>
+                                    </div>
+                                    <div className="flex justify-between text-xl font-black text-primary border-t border-gray-200 pt-4">
+                                        <span>الإجمالي</span>
+                                        <span>{(selectedType === 'service' ? systemFees.serviceFee : systemFees.hallFee) * 1.15} ر.س</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <Input placeholder="اسم حامل البطاقة" value={paymentData.holder} onChange={e => setPaymentData({...paymentData, holder: e.target.value})} className="h-12 rounded-xl font-bold" />
+                                    <Input placeholder="رقم البطاقة" value={paymentData.number} onChange={e => setPaymentData({...paymentData, number: e.target.value})} className="h-12 rounded-xl font-bold font-mono text-left" dir="ltr" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input placeholder="MM/YY" value={paymentData.expiry} onChange={e => setPaymentData({...paymentData, expiry: e.target.value})} className="h-12 rounded-xl font-bold font-mono text-center" />
+                                        <Input placeholder="CVC" value={paymentData.cvc} onChange={e => setPaymentData({...paymentData, cvc: e.target.value})} className="h-12 rounded-xl font-bold font-mono text-center" />
+                                    </div>
+                                </div>
+
+                                <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name || !assetData.price} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-8 bg-primary text-white hover:scale-[1.02] transition-transform">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'دفع وتفعيل الحساب'}
+                                </Button>
+                                <div className="flex items-center justify-center gap-2 mt-4 text-[10px] text-gray-400 font-bold">
+                                    <Lock className="w-3 h-3" /> مدفوعات آمنة ومشفرة 100%
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                )}
             </div>
           )}
 
@@ -520,9 +672,9 @@ const App: React.FC = () => {
           {activeTab === 'home' && (
             <Home 
               user={userProfile} onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
-              onRegisterClick={() => { setActiveTab('register'); window.scrollTo(0,0); }}
+              onRegisterClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }}
               onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
-              onNavigate={navigateToDetails} onLogout={() => { supabase.auth.signOut(); setActiveTab('home'); }}
+              onNavigate={navigateToDetails} onLogout={handleLogout}
             />
           )}
 
@@ -545,8 +697,8 @@ const App: React.FC = () => {
             />
           )}
 
-          {/* Dashboard Routes */}
-          {activeTab !== 'home' && activeTab !== 'browse' && activeTab !== 'hall_details' && activeTab !== 'login' && activeTab !== 'register' && (
+          {/* Dashboard Routes - ONLY VISIBLE IF NOT LOCKED */}
+          {!isLocked && activeTab !== 'home' && activeTab !== 'browse' && activeTab !== 'hall_details' && activeTab !== 'login' && activeTab !== 'register' && (
             <div className="mx-auto w-full max-w-[1600px]">
               {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
               {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}

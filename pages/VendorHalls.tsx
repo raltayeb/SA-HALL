@@ -74,7 +74,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Analytics Calculation (kept same as before, omitted for brevity if unchanged logic, but included structure)
+  // Analytics Calculation
   const analytics = useMemo(() => {
     const filteredHalls = selectedHallId === 'all' ? halls : halls.filter(h => h.id === selectedHallId);
     const filteredBookings = selectedHallId === 'all' ? allBookings : allBookings.filter(b => b.hall_id === selectedHallId);
@@ -118,9 +118,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     };
   }, [selectedHallId, halls, allBookings, reviewsSummary]);
 
-  // Handlers (file upload, save, etc. - kept same, simplified style in JSX)
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    /* ... same logic ... */
     const files = event.target.files;
     if (!files || files.length === 0) return;
     setUploading(true);
@@ -141,14 +139,22 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   };
 
   const handleSave = async () => {
-    /* ... same logic ... */
-    if (!currentHall.name || !currentHall.price_per_night || !currentHall.city) {
+    if (!currentHall.name || !currentHall.city) {
       toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الأساسية.', variant: 'destructive' });
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...currentHall, vendor_id: user.id, image_url: currentHall.images?.[0] || '' };
+      // Calculate total capacity
+      const totalCapacity = (Number(currentHall.capacity_men) || 0) + (Number(currentHall.capacity_women) || 0);
+      
+      const payload = { 
+          ...currentHall, 
+          vendor_id: user.id, 
+          image_url: currentHall.images?.[0] || '',
+          capacity: totalCapacity > 0 ? totalCapacity : Number(currentHall.capacity) || 0
+      };
+      
       const { error } = currentHall.id ? await supabase.from('halls').update(payload).eq('id', currentHall.id) : await supabase.from('halls').insert([payload]);
       if (error) throw error;
       toast({ title: 'تم الحفظ', variant: 'success' });
@@ -161,7 +167,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (halls.length >= user.hall_limit) { setIsUpgradeModalOpen(true); return; }
-    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 100 }); 
+    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0 }); 
     setIsEditing(true);
   };
 
@@ -171,13 +177,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     setCurrentHall({ ...currentHall, amenities: updated });
   };
 
-  // Navigate to bookings with filter
   const goToHallBookings = (hallId: string) => {
-      // In a real app, you might use context or query params. 
-      // Here we assume navigating to the bookings page where the user can filter manually or we pass state.
-      // For now, simpler:
       window.location.hash = 'hall_bookings';
-      // Ideally pass hallId to pre-filter
   };
 
   return (
@@ -203,7 +204,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Analytics Cards - Flat */}
+      {/* Analytics Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Revenue */}
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-primary/20 transition-all">
@@ -254,7 +255,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Hall Cards Grid - Flat & Integrated */}
+      {/* Hall Cards Grid */}
       <div className="flex justify-between items-center text-right flex-row-reverse border-t border-gray-200 pt-8 mt-4">
         <div>
            <h2 className="text-2xl font-black">إدارة وتعديل القاعات</h2>
@@ -297,75 +298,93 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         )}
       </div>
 
-      {/* Edit Hall Modal (Kept same structure, removed shadow classes) */}
+      {/* Edit Hall Modal - DESIGN UPDATE */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="w-full md:max-w-3xl h-full bg-white border-l border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="w-full md:max-w-4xl h-full bg-white border-l border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
+              {/* Modal Header */}
               <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10">
                 <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-50 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"><X className="w-5 h-5" /></button>
                 <div className="text-right">
-                    <h3 className="font-black text-2xl text-primary">{currentHall.id ? 'تعديل القاعة' : 'إضافة قاعة جديدة'}</h3>
-                    <p className="text-xs text-gray-400 font-bold mt-1">أكمل البيانات لعرض قاعتك للعملاء</p>
+                    <h3 className="font-black text-2xl text-primary">{currentHall.id ? 'تعديل القاعة' : 'إضافة'}</h3>
                 </div>
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar">
-                 {/* Basic Info */}
-                 <div className="space-y-6">
-                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2 text-right">البيانات الأساسية</h4>
+                 
+                 {/* Section 1: Owner Info (Read-Only) */}
+                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
+                    <h3 className="text-sm font-black text-primary mb-6 text-right">معلومات المالك</h3>
                     <div className="space-y-4 text-right">
-                      <Input label="اسم القاعة" value={currentHall.name || ''} onChange={e => setCurrentHall({...currentHall, name: e.target.value})} className="h-12 rounded-2xl font-bold border-gray-200" />
-                      <div className="grid grid-cols-2 gap-4">
-                         <Input label="السعر لليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-12 rounded-2xl font-bold border-gray-200" />
-                         <Input label="السعة (شخص)" type="number" value={currentHall.capacity || ''} onChange={e => setCurrentHall({...currentHall, capacity: Number(e.target.value)})} className="h-12 rounded-2xl font-bold border-gray-200" />
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-xs font-bold text-gray-500">المدينة</label>
-                         <select className="w-full h-12 border border-gray-200 rounded-2xl px-4 bg-white outline-none text-right font-bold appearance-none" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
-                            {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                         </select>
-                      </div>
-                      <div className="space-y-2">
-                         <label className="text-xs font-bold text-gray-500">وصف القاعة</label>
-                         <textarea className="w-full h-32 border border-gray-200 rounded-2xl p-4 bg-white outline-none text-right resize-none font-bold text-sm leading-relaxed" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} placeholder="اكتب وصفاً جذاباً للقاعة..." />
-                      </div>
+                       <Input label="الاسم" value={user.full_name} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold" />
+                       <div className="grid grid-cols-2 gap-4">
+                          <Input label="رقم الهاتف" value={user.phone_number || ''} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold text-left" />
+                          <Input label="البريد الالكتروني" value={user.email} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold text-left" />
+                       </div>
                     </div>
                  </div>
 
-                 {/* Images */}
-                 <div className="space-y-6 text-right">
-                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2">معرض الصور</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {currentHall.images?.map((img, i) => (
-                            <div key={i} className="aspect-square rounded-2xl overflow-hidden relative group border border-gray-100">
-                                <img src={img} className="w-full h-full object-cover" />
-                                <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, idx) => idx !== i)})} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"><Trash2 className="w-3 h-3" /></button>
+                 {/* Section 2: Basic Hall Info */}
+                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
+                    <h3 className="text-sm font-black text-primary mb-6 text-right">معلومات القاعة الأساسية</h3>
+                    <div className="space-y-4 text-right">
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input label="اسم القاعة | بالعربي" value={currentHall.name || ''} onChange={e => setCurrentHall({...currentHall, name: e.target.value})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
+                            <Input label="اسم القاعة | بالانجليزي" value={currentHall.name_en || ''} onChange={e => setCurrentHall({...currentHall, name_en: e.target.value})} className="h-12 rounded-xl border-gray-200 bg-white font-bold text-left" dir="ltr" />
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500">المدينة</label>
+                            <select className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-white outline-none text-right font-bold appearance-none" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
+                                {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <Input label="عدد النساء" type="number" value={currentHall.capacity_women || ''} onChange={e => setCurrentHall({...currentHall, capacity_women: Number(e.target.value)})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
+                            <Input label="عدد الرجال" type="number" value={currentHall.capacity_men || ''} onChange={e => setCurrentHall({...currentHall, capacity_men: Number(e.target.value)})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">الوصف | بالعربي</label>
+                                <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-right resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
                             </div>
-                        ))}
-                        <div onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-gray-300 transition-all group">
-                            {uploading ? <Loader2 className="w-8 h-8 animate-spin text-primary" /> : <Plus className="w-8 h-8 text-gray-300 group-hover:text-gray-500 transition-colors" />}
-                            <span className="text-[10px] font-bold text-gray-400 mt-2 group-hover:text-gray-600">إضافة صورة</span>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">الوصف | بالانجليزي (اختياري)</label>
+                                <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-left resize-none font-bold text-sm" dir="ltr" value={currentHall.description_en || ''} onChange={e => setCurrentHall({...currentHall, description_en: e.target.value})} />
+                            </div>
+                        </div>
+                        
+                        <Input label="سعر الليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
+                    </div>
+                 </div>
+
+                 {/* Section 3: Attachments */}
+                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
+                    <h3 className="text-sm font-black text-primary mb-6 text-right">المرفقات</h3>
+                    
+                    <div className="flex flex-wrap gap-4 justify-end">
+                        {/* Add Button */}
+                        <div onClick={() => fileInputRef.current?.click()} className="w-40 h-40 rounded-xl bg-purple-100 border-2 border-dashed border-purple-300 flex items-center justify-center cursor-pointer hover:bg-purple-200 transition-all group">
+                            <div className="bg-primary text-white rounded-lg p-2 group-hover:scale-110 transition-transform">
+                                {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Plus className="w-6 h-6" />}
+                            </div>
                         </div>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
-                    </div>
-                 </div>
 
-                 {/* Amenities */}
-                 <div className="space-y-6 pb-10 text-right">
-                    <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-2">المرافق والخدمات</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                        {HALL_AMENITIES.map(amenity => (
-                            <button 
-                            key={amenity}
-                            onClick={() => toggleAmenity(amenity)}
-                            className={`flex items-center gap-2 p-3 rounded-2xl border text-[11px] font-bold transition-all text-right ${currentHall.amenities?.includes(amenity) ? 'bg-primary text-white border-primary' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
-                            >
-                                {currentHall.amenities?.includes(amenity) ? <CheckSquare className="w-4 h-4 shrink-0" /> : <Square className="w-4 h-4 shrink-0" />}
-                                {amenity}
-                            </button>
+                        {/* Existing Images */}
+                        {currentHall.images?.map((img, i) => (
+                            <div key={i} className="w-40 h-40 rounded-xl overflow-hidden relative group border border-gray-200">
+                                <img src={img} className="w-full h-full object-cover" />
+                                <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, idx) => idx !== i)})} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         ))}
                     </div>
                  </div>
+
+                 {/* Amenities (Hidden in new design but kept for logic if needed, or add a section) */}
+                 {/* Can add another section here if needed */}
               </div>
 
               <div className="p-6 border-t border-gray-100 bg-white z-10 flex gap-4">
