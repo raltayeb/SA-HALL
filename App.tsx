@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 import { UserProfile, VAT_RATE, SAUDI_CITIES, HALL_AMENITIES, SERVICE_CATEGORIES } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
 import { PublicNavbar } from './components/Layout/PublicNavbar';
+import { Footer } from './components/Layout/Footer'; // Import Footer
 import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
 import { Bookings } from './pages/Bookings';
@@ -21,6 +22,8 @@ import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorServices } from './pages/VendorServices';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
 import { BrowseHalls } from './pages/BrowseHalls';
+import { PublicListing } from './pages/PublicListing'; // New Page
+import { PublicStore } from './pages/PublicStore'; // New Page
 import { Favorites } from './pages/Favorites';
 import { AdminRequests } from './pages/AdminRequests';
 import { VendorAccounting } from './pages/VendorAccounting';
@@ -30,7 +33,7 @@ import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
   Loader2, CheckCircle2, Mail, ArrowLeft,
-  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -51,6 +54,7 @@ const App: React.FC = () => {
   const profileIdRef = useRef<string | null>(null);
   const activeTabRef = useRef(activeTab);
   const regStepRef = useRef<RegStep>(0); // Ref to track step inside callbacks
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Registration State
   const [regStep, setRegStep] = useState<RegStep>(0);
@@ -68,10 +72,15 @@ const App: React.FC = () => {
   const [selectedType, setSelectedType] = useState<'hall' | 'chalet' | 'service' | null>(null);
   const [assetData, setAssetData] = useState({
     name: '',
-    price: '',
+    name_en: '',
+    price: '0', // Default to 0 as it's removed from form
     city: SAUDI_CITIES[0],
     category: SERVICE_CATEGORIES[0],
-    description: ''
+    description: '',
+    description_en: '',
+    capacity_men: '',
+    capacity_women: '',
+    images: [] as string[]
   });
   const [paymentData, setPaymentData] = useState({
     number: '',
@@ -109,8 +118,7 @@ const App: React.FC = () => {
           profileIdRef.current = profile.id;
 
           // --- STRICT ONBOARDING GATE ---
-          // Prevent redirecting if user is currently in the middle of registration flow (Step 1 or 2)
-          // This fixes the issue where verifying OTP (Step 1 -> 2) triggers a profile fetch that jumps to Step 3.
+          // FIX: Don't redirect if already on Step 4 (filling form)
           if (activeTabRef.current === 'register' && regStepRef.current > 0 && regStepRef.current < 3) {
               setLoading(false);
               return;
@@ -124,7 +132,8 @@ const App: React.FC = () => {
              ]);
              
              // If no assets or payment not confirmed -> FORCE REGISTRATION FLOW (Step 3: Welcome)
-             if ((hallCount === 0 && serviceCount === 0) || profile.payment_status !== 'paid') {
+             // FIX: Added condition `&& regStepRef.current !== 4` to prevent redirect while filling form
+             if (((hallCount === 0 && serviceCount === 0) || profile.payment_status !== 'paid') && regStepRef.current !== 4) {
                  setActiveTab('register');
                  setRegStep(3); // Force to "Welcome/Selection" screen
                  setLoading(false);
@@ -134,7 +143,7 @@ const App: React.FC = () => {
 
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
-            if (['home', 'browse', 'hall_details', 'login', 'register'].includes(currentTab)) {
+            if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(currentTab)) {
                // Stay on public pages
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
@@ -226,7 +235,6 @@ const App: React.FC = () => {
     const { data, error } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'magiclink' }); 
     
     if (error) {
-       // Allow verifying signup specifically 
        const { error: signUpError } = await supabase.auth.verifyOtp({ email: regData.email, token: otpCode, type: 'signup' });
        if (signUpError) {
            toast({ title: 'كود خاطئ', description: 'تأكد من الكود وحاول مرة أخرى', variant: 'destructive' });
@@ -234,8 +242,6 @@ const App: React.FC = () => {
            return;
        }
     }
-    
-    // Move to Step 2 (Password Creation) immediately
     setRegStep(2);
     setAuthLoading(false);
   };
@@ -251,67 +257,92 @@ const App: React.FC = () => {
     if (error) {
         toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     } else {
-        // Ensure profile exists/updated
         const user = (await supabase.auth.getUser()).data.user;
         if (user) {
             await supabase.from('profiles').upsert({
                 id: user.id,
                 email: regData.email,
                 full_name: regData.fullName,
-                business_name: regData.fullName, // Default business name to Full Name initially
+                business_name: regData.fullName,
                 phone_number: regData.phone,
                 role: 'vendor',
                 status: 'pending'
             });
         }
-        setRegStep(3); // Go to Welcome Selection ONLY after password is set
+        setRegStep(3);
     }
     setAuthLoading(false);
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if(!user) return;
+      const file = files[0];
+      const fileName = `${user.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('hall-images').upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('hall-images').getPublicUrl(fileName);
+      setAssetData(prev => ({ ...prev, images: [...prev.images, publicUrl] }));
+      toast({ title: 'تم الرفع', variant: 'success' });
+    } catch (error: any) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleAssetSetupAndPay = async () => {
+    if (!assetData.name) {
+        toast({ title: 'بيانات ناقصة', description: 'يرجى إكمال الحقول الأساسية.', variant: 'destructive' });
+        return;
+    }
     setAuthLoading(true);
     try {
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) throw new Error("No user");
 
-        // 1. Simulate Payment
         await new Promise(r => setTimeout(r, 1500));
 
-        // 2. Insert Asset based on selection
         if (selectedType === 'hall' || selectedType === 'chalet') {
+            const totalCapacity = (Number(assetData.capacity_men) || 0) + (Number(assetData.capacity_women) || 0);
             await supabase.from('halls').insert([{
                 vendor_id: user.id,
                 name: assetData.name,
-                price_per_night: Number(assetData.price),
+                name_en: assetData.name_en,
+                price_per_night: 0, // Default to 0, vendor can update later
                 city: assetData.city,
                 type: selectedType === 'chalet' ? 'chalet' : 'hall',
                 description: assetData.description,
+                description_en: assetData.description_en,
+                capacity: totalCapacity,
+                capacity_men: Number(assetData.capacity_men),
+                capacity_women: Number(assetData.capacity_women),
+                image_url: assetData.images[0] || '',
+                images: assetData.images,
                 is_active: true
             }]);
         } else if (selectedType === 'service') {
             await supabase.from('services').insert([{
                 vendor_id: user.id,
                 name: assetData.name,
-                price: Number(assetData.price),
+                price: 0, // Default
                 category: assetData.category,
                 description: assetData.description,
+                image_url: assetData.images[0] || '',
                 is_active: true
             }]);
         }
 
-        // 3. Update Profile status to approved (since paid) & set limits
         await supabase.from('profiles').update({
             status: 'approved',
             payment_status: 'paid',
-            business_name: assetData.name, // Update business name to the asset name
+            business_name: assetData.name,
             hall_limit: selectedType === 'service' ? 0 : 1, 
             service_limit: selectedType === 'service' ? 1 : 0
         }).eq('id', user.id);
 
         toast({ title: 'تم بنجاح', description: 'تم تفعيل حسابك وإضافة الخدمة.', variant: 'success' });
-        
-        // Reload to enter dashboard
         window.location.reload(); 
 
     } catch (err: any) {
@@ -334,28 +365,37 @@ const App: React.FC = () => {
     </div>
   );
 
-  const isPublicPage = ['home', 'browse', 'hall_details', 'login', 'register'].includes(activeTab);
-  
-  // Is the user "locked" in onboarding?
+  const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(activeTab);
   const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
+  const showNavbar = isPublicPage || (activeTab === 'register' && regStep >= 3);
+
+  // Computed User Info for Step 4
+  const displayEmail = userProfile?.email || regData.email;
+  const displayName = userProfile?.full_name || regData.fullName;
+  const displayPhone = userProfile?.phone_number || regData.phone;
+
+  // Determine Asset Label based on selection
+  const assetLabel = selectedType === 'service' ? 'الخدمة' : selectedType === 'chalet' ? 'الشاليه' : 'القاعة';
 
   return (
     <NotificationProvider userId={userProfile?.id}>
       <div className="min-h-screen bg-[#F8F9FC] text-gray-900 font-sans" dir="rtl">
         
-        {/* Navbar - Hide if user is locked in onboarding */}
-        {isPublicPage && !isLocked && (
+        {/* Navbar */}
+        {showNavbar && (
             <PublicNavbar 
                 user={userProfile}
                 onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
                 onRegisterClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }}
                 onLogout={handleLogout}
                 onNavigate={(tab) => {
-                    if (tab === 'home') setActiveTab('home');
-                    else if (tab === 'browse') { setBrowseFilters(null); setActiveTab('browse'); }
-                    else if (tab === 'dashboard') setActiveTab('dashboard');
-                    else if (tab === 'login') setActiveTab('login');
-                    else if (tab === 'register') { setActiveTab('register'); setRegStep(0); }
+                    if (['home', 'browse', 'dashboard', 'login', 'halls_page', 'chalets_page', 'services_page', 'store_page'].includes(tab)) {
+                        setActiveTab(tab);
+                        window.scrollTo(0,0);
+                    } else if (tab === 'register') { 
+                        setActiveTab('register'); 
+                        setRegStep(0); 
+                    }
                 }}
                 activeTab={activeTab}
             />
@@ -448,7 +488,7 @@ const App: React.FC = () => {
                                 <p className="mt-2 text-sm font-bold text-gray-500">سجل منشأتك وابدأ في استقبال الحجوزات اليوم.</p>
                             </div>
 
-                            {/* Step 0: Basic Info (Business Name Removed) */}
+                            {/* Step 0: Basic Info */}
                             {regStep === 0 && (
                             <div className="space-y-4 animate-in slide-in-from-right-8 duration-500">
                                 <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-14 rounded-2xl font-bold" />
@@ -490,7 +530,7 @@ const App: React.FC = () => {
                             </div>
                             )}
 
-                            {/* Step 2: Password (Mandatory) */}
+                            {/* Step 2: Password */}
                             {regStep === 2 && (
                             <div className="space-y-6 animate-in slide-in-from-right-8 duration-500">
                                 <div className="text-center space-y-2">
@@ -509,7 +549,6 @@ const App: React.FC = () => {
                                     <Input type={showPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-14 rounded-2xl font-bold" />
                                 </div>
 
-                                {/* Password Rules Animation */}
                                 <div className="flex gap-2 justify-center text-[10px] font-bold">
                                     <span className={`px-3 py-1 rounded-full transition-all duration-300 ${passValidations.length ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>8 خانات على الأقل</span>
                                     <span className={`px-3 py-1 rounded-full transition-all duration-300 ${passValidations.match && passValidations.filled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>تطابق الكلمتين</span>
@@ -522,7 +561,7 @@ const App: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    {/* Unified Left Brand Column (Exact copy of Login to match 100%) */}
+                    {/* Unified Left Brand Column */}
                     <div className="hidden lg:flex w-1/2 bg-primary relative overflow-hidden flex-col justify-center items-center text-center p-12 text-white">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
@@ -540,22 +579,12 @@ const App: React.FC = () => {
                     </div>
                     </>
                 ) : regStep === 3 ? (
-                    // WELCOME SELECTION SCREEN (LOCKED UNTIL PAID)
+                    // WELCOME SELECTION SCREEN
                     <div className="w-full flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-700 relative overflow-hidden">
-                        
-                        {/* Logout for Locked State */}
-                        <div className="absolute top-6 left-6 z-50">
-                           <Button variant="ghost" onClick={handleLogout} className="flex items-center gap-2 text-gray-500 hover:text-red-500 transition-colors">
-                              <LogOut className="w-4 h-4" /> تسجيل الخروج
-                           </Button>
-                        </div>
-
                         <div className="absolute top-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 pointer-events-none"></div>
                         
                         <div className="text-center space-y-6 max-w-4xl z-10">
-                            {/* Bigger Logo as requested */}
                             <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-56 w-auto mx-auto mb-10 drop-shadow-2xl hover:scale-105 transition-transform duration-500" />
-                            
                             <h1 className="text-6xl font-ruqaa text-primary leading-tight">مرحباً ألف</h1>
                             <p className="text-xl text-gray-500 font-bold max-w-lg mx-auto">سعداء بانضمامك لعائلتنا. يجب اختيار نوع نشاطك وتفعيل الاشتراك للوصول إلى المنصة.</p>
                             
@@ -576,59 +605,106 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    // SETUP & PAY SCREEN (Step 4)
-                    <div className="w-full flex items-center justify-center p-4 bg-gray-50">
-                        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-8 duration-500">
+                    // SETUP & PAY SCREEN (Step 4 - REFINED LAYOUT)
+                    <div className="w-full flex items-center justify-center p-4 bg-gray-50/50">
+                        <div className="max-w-4xl w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-500 pb-20">
                             
-                            {/* Column 1: Personal Info */}
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-fit">
-                                <h3 className="text-lg font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2"><User className="w-5 h-5" /> البيانات الشخصية</h3>
-                                <div className="space-y-4 opacity-70 pointer-events-none">
-                                    <Input label="الاسم" value={regData.fullName} readOnly className="bg-gray-50 border-none font-bold" />
-                                    <Input label="البريد" value={regData.email} readOnly className="bg-gray-50 border-none font-bold" />
-                                    <Input label="الجوال" value={regData.phone} readOnly className="bg-gray-50 border-none font-bold" />
-                                </div>
-                                <div className="mt-6 pt-6 border-t border-gray-100">
-                                    <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-xl">
-                                        <CheckCircle2 className="w-5 h-5" /> <span className="text-xs font-bold">تم التحقق من الحساب</span>
+                            <div className="flex justify-between items-center px-2">
+                                <h2 className="text-3xl font-black text-primary">إضافة {assetLabel}</h2>
+                                <Button variant="outline" onClick={() => setRegStep(3)} className="gap-2 h-12 rounded-xl">
+                                    <ArrowRight className="w-4 h-4" /> تغيير النشاط
+                                </Button>
+                            </div>
+
+                            {/* 1. Owner Info Card (Read Only from DB) */}
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+                                <h3 className="text-lg font-black text-primary mb-6 text-right">معلومات المالك</h3>
+                                <div className="space-y-4 text-right">
+                                    <Input label="الاسم" value={displayName} readOnly className="bg-gray-50 border-gray-100 font-bold text-gray-500 cursor-not-allowed" />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input label="رقم الهاتف" value={displayPhone} readOnly className="bg-gray-50 border-gray-100 font-bold text-gray-500 text-left cursor-not-allowed" dir="ltr" />
+                                        <Input label="البريد الالكتروني" value={displayEmail} readOnly className="bg-gray-50 border-gray-100 font-bold text-gray-500 text-left cursor-not-allowed" dir="ltr" />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Column 2: Asset Info */}
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm h-fit">
-                                <h3 className="text-lg font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                                    {selectedType === 'service' ? <Sparkles className="w-5 h-5" /> : <Building2 className="w-5 h-5" />} 
-                                    بيانات {selectedType === 'hall' ? 'القاعة' : selectedType === 'chalet' ? 'الشاليه' : 'الخدمة'}
-                                </h3>
-                                <div className="space-y-4">
-                                    <Input label="الاسم التجاري" placeholder="مثال: قاعة الملوك" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl font-bold" />
-                                    {selectedType === 'service' ? (
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-gray-500">التصنيف</label>
-                                            <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={assetData.category} onChange={e => setAssetData({...assetData, category: e.target.value})}>
-                                                {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                    ) : (
+                            {/* 2. Asset Info Card (Dynamic Fields) */}
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+                                <h3 className="text-lg font-black text-primary mb-6 text-right">معلومات {assetLabel} الأساسية</h3>
+                                <div className="space-y-4 text-right">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <Input label={`اسم ${assetLabel} | بالعربي`} value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold" />
+                                        <Input label={`اسم ${assetLabel} | بالانجليزي`} value={assetData.name_en} onChange={e => setAssetData({...assetData, name_en: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold text-left" dir="ltr" />
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-gray-500">المدينة</label>
-                                            <select className="w-full h-12 border rounded-xl px-4 font-bold bg-white" value={assetData.city} onChange={e => setAssetData({...assetData, city: e.target.value})}>
+                                            <select className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-white outline-none text-right font-bold appearance-none" value={assetData.city} onChange={e => setAssetData({...assetData, city: e.target.value})}>
                                                 {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
+                                        
+                                        {/* Show Category for Services, Empty/Hidden for Halls */}
+                                        {selectedType === 'service' ? (
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-gray-500">تصنيف الخدمة</label>
+                                                <select className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-white outline-none text-right font-bold appearance-none" value={assetData.category} onChange={e => setAssetData({...assetData, category: e.target.value})}>
+                                                    {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                                </select>
+                                            </div>
+                                        ) : (
+                                            <div className="hidden md:block"></div> 
+                                        )}
+                                    </div>
+
+                                    {selectedType !== 'service' && (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <Input label="عدد النساء" type="number" value={assetData.capacity_women} onChange={e => setAssetData({...assetData, capacity_women: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold" />
+                                            <Input label="عدد الرجال" type="number" value={assetData.capacity_men} onChange={e => setAssetData({...assetData, capacity_men: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold" />
+                                        </div>
                                     )}
-                                    <Input label="السعر المبدئي" type="number" value={assetData.price} onChange={e => setAssetData({...assetData, price: e.target.value})} className="h-12 rounded-xl font-bold" />
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-gray-500">نبذة مختصرة</label>
-                                        <textarea className="w-full h-24 border rounded-xl p-3 font-bold text-sm resize-none" placeholder="وصف يجذب العملاء..." value={assetData.description} onChange={e => setAssetData({...assetData, description: e.target.value})} />
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500">الوصف | بالعربي (اختياري)</label>
+                                            <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-right resize-none font-bold text-sm" value={assetData.description} onChange={e => setAssetData({...assetData, description: e.target.value})} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-gray-500">الوصف | بالانجليزي (اختياري)</label>
+                                            <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-left resize-none font-bold text-sm" dir="ltr" value={assetData.description_en} onChange={e => setAssetData({...assetData, description_en: e.target.value})} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Column 3: Payment */}
-                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl h-fit border-t-4 border-t-primary">
-                                <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> إتمام الاشتراك</h3>
+                            {/* 3. Attachments Card */}
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+                                <h3 className="text-lg font-black text-primary mb-6 text-right">المرفقات</h3>
+                                <div className="flex justify-end">
+                                    <div 
+                                        onClick={() => fileInputRef.current?.click()} 
+                                        className="w-40 h-40 rounded-xl bg-purple-50 border-2 border-dashed border-purple-200 flex flex-col items-center justify-center cursor-pointer hover:bg-purple-100 transition-all group"
+                                    >
+                                        <div className="bg-primary text-white rounded-lg p-3 mb-2 group-hover:scale-110 transition-transform shadow-lg shadow-primary/20">
+                                            <Plus className="w-6 h-6" />
+                                        </div>
+                                        <span className="text-xs font-bold text-primary">إضافة صور</span>
+                                    </div>
+                                    <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
+                                </div>
+                                {assetData.images.length > 0 && (
+                                    <div className="flex gap-4 mt-4 justify-end flex-wrap">
+                                        {assetData.images.map((img, i) => (
+                                            <img key={i} src={img} className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 4. Payment Card */}
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl border-t-4 border-t-primary">
+                                <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" /> إتمام الاشتراك والدفع</h3>
                                 
                                 <div className="bg-gray-50 p-6 rounded-2xl mb-6 space-y-4 border border-gray-100">
                                     <div className="flex justify-between text-sm font-bold text-gray-500">
@@ -653,13 +729,16 @@ const App: React.FC = () => {
                                         <Input placeholder="CVC" value={paymentData.cvc} onChange={e => setPaymentData({...paymentData, cvc: e.target.value})} className="h-12 rounded-xl font-bold font-mono text-center" />
                                     </div>
                                 </div>
+                            </div>
 
-                                <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name || !assetData.price} className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-8 bg-primary text-white hover:scale-[1.02] transition-transform">
-                                    {authLoading ? <Loader2 className="animate-spin" /> : 'دفع وتفعيل الحساب'}
+                            {/* Actions - Resized Buttons */}
+                            <div className="flex gap-4">
+                                <Button variant="outline" onClick={() => setRegStep(3)} className="h-12 px-8 rounded-2xl font-bold text-lg border-2">
+                                    رجوع
                                 </Button>
-                                <div className="flex items-center justify-center gap-2 mt-4 text-[10px] text-gray-400 font-bold">
-                                    <Lock className="w-3 h-3" /> مدفوعات آمنة ومشفرة 100%
-                                </div>
+                                <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name} className="flex-1 h-12 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 bg-primary text-white hover:scale-[1.01] transition-transform">
+                                    {authLoading ? <Loader2 className="animate-spin" /> : 'الدفع والمراجعة'}
+                                </Button>
                             </div>
 
                         </div>
@@ -688,6 +767,11 @@ const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'halls_page' && <PublicListing type="hall" title="قاعات المناسبات" subtitle="تصفح أرقى القاعات لحفلات الزفاف والمناسبات الخاصة" onNavigate={navigateToDetails} />}
+          {activeTab === 'chalets_page' && <PublicListing type="chalet" title="الشاليهات والمنتجعات" subtitle="أماكن استثنائية للاستجمام والفعاليات الخارجية" onNavigate={navigateToDetails} />}
+          {activeTab === 'services_page' && <PublicListing type="service" title="خدمات المناسبات" subtitle="كل ما تحتاجه لإكمال فرحتك من ضيافة وتصوير وتجهيزات" onNavigate={navigateToDetails} />}
+          {activeTab === 'store_page' && <PublicStore />}
+
           {activeTab === 'hall_details' && selectedEntity && (
             <HallDetails
                 item={selectedEntity.item}
@@ -698,7 +782,7 @@ const App: React.FC = () => {
           )}
 
           {/* Dashboard Routes - ONLY VISIBLE IF NOT LOCKED */}
-          {!isLocked && activeTab !== 'home' && activeTab !== 'browse' && activeTab !== 'hall_details' && activeTab !== 'login' && activeTab !== 'register' && (
+          {!isLocked && activeTab !== 'home' && activeTab !== 'browse' && !activeTab.endsWith('_page') && activeTab !== 'hall_details' && activeTab !== 'login' && activeTab !== 'register' && (
             <div className="mx-auto w-full max-w-[1600px]">
               {activeTab === 'dashboard' && userProfile && <Dashboard user={userProfile} />}
               {activeTab === 'my_halls' && userProfile && <VendorHalls user={userProfile} />}
@@ -723,6 +807,8 @@ const App: React.FC = () => {
             </div>
           )}
         </main>
+
+        <Footer />
       </div>
     </NotificationProvider>
   );

@@ -1,19 +1,16 @@
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, Service, SAUDI_CITIES } from '../types';
+import { UserProfile, SAUDI_CITIES, SERVICE_CATEGORIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Search, MapPin, Star, Users, ArrowRight, ArrowLeft, 
-  ChevronRight, ChevronLeft, Filter, X, 
-  RotateCcw, List, Grid3X3, SlidersHorizontal, Home as HomeIcon
+  Search, MapPin, Star, Users, List, Grid3X3, SlidersHorizontal, Filter
 } from 'lucide-react';
-import { useToast } from '../context/ToastContext';
 
 interface BrowseHallsProps {
   user: UserProfile | null;
-  mode: 'halls' | 'services';
+  mode: 'halls' | 'services'; // Basic mode, but we can refine with filters
   onBack: () => void;
   onNavigate: (tab: string, item?: any) => void;
   initialFilters?: any;
@@ -25,13 +22,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
+  // Filters
   const [selectedCity, setSelectedCity] = useState<string>(initialFilters?.city || 'all');
   const [priceRange, setPriceRange] = useState<number>(initialFilters?.budget || 300000);
+  const [selectedType, setSelectedType] = useState<string>(initialFilters?.type || 'all'); // hall, chalet, etc.
+  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // For Services
 
   useEffect(() => {
     if (initialFilters) {
       if (initialFilters.city) setSelectedCity(initialFilters.city);
       if (initialFilters.budget) setPriceRange(initialFilters.budget);
+      if (initialFilters.type) setSelectedType(initialFilters.type);
     }
   }, [initialFilters]);
 
@@ -40,12 +41,27 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
     try {
       if (mode === 'halls') {
         let query = supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
+        
+        // Filter logic applied in JS for flexibility or DB for performance. 
+        // Let's do DB filtering for strict fields
         if (selectedCity !== 'all') query = query.eq('city', selectedCity);
+        
+        // Handle Types (Hall vs Chalet vs All)
+        if (selectedType !== 'all') {
+            if (selectedType === 'resort' || selectedType === 'chalet') {
+                query = query.in('type', ['chalet', 'resort', 'lounge']);
+            } else {
+                query = query.eq('type', selectedType);
+            }
+        }
+
         const { data: res, error } = await query;
         if (error) throw error;
         setData(res || []);
       } else {
+        // Services
         let query = supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true);
+        if (selectedCategory !== 'all') query = query.eq('category', selectedCategory);
         const { data: res, error } = await query;
         if (error) throw error;
         setData(res || []);
@@ -55,7 +71,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
     } finally {
       setLoading(false);
     }
-  }, [mode, selectedCity]);
+  }, [mode, selectedCity, selectedType, selectedCategory]);
 
   useEffect(() => {
     fetchData();
@@ -65,6 +81,10 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const itemPrice = item.price_per_night || item.price;
     const matchesPrice = itemPrice <= priceRange;
+    
+    // Additional City Check for Services (if services have city in future, currently they don't explicitly in DB schema but logic can expand)
+    // For halls, DB filter handles city.
+    
     return matchesSearch && matchesPrice;
   });
 
@@ -77,7 +97,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
           <aside className="w-full lg:w-72 shrink-0 space-y-8 h-fit lg:sticky lg:top-24 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
              <div className="flex items-center justify-between">
                 <h3 className="text-lg font-black flex items-center gap-2"><SlidersHorizontal className="w-5 h-5" /> الفلترة</h3>
-                <button onClick={() => { setSelectedCity('all'); setPriceRange(300000); setSearch(''); }} className="text-xs font-bold text-primary hover:underline">إعادة تعيين</button>
+                <button onClick={() => { setSelectedCity('all'); setPriceRange(300000); setSearch(''); setSelectedType('all'); setSelectedCategory('all'); }} className="text-xs font-bold text-primary hover:underline">إعادة تعيين</button>
              </div>
 
              <div className="space-y-4">
@@ -85,7 +105,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                 <div className="relative">
                     <input 
                         className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl px-10 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                        placeholder="اسم القاعة..."
+                        placeholder={mode === 'halls' ? "اسم القاعة..." : "اسم الخدمة..."}
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -93,15 +113,48 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                 </div>
              </div>
 
-             <div className="space-y-4">
-                <label className="text-xs font-black uppercase text-gray-400 tracking-widest">المدينة</label>
-                <div className="flex flex-wrap gap-2">
-                   <button onClick={() => setSelectedCity('all')} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedCity === 'all' ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>الكل</button>
-                   {SAUDI_CITIES.slice(0, 6).map(city => (
-                      <button key={city} onClick={() => setSelectedCity(city)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedCity === city ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>{city}</button>
-                   ))}
+             {mode === 'halls' && (
+                 <div className="space-y-4">
+                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">نوع المكان</label>
+                    <select 
+                        className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl px-4 text-sm font-bold outline-none cursor-pointer"
+                        value={selectedType}
+                        onChange={e => setSelectedType(e.target.value)}
+                    >
+                        <option value="all">الكل</option>
+                        <option value="hall">قاعات ومراسم</option>
+                        <option value="chalet">شاليهات ومنتجعات</option>
+                    </select>
+                 </div>
+             )}
+
+             {mode === 'services' && (
+                 <div className="space-y-4">
+                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">التصنيف</label>
+                    <select 
+                        className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl px-4 text-sm font-bold outline-none cursor-pointer"
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                    >
+                        <option value="all">كل الخدمات</option>
+                        {SERVICE_CATEGORIES.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                 </div>
+             )}
+
+             {mode === 'halls' && (
+                <div className="space-y-4">
+                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">المدينة</label>
+                    <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setSelectedCity('all')} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedCity === 'all' ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>الكل</button>
+                    {SAUDI_CITIES.slice(0, 6).map(city => (
+                        <button key={city} onClick={() => setSelectedCity(city)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedCity === city ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>{city}</button>
+                    ))}
+                    </div>
                 </div>
-             </div>
+             )}
 
              <div className="space-y-4">
                 <div className="flex justify-between items-center text-xs font-black uppercase text-gray-400 tracking-widest">
@@ -109,7 +162,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                    <span className="text-primary">{new Intl.NumberFormat('en-US').format(priceRange)} ر.س</span>
                 </div>
                 <input 
-                  type="range" min="5000" max="300000" step="5000" 
+                  type="range" min="100" max="300000" step="100" 
                   className="w-full accent-primary h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" 
                   value={priceRange} onChange={e => setPriceRange(Number(e.target.value))} 
                 />
@@ -141,14 +194,15 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                          <div className={`relative overflow-hidden ${viewMode === 'list' ? 'w-48 h-32 rounded-[2rem]' : 'aspect-[4/3]'}`}>
                             <img src={item.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={item.name} />
                             <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                            {viewMode === 'grid' && <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black shadow-sm">{item.city}</div>}
+                            {viewMode === 'grid' && mode === 'halls' && <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black shadow-sm">{item.city}</div>}
+                            {viewMode === 'grid' && mode === 'services' && <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black shadow-sm">{item.category}</div>}
                          </div>
                          
                          <div className={`p-6 space-y-3 ${viewMode === 'list' ? 'flex-1 py-2' : ''}`}>
                             <div className="flex justify-between items-start">
                                <div>
                                   <h3 className="text-lg font-black text-gray-900 group-hover:text-primary transition-colors line-clamp-1">{item.name}</h3>
-                                  {viewMode === 'list' && <p className="text-xs text-gray-400 font-bold">{item.city}</p>}
+                                  {viewMode === 'list' && <p className="text-xs text-gray-400 font-bold">{mode === 'halls' ? item.city : item.category}</p>}
                                </div>
                                {viewMode === 'grid' && (
                                   <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold bg-yellow-50 px-2 py-1 rounded-lg">
@@ -157,7 +211,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                                )}
                             </div>
                             
-                            {viewMode === 'grid' && (
+                            {viewMode === 'grid' && mode === 'halls' && (
                                <div className="flex items-center gap-4 text-xs font-bold text-gray-400">
                                   <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {item.capacity}</span>
                                   <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {item.city}</span>

@@ -49,6 +49,39 @@ export interface VendorClient {
   created_at?: string;
 }
 
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+export interface FooterConfig {
+  app_section: {
+    show: boolean;
+    image_url: string;
+    title: string;
+    description: string;
+    apple_store_link: string;
+    google_play_link: string;
+  };
+  faq_section: {
+    show: boolean;
+    title: string;
+    items: FAQItem[];
+  };
+  contact_info: {
+    phone: string;
+    email: string;
+    address: string;
+    copyright_text: string;
+  };
+  social_links: {
+    twitter: string;
+    instagram: string;
+    facebook: string;
+    linkedin?: string;
+  };
+}
+
 export interface SystemSettings {
   site_name: string;
   commission_rate: number;
@@ -56,6 +89,7 @@ export interface SystemSettings {
   platform_logo_url?: string;
   hall_listing_fee: number;
   service_listing_fee: number;
+  footer_config?: FooterConfig; // New Field
   payment_gateways: {
     visa_enabled: boolean;
     cash_enabled: boolean;
