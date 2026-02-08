@@ -175,7 +175,7 @@ const App: React.FC = () => {
         setUserProfile(null);
         profileIdRef.current = null;
         setLoading(false);
-        setActiveTab('home');
+        setActiveTab('login');
       }
     });
 
@@ -194,8 +194,15 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-      await supabase.auth.signOut();
-      window.location.reload();
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        setUserProfile(null);
+        profileIdRef.current = null;
+        setActiveTab('login');
+      }
   };
 
   const sendOtp = async () => {
