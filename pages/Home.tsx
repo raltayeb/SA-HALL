@@ -114,37 +114,60 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       
       {/* 1. Hero Section - 95% Width & Auto Animation */}
       <section className="relative w-full pt-28 pb-8 flex justify-center">
-        <div className="w-[95%] h-[600px] md:h-[700px] relative rounded-[3rem] overflow-hidden shadow-2xl group">
+        <div className="w-[95%] h-[600px] md:h-[750px] relative rounded-[3rem] overflow-hidden shadow-2xl group ring-1 ring-black/5 bg-gray-900">
+          
           {/* Background Images with Fade Transition */}
           {HERO_IMAGES.map((img, index) => (
             <div 
               key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentHeroImage ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 transition-all duration-[2000ms] ease-in-out transform ${index === currentHeroImage ? 'opacity-100 scale-105' : 'opacity-0 scale-100'}`}
             >
               <img 
                 src={img} 
                 className="w-full h-full object-cover" 
                 alt={`Luxury Resort ${index + 1}`} 
               />
-              <div className="absolute inset-0 bg-black/40"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
             </div>
           ))}
 
-          {/* Content Container */}
+          {/* Content Container - Modern Layout */}
           <div className="relative z-10 h-full flex items-center justify-start px-8 md:px-24 text-right font-tajawal">
-            <div className="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-8 duration-1000">
-              <h1 className="text-4xl lg:text-7xl font-black text-white leading-[1.2] tracking-tight drop-shadow-lg">
-                عش التجربة <br /> الأمثل <span className="text-primary">للفخامة</span>
-              </h1>
-              <p className="text-white/90 text-lg lg:text-2xl font-medium leading-relaxed max-w-xl drop-shadow-md">
-                اجعل مناسبتك ذكرى لا تُنسى مع المزيج المثالي من الفخامة والراحة المصممة خصيصاً لتفوق توقعاتك.
+            <div className="max-w-3xl space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+              
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white shadow-lg w-fit">
+                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                <span className="text-xs md:text-sm font-bold tracking-wide">الوجهة الأولى للمناسبات الفاخرة</span>
+              </div>
+
+              <div className="space-y-4">
+                <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white leading-[1.1] tracking-tight drop-shadow-xl">
+                  حيث تكتمل <br /> 
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
+                    لحظات الفرح
+                  </span>
+                </h1>
+                <div className="w-32 h-2 bg-gradient-to-l from-primary to-transparent rounded-full opacity-80"></div>
+              </div>
+              
+              <p className="text-gray-200 text-lg md:text-2xl font-medium leading-relaxed max-w-2xl drop-shadow-md border-r-4 border-white/20 pr-6">
+                نجمع لك أرقى القاعات وأفخم الخدمات في منصة واحدة، لتكون مناسبتك ذكرى لا تُنسى بكل معاني الفخامة.
               </p>
+
             </div>
           </div>
 
-          {/* Bottom Scroll Indicator Style element */}
-          <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50">
-              <div className="w-[1px] h-12 bg-white/50"></div>
+          {/* Bottom Indicators */}
+          <div className="absolute bottom-12 left-12 flex items-center gap-6 z-20">
+              <div className="flex gap-3">
+                 {HERO_IMAGES.map((_, i) => (
+                    <button 
+                        key={i} 
+                        onClick={() => setCurrentHeroImage(i)}
+                        className={`h-1.5 rounded-full transition-all duration-500 shadow-sm ${i === currentHeroImage ? 'w-12 bg-white' : 'w-3 bg-white/30 hover:bg-white/50'}`}
+                    ></button>
+                 ))}
+              </div>
           </div>
         </div>
       </section>
@@ -181,49 +204,4 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 items-stretch">
             <div className="lg:w-1/2 min-h-[500px] relative overflow-hidden rounded-[3rem] shadow-2xl">
                 <img 
-                    src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200" 
-                    className="absolute inset-0 w-full h-full object-cover" 
-                    alt="Atmosphere" 
-                />
-            </div>
-            <div className="lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">إجمالي القاعات</span>
-                    <div className="w-full h-px bg-gray-200"></div>
-                    <div className="flex items-center justify-end gap-2">
-                        <span className="text-primary text-4xl font-black">+</span>
-                        <span className="text-6xl font-black text-[#111827]">180</span>
-                    </div>
-                    <p className="text-sm font-bold text-gray-500 text-right">قاعات فخمة وأجنحة ملكية</p>
-                </div>
-                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">الزوار سنوياً</span>
-                    <div className="w-full h-px bg-gray-200"></div>
-                    <div className="flex items-center justify-end gap-2">
-                        <span className="text-primary text-4xl font-black">+</span>
-                        <span className="text-6xl font-black text-[#111827]">8500</span>
-                    </div>
-                    <p className="text-sm font-bold text-gray-500 text-right">عميل سعيد بخدماتنا</p>
-                </div>
-                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">قائمة الخدمات</span>
-                    <div className="w-full h-px bg-gray-200"></div>
-                    <div className="flex items-center justify-end gap-2">
-                        <span className="text-primary text-4xl font-black">+</span>
-                        <span className="text-6xl font-black text-[#111827]">65</span>
-                    </div>
-                    <p className="text-sm font-bold text-gray-500 text-right">باقات طعام وضيافة منوعة</p>
-                </div>
-                <div className="relative rounded-[2.5rem] overflow-hidden group shadow-lg">
-                    <img 
-                        src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                        alt="Quality" 
-                    />
-                </div>
-            </div>
-        </div>
-      </section>
-    </div>
-  );
-};
+                    src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=
