@@ -353,7 +353,10 @@ const App: React.FC = () => {
 
   const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(activeTab);
   const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
-  const showNavbar = isPublicPage || (activeTab === 'register' && regStep >= 3);
+  
+  // Navbar Logic: Show on public pages EXCEPT login/register pages (auth pages)
+  const isAuthPage = ['login', 'register'].includes(activeTab);
+  const showNavbar = isPublicPage && !isAuthPage;
 
   const displayEmail = userProfile?.email || regData.email;
   const displayName = userProfile?.full_name || regData.fullName;
@@ -392,7 +395,7 @@ const App: React.FC = () => {
 
         <main className={`${!isPublicPage && userProfile && !isLocked ? 'lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8' : ''}`}>
           {activeTab === 'login' && (
-            <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
+            <div className="min-h-screen flex flex-col lg:flex-row bg-white">
                 <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24 animate-in slide-in-from-right-4 duration-500">
                     <div className="w-full max-w-md space-y-8">
                         <div className="text-center lg:text-right">
@@ -412,6 +415,9 @@ const App: React.FC = () => {
                                 <span className="text-xs font-bold text-gray-400">ليس لديك حساب؟ </span>
                                 <button type="button" onClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
                             </div>
+                            <div className="text-center">
+                                <button type="button" onClick={() => { setActiveTab('home'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-gray-600">العودة للرئيسية</button>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -425,7 +431,7 @@ const App: React.FC = () => {
           )}
 
           {activeTab === 'register' && (
-            <div className="min-h-screen pt-20 flex flex-col lg:flex-row bg-white">
+            <div className="min-h-screen flex flex-col lg:flex-row bg-white">
                 {regStep < 3 ? (
                     <>
                     <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24">
@@ -440,6 +446,9 @@ const App: React.FC = () => {
                                 <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-14 rounded-2xl font-bold" />
                                 <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-14 rounded-2xl font-bold" />
                                 <Button onClick={sendOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">{authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل ومتابعة'}</Button>
+                                <div className="text-center pt-2">
+                                    <button type="button" onClick={() => { setActiveTab('home'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-gray-600">العودة للرئيسية</button>
+                                </div>
                             </div>
                             )}
                             {regStep === 1 && (
@@ -498,7 +507,7 @@ const App: React.FC = () => {
                     </div>
                 ) : (
                     <div className="w-full flex items-center justify-center p-4 bg-gray-50/50">
-                        <div className="max-w-4xl w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-500 pb-20 mt-24">
+                        <div className="max-w-4xl w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-500 pb-20">
                             <div className="flex justify-between items-center px-2">
                                 <h2 className="text-3xl font-black text-primary">إضافة {assetLabel}</h2>
                                 <Button variant="outline" onClick={() => setRegStep(3)} className="gap-2 h-12 rounded-xl"><ArrowRight className="w-4 h-4" /> تغيير النشاط</Button>
@@ -637,7 +646,7 @@ const App: React.FC = () => {
             </div>
           )}
         </main>
-        {isPublicPage && <Footer />}
+        {showNavbar && <Footer />}
       </div>
     </NotificationProvider>
   );
