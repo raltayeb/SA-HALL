@@ -120,7 +120,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         </div>
         <h3 className="font-bold text-gray-900 text-sm mb-1 truncate">{product.name}</h3>
         <p className="text-[10px] font-bold text-gray-400 mb-3">{product.category}</p>
-        <div className="mt-auto pt-3 border-t border-gray-100 flex flex-col gap-2">
+        <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
             <PriceTag amount={product.price} className="justify-center text-lg font-black text-primary" />
             <div className="text-[10px] font-black text-primary flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span>تسوّق الآن</span>
@@ -290,7 +290,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             <div className="relative order-1 lg:order-2">
                 <div className="aspect-[4/5] rounded-[3rem] overflow-hidden border-8 border-gray-50">
                     <img 
-                        src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=1200" 
+                        src="https://i.ytimg.com/vi/fynjsdbrr1s/maxresdefault.jpg" 
                         className="w-full h-full object-cover" 
                         alt="Atmosphere" 
                     />
