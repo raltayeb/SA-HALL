@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, Service, SAUDI_CITIES, POSItem } from '../types';
+import { Hall, UserProfile, Service, POSItem } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
@@ -22,6 +22,17 @@ const HERO_IMAGES = [
   "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=2000",
   "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=2000"
 ];
+
+const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon: any, subtitle: string }) => (
+  <div className="flex flex-col items-center text-center space-y-3 mb-12">
+      <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
+          <Icon className="w-4 h-4 fill-current" />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{subtitle}</span>
+      </div>
+      <h2 className="text-4xl font-black tracking-tight text-gray-900">{title}</h2>
+      <div className="w-16 h-1 bg-primary rounded-full"></div>
+  </div>
+);
 
 export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
@@ -60,17 +71,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
-  const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon: any, subtitle: string }) => (
-    <div className="flex flex-col items-center text-center space-y-3 mb-12">
-        <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-            <Icon className="w-4 h-4 fill-current" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{subtitle}</span>
-        </div>
-        <h2 className="text-4xl font-black tracking-tight text-gray-900">{title}</h2>
-        <div className="w-16 h-1 bg-primary rounded-full"></div>
-    </div>
-  );
 
   const renderCard = (item: any, type: 'hall' | 'service', label: string) => (
     <div 
