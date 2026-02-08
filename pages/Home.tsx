@@ -204,4 +204,49 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-12 items-stretch">
             <div className="lg:w-1/2 min-h-[500px] relative overflow-hidden rounded-[3rem] shadow-2xl">
                 <img 
-                    src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=
+                    src="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200" 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                    alt="Atmosphere" 
+                />
+            </div>
+            <div className="lg:w-1/2 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">إجمالي القاعات</span>
+                    <div className="w-full h-px bg-gray-200"></div>
+                    <div className="flex items-center justify-end gap-2">
+                        <span className="text-primary text-4xl font-black">+</span>
+                        <span className="text-6xl font-black text-[#111827]">180</span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 text-right">قاعات فخمة وأجنحة ملكية</p>
+                </div>
+                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">الزوار سنوياً</span>
+                    <div className="w-full h-px bg-gray-200"></div>
+                    <div className="flex items-center justify-end gap-2">
+                        <span className="text-primary text-4xl font-black">+</span>
+                        <span className="text-6xl font-black text-[#111827]">8500</span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 text-right">عميل سعيد بخدماتنا</p>
+                </div>
+                <div className="bg-[#F9FAFB] rounded-[2.5rem] p-10 flex flex-col justify-center space-y-6 border border-gray-100">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">قائمة الخدمات</span>
+                    <div className="w-full h-px bg-gray-200"></div>
+                    <div className="flex items-center justify-end gap-2">
+                        <span className="text-primary text-4xl font-black">+</span>
+                        <span className="text-6xl font-black text-[#111827]">65</span>
+                    </div>
+                    <p className="text-sm font-bold text-gray-500 text-right">باقات طعام وضيافة منوعة</p>
+                </div>
+                <div className="relative rounded-[2.5rem] overflow-hidden group shadow-lg">
+                    <img 
+                        src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                        alt="Quality" 
+                    />
+                </div>
+            </div>
+        </div>
+      </section>
+    </div>
+  );
+};
