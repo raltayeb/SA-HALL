@@ -424,7 +424,12 @@ const App: React.FC = () => {
                             <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-14 rounded-2xl font-bold" />
                             <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-14 rounded-2xl font-bold" />
                             <Button onClick={sendOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">{authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل ومتابعة'}</Button>
-                            <div className="text-center pt-2">
+                            
+                            <div className="text-center pt-4 space-y-2">
+                                <div>
+                                    <span className="text-xs font-bold text-gray-400">لديك حساب بالفعل؟ </span>
+                                    <button type="button" onClick={() => { setActiveTab('login'); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">سجل دخول</button>
+                                </div>
                                 <button type="button" onClick={() => { setActiveTab('home'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-gray-600">العودة للرئيسية</button>
                             </div>
                         </div>

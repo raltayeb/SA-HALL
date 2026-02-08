@@ -84,7 +84,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     className="rounded-xl px-5 h-11 text-xs font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 hidden md:flex"
                   >
                     <UserPlus className="w-4 h-4" />
-                    <span>ابدأ مجاناً</span>
+                    <span>انضم إلينا</span>
                   </Button>
                   <button 
                     onClick={() => onNavigate('login')} 
@@ -165,7 +165,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                                 onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} 
                                 className="w-full rounded-xl h-12 font-black bg-primary text-white"
                             >
-                                سجل الآن مجاناً
+                                انضم إلينا
                             </Button>
                         </div>
                     )}

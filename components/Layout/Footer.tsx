@@ -98,7 +98,7 @@ export const Footer: React.FC = () => {
         </section>
       )}
 
-      {/* 2. App Download Section (Moved Below FAQ) */}
+      {/* 2. App Download Section (Buttons Right Aligned) */}
       {config.app_section.show && (
         <section className="bg-[#F9FAFB] pt-24">
             <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
@@ -115,7 +115,7 @@ export const Footer: React.FC = () => {
                     <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-6 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
                         <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
                         <p className="text-white/80 font-medium text-lg leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
-                        <div className="flex flex-wrap justify-center md:justify-end gap-4 pt-4">
+                        <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4"> {/* Changed to justify-start for Right alignment in RTL */}
                             <a href={config.app_section.apple_store_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on App Store" className="h-14" />
                             </a>
