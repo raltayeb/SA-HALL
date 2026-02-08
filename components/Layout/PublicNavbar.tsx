@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile } from '../../types';
 import { Button } from '../ui/Button';
-import { ChevronDown, LayoutDashboard, LogOut, Menu, X, Home, Building2, Palmtree, Sparkles, ShoppingBag, UserPlus } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, LogOut, Menu, X, Home, Building2, Palmtree, Sparkles, ShoppingBag } from 'lucide-react';
 
 interface PublicNavbarProps {
   user: UserProfile | null;
@@ -31,35 +31,35 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   }, []);
 
   const navItems = [
-    { id: 'home', label: 'الرئيسية', icon: <Home className="w-4 h-4" /> },
-    { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'chalets_page', label: 'الشاليهات', icon: <Palmtree className="w-4 h-4" /> },
-    { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" /> },
-    { id: 'store_page', label: 'المتجر', icon: <ShoppingBag className="w-4 h-4" /> },
+    { id: 'home', label: 'الرئيسية' },
+    { id: 'halls_page', label: 'القاعات' },
+    { id: 'chalets_page', label: 'الشاليهات' },
+    { id: 'services_page', label: 'الخدمات' },
+    { id: 'store_page', label: 'المتجر' },
   ];
 
   const shouldHideAuthButton = activeTab === 'register' && user?.role === 'vendor' && user.status === 'pending';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm transition-all duration-300 h-24">
+    <header className="fixed top-0 left-0 right-0 z-[100] bg-white/95 backdrop-blur-md border-b border-gray-50 h-24 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             
             {/* Logo & Desktop Nav */}
-            <div className="flex items-center gap-12">
-              <div className="flex items-center gap-2 cursor-pointer group hover:opacity-80 transition-opacity" onClick={() => onNavigate('home')}>
+            <div className="flex items-center">
+              <div className="flex items-center cursor-pointer ml-12" onClick={() => onNavigate('home')}>
                 <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-16 w-auto object-contain transition-transform hover:scale-105" />
               </div>
-              <nav className="hidden lg:flex items-center gap-1 bg-gray-50/50 p-1.5 rounded-full border border-gray-100/50">
+              <nav className="hidden lg:flex items-center gap-6">
                 {navItems.map(item => (
                     <button 
                         key={item.id}
                         onClick={() => onNavigate(item.id)} 
                         className={`
-                            px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2
+                            px-6 py-2.5 rounded-full text-base font-bold transition-all duration-300
                             ${activeTab === item.id 
-                                ? 'bg-white text-primary shadow-sm ring-1 ring-black/5' 
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}
+                                ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                                : 'text-gray-500 hover:text-primary'}
                         `}
                     >
                         {item.label}
@@ -69,15 +69,14 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="hidden lg:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-6">
               {!user ? (
-                <div className="flex items-center gap-3">
-                  <button onClick={() => onNavigate('login')} className={`text-sm font-bold px-6 py-2.5 rounded-full transition-colors ${activeTab === 'login' ? 'text-primary bg-primary/5' : 'text-gray-500 hover:text-primary hover:bg-gray-50'}`}>تسجيل الدخول</button>
+                <div className="flex items-center gap-6">
+                  <button onClick={() => onNavigate('login')} className="text-base font-bold text-gray-500 hover:text-primary transition-colors">تسجيل الدخول</button>
                   <Button 
                     onClick={() => onNavigate('register')} 
-                    className="rounded-full px-8 h-12 text-sm font-black bg-primary text-white hover:bg-[#3a006b] hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-primary/20 transform hover:-translate-y-0.5"
+                    className="rounded-xl px-8 h-12 text-base font-bold bg-primary text-white hover:bg-[#3a006b] hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 shadow-lg shadow-primary/20"
                   >
-                    <UserPlus className="w-4 h-4" />
                     انضم إلينا
                   </Button>
                 </div>
@@ -132,7 +131,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                             onClick={() => { onNavigate(item.id); setIsMobileMenuOpen(false); }} 
                             className={`w-full text-right px-6 py-4 rounded-2xl text-sm font-bold flex items-center justify-end gap-3 ${activeTab === item.id ? 'bg-primary/5 text-primary' : 'text-gray-600 hover:bg-gray-50'}`}
                         >
-                            {item.label} {item.icon}
+                            {item.label}
                         </button>
                     ))}
                     <div className="h-px bg-gray-100 my-4"></div>

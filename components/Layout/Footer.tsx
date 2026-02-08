@@ -57,38 +57,7 @@ export const Footer: React.FC = () => {
   return (
     <footer className="font-sans bg-[#F9FAFB]">
       
-      {/* 1. App Download Section */}
-      {config.app_section.show && (
-        <section className="bg-[#F9FAFB] pt-24">
-            <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-center min-h-[550px]">
-                    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -mr-40 -mt-40 pointer-events-none"></div>
-                    <div className="w-full md:w-1/2 h-full min-h-[400px] md:min-h-full relative order-2 md:order-1">
-                        <img 
-                            src={config.app_section.image_url || "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=800"} 
-                            className="absolute inset-0 w-full h-full object-cover" 
-                            alt="App Screen" 
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 to-transparent md:bg-gradient-to-r"></div>
-                    </div>
-                    <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-6 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
-                        <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
-                        <p className="text-white/80 font-medium text-lg leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
-                        <div className="flex flex-wrap justify-center md:justify-end gap-4 pt-4">
-                            <a href={config.app_section.apple_store_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on App Store" className="h-14" />
-                            </a>
-                            <a href={config.app_section.google_play_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
-                                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" className="h-14" />
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-      )}
-
-      {/* 2. FAQ Section */}
+      {/* 1. FAQ Section (Moved to Top) */}
       {config.faq_section.show && config.faq_section.items.length > 0 && (
         <section className="bg-[#F9FAFB] py-32 px-6 lg:px-20">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-16 lg:gap-24 text-right">
@@ -125,6 +94,37 @@ export const Footer: React.FC = () => {
                     </div>
                 </div>
 
+            </div>
+        </section>
+      )}
+
+      {/* 2. App Download Section (Moved Below FAQ) */}
+      {config.app_section.show && (
+        <section className="bg-[#F9FAFB] pt-24">
+            <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
+                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-center min-h-[550px]">
+                    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -mr-40 -mt-40 pointer-events-none"></div>
+                    <div className="w-full md:w-1/2 h-full min-h-[400px] md:min-h-full relative order-2 md:order-1">
+                        <img 
+                            src={config.app_section.image_url || "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=800"} 
+                            className="absolute inset-0 w-full h-full object-cover" 
+                            alt="App Screen" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 to-transparent md:bg-gradient-to-r"></div>
+                    </div>
+                    <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-6 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
+                        <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
+                        <p className="text-white/80 font-medium text-lg leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
+                        <div className="flex flex-wrap justify-center md:justify-end gap-4 pt-4">
+                            <a href={config.app_section.apple_store_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on App Store" className="h-14" />
+                            </a>
+                            <a href={config.app_section.google_play_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
+                                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" className="h-14" />
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
       )}
