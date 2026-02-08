@@ -71,9 +71,12 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             {/* Actions */}
             <div className="hidden lg:flex items-center gap-4">
               {!user ? (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <button onClick={() => onNavigate('login')} className={`text-sm font-bold px-6 py-2.5 rounded-full transition-colors ${activeTab === 'login' ? 'text-primary bg-primary/5' : 'text-gray-500 hover:text-primary hover:bg-gray-50'}`}>تسجيل الدخول</button>
-                  <Button onClick={() => onNavigate('register')} className="rounded-full px-8 h-12 text-sm font-black bg-primary hover:bg-primary/90 text-white hover:scale-105 shadow-none">
+                  <Button 
+                    onClick={() => onNavigate('register')} 
+                    className="rounded-full px-8 h-11 text-sm font-black bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all shadow-none"
+                  >
                     انضم إلينا
                   </Button>
                 </div>

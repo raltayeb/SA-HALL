@@ -41,7 +41,14 @@ export const Footer: React.FC = () => {
     const fetchConfig = async () => {
       const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
       if (data?.value?.footer_config) {
-        setConfig(prev => ({ ...prev, ...data.value.footer_config }));
+        setConfig(prev => ({ 
+            ...prev, 
+            ...data.value.footer_config,
+            app_section: {
+                ...prev.app_section,
+                ...data.value.footer_config.app_section
+            }
+        }));
       }
     };
     fetchConfig();

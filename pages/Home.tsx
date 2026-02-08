@@ -18,11 +18,27 @@ interface HomeProps {
   onLogout: () => void;
 }
 
+const HERO_IMAGES = [
+  "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=2000",
+  "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000",
+  "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=2000",
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=2000"
+];
+
 export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
   const [resorts, setResorts] = useState<Hall[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentHeroImage, setCurrentHeroImage] = useState(0);
+
+  // Hero Animation
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentHeroImage((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, 5000); // Change every 5 seconds
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -96,27 +112,31 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900">
       
-      {/* 1. Hero Section - CONSTRAINED WIDTH & ROUNDED DESIGN */}
-      <section className="relative w-full pt-28 pb-8 px-4 lg:px-8">
-        <div className="max-w-7xl mx-auto h-[600px] md:h-[700px] relative rounded-[3rem] overflow-hidden shadow-2xl group">
-          {/* Background Image */}
-          <div className="absolute inset-0 z-0">
-            <img 
-              src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&q=80&w=2000" 
-              className="w-full h-full object-cover transition-transform duration-[10000ms] group-hover:scale-110" 
-              alt="Luxury Resort" 
-            />
-            {/* Overlay matching the design */}
-            <div className="absolute inset-0 bg-black/40"></div>
-          </div>
+      {/* 1. Hero Section - 95% Width & Auto Animation */}
+      <section className="relative w-full pt-28 pb-8 flex justify-center">
+        <div className="w-[95%] h-[600px] md:h-[700px] relative rounded-[3rem] overflow-hidden shadow-2xl group">
+          {/* Background Images with Fade Transition */}
+          {HERO_IMAGES.map((img, index) => (
+            <div 
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentHeroImage ? 'opacity-100' : 'opacity-0'}`}
+            >
+              <img 
+                src={img} 
+                className="w-full h-full object-cover" 
+                alt={`Luxury Resort ${index + 1}`} 
+              />
+              <div className="absolute inset-0 bg-black/40"></div>
+            </div>
+          ))}
 
           {/* Content Container */}
-          <div className="relative z-10 h-full flex items-center justify-start px-8 md:px-20 text-right font-tajawal">
+          <div className="relative z-10 h-full flex items-center justify-start px-8 md:px-24 text-right font-tajawal">
             <div className="max-w-2xl space-y-6 animate-in fade-in slide-in-from-right-8 duration-1000">
-              <h1 className="text-4xl lg:text-6xl font-black text-white leading-[1.2] tracking-tight drop-shadow-lg">
-                عش التجربة <br /> الأمثل <span className="text-primary bg-white/90 px-4 py-1 rounded-2xl">للفخامة</span>
+              <h1 className="text-4xl lg:text-7xl font-black text-white leading-[1.2] tracking-tight drop-shadow-lg">
+                عش التجربة <br /> الأمثل <span className="text-primary">للفخامة</span>
               </h1>
-              <p className="text-white/90 text-lg lg:text-xl font-medium leading-relaxed max-w-xl drop-shadow-md">
+              <p className="text-white/90 text-lg lg:text-2xl font-medium leading-relaxed max-w-xl drop-shadow-md">
                 اجعل مناسبتك ذكرى لا تُنسى مع المزيج المثالي من الفخامة والراحة المصممة خصيصاً لتفوق توقعاتك.
               </p>
             </div>

@@ -127,11 +127,16 @@ const App: React.FC = () => {
                 supabase.from('services').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id)
              ]);
              
-             if (((hallCount === 0 && serviceCount === 0) || profile.payment_status !== 'paid') && regStepRef.current !== 4) {
-                 setActiveTab('register');
-                 setRegStep(3);
-                 setLoading(false);
-                 return;
+             // Redirect Logic: If vendor has items, go to dashboard. Else, setup flow.
+             if ((hallCount || 0) > 0 || (serviceCount || 0) > 0) {
+                 if (isInitialLoad || activeTabRef.current === 'login' || activeTabRef.current === 'register') {
+                     setActiveTab('dashboard');
+                 }
+             } else {
+                 if (regStepRef.current !== 4) {
+                     setActiveTab('register');
+                     setRegStep(3);
+                 }
              }
           }
 
@@ -141,7 +146,6 @@ const App: React.FC = () => {
                // Stay on public pages
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
-                else if (profile.role === 'vendor' && profile.status === 'approved') setActiveTab('dashboard');
                 else if (profile.role === 'user') setActiveTab('browse');
             }
           }
@@ -466,8 +470,13 @@ const App: React.FC = () => {
                     </div>
                     </>
                 ) : regStep === 3 ? (
-                    <div className="w-full flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-700">
-                        <div className="text-center space-y-6 max-w-4xl">
+                    <div className="w-full flex flex-col items-center justify-center p-8 animate-in zoom-in-95 duration-700 min-h-screen">
+                        <div className="text-center space-y-6 max-w-4xl relative">
+                            {/* Logout Button for Stuck State */}
+                            <button onClick={handleLogout} className="absolute top-0 left-0 text-red-500 font-bold hover:underline flex items-center gap-2">
+                                <LogOut className="w-4 h-4" /> تسجيل خروج
+                            </button>
+
                             <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-56 w-auto mx-auto mb-10 drop-shadow-2xl" />
                             <h1 className="text-6xl font-ruqaa text-primary">مرحباً ألف</h1>
                             <p className="text-xl text-gray-500 font-bold max-w-lg mx-auto">سعداء بانضمامك لعائلتنا. يجب اختيار نوع نشاطك وتفعيل الاشتراك للوصول إلى المنصة.</p>
