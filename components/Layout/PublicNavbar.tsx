@@ -42,10 +42,11 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 h-20">
+    <header className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 shadow-sm h-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             
+            {/* Right side: Logo & Desktop Nav Links (Start of RTL flow) */}
             <div className="flex items-center gap-8">
               <div 
                 className="flex items-center cursor-pointer shrink-0" 
@@ -74,6 +75,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
               </nav>
             </div>
 
+            {/* Left side: Profile & Auth & Mobile Toggle (End of RTL flow) */}
             <div className="flex items-center gap-3">
               {!user ? (
                 <div className="flex items-center gap-2">
@@ -82,7 +84,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     className="rounded-xl px-5 h-11 text-xs font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 hidden md:flex"
                   >
                     <UserPlus className="w-4 h-4" />
-                    <span>انضم إلينا</span>
+                    <span>ابدأ مجاناً</span>
                   </Button>
                   <button 
                     onClick={() => onNavigate('login')} 
@@ -108,7 +110,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                   </button>
                   
                   {isUserMenuOpen && (
-                    <div className="absolute left-0 mt-3 w-56 bg-white border border-gray-100 rounded-2xl ring-1 ring-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[110] text-right">
+                    <div className="absolute left-0 mt-3 w-56 bg-white border border-gray-100 rounded-2xl ring-1 ring-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[110] text-right shadow-xl">
                       <div className="p-4 border-b border-gray-100 bg-gray-50/50">
                         <p className="text-xs font-black text-gray-900 truncate">{user.full_name}</p>
                         <p className="text-[10px] text-gray-400 mt-0.5 truncate">{user.email}</p>
@@ -129,6 +131,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                 </div>
               )}
               
+              {/* Mobile Burger Menu Toggle - Stays on the far left */}
               <div className="lg:hidden">
                 <button 
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
@@ -142,8 +145,9 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
           </div>
         </div>
 
+        {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
-            <div className="lg:hidden bg-white border-t border-gray-100 py-4 px-4 animate-in slide-in-from-top-5 absolute w-full">
+            <div className="lg:hidden bg-white border-t border-gray-100 py-4 px-4 animate-in slide-in-from-top-5 shadow-2xl absolute w-full">
                 <nav className="flex flex-col gap-2">
                     {navItems.map(item => (
                         <button 
@@ -161,7 +165,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                                 onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} 
                                 className="w-full rounded-xl h-12 font-black bg-primary text-white"
                             >
-                                انضم إلينا
+                                سجل الآن مجاناً
                             </Button>
                         </div>
                     )}
