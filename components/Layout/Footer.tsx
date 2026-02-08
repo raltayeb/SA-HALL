@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Facebook, Instagram, Twitter, MapPin, Mail, Phone, ChevronLeft, HelpCircle, Linkedin } from 'lucide-react';
+import { Facebook, Instagram, Twitter, MapPin, Mail, Phone, ChevronDown, Linkedin } from 'lucide-react';
 import { FooterConfig } from '../../types';
 
 export const Footer: React.FC = () => {
@@ -16,10 +16,14 @@ export const Footer: React.FC = () => {
     },
     faq_section: {
         show: true,
-        title: 'الأسئلة الشائعة',
+        title: 'كل ما تحتاج معرفته عن الحجز معنا',
         items: [
-            { question: "كيف يمكنني حجز قاعة؟", answer: "يمكنك القيام بذلك بسهولة من خلال التطبيق أو الموقع الإلكتروني عبر خطوات بسيطة وميسرة." },
-            { question: "هل يمكنني إلغاء الحجز؟", answer: "نعم، وفقاً لسياسة الإلغاء الخاصة بكل قاعة والموضحة في تفاصيل الحجز." }
+            { question: "ما هي أوقات الدخول والخروج؟", answer: "تختلف المواعيد حسب القاعة، ولكن غالباً ما يبدأ الدخول من الساعة 4 عصراً والخروج في الساعة 12 منتصف الليل." },
+            { question: "هل تقدمون خدمات النقل أو الاستقبال؟", answer: "نعم، بعض شركائنا يوفرون حافلات نقل الضيوف وسيارات استقبال خاصة." },
+            { question: "هل يسمح بدخول الحيوانات الأليفة؟", answer: "يعتمد ذلك على سياسة القاعة أو الشاليه المختارة؛ يرجى مراجعة تفاصيل المكان." },
+            { question: "هل تتوفر خدمة واي فاي مجانية؟", answer: "نعم، معظم القاعات توفر إنترنت عالي السرعة لضيوفها." },
+            { question: "ما هي المرافق المتاحة للضيوف؟", answer: "تشمل المرافق غرف تبديل الملابس، أجنحة العروس، صالات الطعام، ومواقف السيارات." },
+            { question: "هل يتوفر خيار تقديم الإفطار؟", answer: "نعم، في حال حجز الشاليهات أو المنتجعات لعدة أيام، يتوفر بوفيه إفطار حسب الطلب." }
         ]
     },
     contact_info: {
@@ -30,6 +34,8 @@ export const Footer: React.FC = () => {
     },
     social_links: { twitter: '#', instagram: '#', facebook: '#', linkedin: '#' }
   });
+
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -42,16 +48,14 @@ export const Footer: React.FC = () => {
   }, []);
 
   return (
-    <footer className="font-sans bg-white">
+    <footer className="font-sans bg-[#F9FAFB]">
       
-      {/* 1. App Download Section (Taller, Wider, Flat) */}
+      {/* 1. App Download Section */}
       {config.app_section.show && (
-        <section className="bg-white pt-24 border-t border-gray-100">
+        <section className="bg-[#F9FAFB] pt-24">
             <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-center shadow-none min-h-[550px]">
+                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-center min-h-[550px]">
                     <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -mr-40 -mt-40 pointer-events-none"></div>
-                    
-                    {/* Right: Image (Full Column, No Skew) */}
                     <div className="w-full md:w-1/2 h-full min-h-[400px] md:min-h-full relative order-2 md:order-1">
                         <img 
                             src={config.app_section.image_url || "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=800"} 
@@ -60,12 +64,9 @@ export const Footer: React.FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 to-transparent md:bg-gradient-to-r"></div>
                     </div>
-
-                    {/* Left: Text & Badges */}
-                    <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-8 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
-                        <h2 className="text-4xl md:text-6xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
-                        <p className="text-white/80 font-medium text-xl leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
-                        
+                    <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-6 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
+                        <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
+                        <p className="text-white/80 font-medium text-lg leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
                         <div className="flex flex-wrap justify-center md:justify-end gap-4 pt-4">
                             <a href={config.app_section.apple_store_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on App Store" className="h-14" />
@@ -80,35 +81,49 @@ export const Footer: React.FC = () => {
         </section>
       )}
 
-      {/* 2. FAQ Section (Flat, Light Purple) */}
+      {/* 2. FAQ Section */}
       {config.faq_section.show && config.faq_section.items.length > 0 && (
-        <section className="bg-primary/5 py-24 mt-24">
-            <div className="max-w-4xl mx-auto px-6 lg:px-8">
-                <div className="text-center mb-16">
-                    <span className="bg-white text-primary px-5 py-2 rounded-full text-xs font-black border border-primary/10">مساعدة</span>
-                    <h2 className="text-4xl font-black text-gray-900 mt-6">{config.faq_section.title}</h2>
+        <section className="bg-[#F9FAFB] py-32 px-6 lg:px-20">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-16 lg:gap-24 text-right">
+                
+                {/* Left Side: Title Section */}
+                <div className="md:w-1/2 space-y-4">
+                    <span className="text-[#B48C5E] text-sm font-black uppercase tracking-widest">FAQ</span>
+                    <h2 className="text-3xl md:text-4xl font-black text-[#111827] leading-tight">
+                        {config.faq_section.title}
+                    </h2>
                 </div>
-                <div className="space-y-4">
-                    {config.faq_section.items.map((item, i) => (
-                        <details key={i} className="group bg-white border border-primary/5 rounded-[2rem] open:bg-white transition-all duration-300 cursor-pointer overflow-hidden">
-                            <summary className="flex justify-between items-center p-8 font-bold text-lg text-gray-800 list-none hover:bg-gray-50 transition-colors select-none">
-                                {item.question}
-                                <div className="bg-gray-50 group-open:bg-primary group-open:text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors">
-                                    <ChevronLeft className="w-5 h-5 group-open:-rotate-90 transition-transform" />
+
+                {/* Right Side: Accordion Section */}
+                <div className="md:w-1/2">
+                    <div className="border-t border-gray-200">
+                        {config.faq_section.items.map((item, i) => (
+                            <div key={i} className="border-b border-gray-200">
+                                <button 
+                                    onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                                    className="w-full py-7 flex justify-between items-center text-right group focus:outline-none"
+                                >
+                                    <span className="text-xl font-bold text-[#111827] group-hover:text-gray-600 transition-colors">
+                                        {item.question}
+                                    </span>
+                                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${openIndex === i ? 'rotate-180' : ''}`} />
+                                </button>
+                                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openIndex === i ? 'max-h-96 pb-8 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                    <p className="text-lg text-gray-500 font-medium leading-relaxed">
+                                        {item.answer}
+                                    </p>
                                 </div>
-                            </summary>
-                            <div className="px-8 pb-8 text-base text-gray-500 leading-loose border-t border-gray-50 pt-6">
-                                {item.answer}
                             </div>
-                        </details>
-                    ))}
+                        ))}
+                    </div>
                 </div>
+
             </div>
         </section>
       )}
 
-      {/* 3. Main Footer Links (Flat) */}
-      <div className="bg-white pt-20 pb-10">
+      {/* 3. Main Footer Links */}
+      <div className="bg-white pt-20 pb-10 border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
             <div className="grid md:grid-cols-4 gap-12 mb-16 border-b border-gray-50 pb-16">
                 {/* Brand */}
@@ -132,10 +147,10 @@ export const Footer: React.FC = () => {
                 <div className="space-y-6">
                     <h4 className="font-black text-gray-900 text-xl">روابط سريعة</h4>
                     <ul className="space-y-4 text-sm text-gray-500 font-bold">
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> عن المنصة</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> القاعات المميزة</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> انضم كشريك</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> المتجر</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">عن المنصة</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">القاعات المميزة</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">انضم كشريك</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">المتجر</a></li>
                     </ul>
                 </div>
 
@@ -143,10 +158,10 @@ export const Footer: React.FC = () => {
                 <div className="space-y-6">
                     <h4 className="font-black text-gray-900 text-xl">السياسات والدعم</h4>
                     <ul className="space-y-4 text-sm text-gray-500 font-bold">
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> شروط الاستخدام</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> سياسة الخصوصية</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> اتفاقية مستوى الخدمة</a></li>
-                        <li><a href="#" className="hover:text-primary transition-colors flex items-center gap-2 group"><ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> مركز المساعدة</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">شروط الاستخدام</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">سياسة الخصوصية</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">اتفاقية مستوى الخدمة</a></li>
+                        <li><a href="#" className="hover:text-primary transition-colors">مركز المساعدة</a></li>
                     </ul>
                 </div>
 
