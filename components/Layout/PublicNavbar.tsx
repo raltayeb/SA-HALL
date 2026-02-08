@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile } from '../../types';
 import { Button } from '../ui/Button';
-import { ChevronDown, LayoutDashboard, LogOut, Menu, X, Home, Building2, Palmtree, Sparkles, ShoppingBag } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, LogOut, Menu, X, Home, Building2, Palmtree, Sparkles, ShoppingBag, UserPlus } from 'lucide-react';
 
 interface PublicNavbarProps {
   user: UserProfile | null;
@@ -41,16 +41,16 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   const shouldHideAuthButton = activeTab === 'register' && user?.role === 'vendor' && user.status === 'pending';
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 shadow-none transition-all duration-300 h-24">
+    <header className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm transition-all duration-300 h-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             
             {/* Logo & Desktop Nav */}
             <div className="flex items-center gap-12">
               <div className="flex items-center gap-2 cursor-pointer group hover:opacity-80 transition-opacity" onClick={() => onNavigate('home')}>
-                <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-20 w-auto object-contain transition-transform hover:scale-105" />
+                <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-16 w-auto object-contain transition-transform hover:scale-105" />
               </div>
-              <nav className="hidden lg:flex items-center gap-2">
+              <nav className="hidden lg:flex items-center gap-1 bg-gray-50/50 p-1.5 rounded-full border border-gray-100/50">
                 {navItems.map(item => (
                     <button 
                         key={item.id}
@@ -58,8 +58,8 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                         className={`
                             px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 flex items-center gap-2
                             ${activeTab === item.id 
-                                ? 'bg-primary text-white' 
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}
+                                ? 'bg-white text-primary shadow-sm ring-1 ring-black/5' 
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}
                         `}
                     >
                         {item.label}
@@ -75,15 +75,16 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                   <button onClick={() => onNavigate('login')} className={`text-sm font-bold px-6 py-2.5 rounded-full transition-colors ${activeTab === 'login' ? 'text-primary bg-primary/5' : 'text-gray-500 hover:text-primary hover:bg-gray-50'}`}>تسجيل الدخول</button>
                   <Button 
                     onClick={() => onNavigate('register')} 
-                    className="rounded-full px-8 h-11 text-sm font-black bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white transition-all shadow-none"
+                    className="rounded-full px-8 h-12 text-sm font-black bg-primary text-white hover:bg-[#3a006b] hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 flex items-center gap-2 shadow-lg shadow-primary/20 transform hover:-translate-y-0.5"
                   >
+                    <UserPlus className="w-4 h-4" />
                     انضم إلينا
                   </Button>
                 </div>
               ) : !shouldHideAuthButton && (
                 <div className="relative" ref={menuRef}>
-                  <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-3 bg-white border border-gray-100 py-1.5 px-2 pl-4 rounded-full hover:bg-gray-50 transition-all group">
-                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform">
+                  <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-3 bg-white border border-gray-100 py-1.5 px-2 pl-4 rounded-full hover:bg-gray-50 transition-all group shadow-sm hover:shadow">
+                    <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-sm font-black group-hover:scale-110 transition-transform shadow-md shadow-primary/20">
                         {user.full_name?.[0]}
                     </div>
                     <div className="text-right hidden xl:block">
@@ -93,7 +94,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                   </button>
                   
                   {isUserMenuOpen && (
-                    <div className="absolute left-0 mt-4 w-64 bg-white border border-gray-100 rounded-3xl shadow-none ring-1 ring-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[110] text-right">
+                    <div className="absolute left-0 mt-4 w-64 bg-white border border-gray-100 rounded-3xl shadow-xl ring-1 ring-black/5 overflow-hidden animate-in fade-in slide-in-from-top-2 z-[110] text-right">
                       <div className="p-5 border-b border-gray-50 bg-gray-50/50">
                         <p className="text-sm font-black text-gray-900">{user.full_name}</p>
                         <p className="text-xs text-gray-400 mt-1 font-mono font-bold">{user.email}</p>
@@ -138,7 +139,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     {!user ? (
                         <div className="space-y-3">
                             <button onClick={() => { onNavigate('login'); setIsMobileMenuOpen(false); }} className="w-full text-right px-6 py-4 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50">تسجيل الدخول</button>
-                            <button onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} className="w-full text-center py-4 rounded-2xl text-sm font-black bg-primary text-white">انضم إلينا</button>
+                            <button onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} className="w-full text-center py-4 rounded-2xl text-sm font-black bg-primary text-white shadow-lg shadow-primary/20">انضم إلينا</button>
                         </div>
                     ) : (
                         <div className="space-y-3">
