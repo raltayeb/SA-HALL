@@ -94,8 +94,9 @@ const App: React.FC = () => {
       regStepRef.current = regStep;
   }, [activeTab, regStep]);
 
-  const fetchProfile = async (id: string, isInitialLoad = false) => {
-    if (profileIdRef.current === id && !isInitialLoad) {
+  const fetchProfile = async (id: string, forceRedirect = false) => {
+    // Avoid re-fetching if we already have the profile loaded and it's the same user
+    if (profileIdRef.current === id && userProfile) {
         setLoading(false);
         return;
     }
@@ -119,7 +120,9 @@ const App: React.FC = () => {
              ]);
              
              if ((hallCount || 0) > 0 || (serviceCount || 0) > 0) {
-                 if (isInitialLoad || activeTabRef.current === 'login' || activeTabRef.current === 'register' || activeTabRef.current === 'guest_login') {
+                 // Only redirect if explicitly forced (Initial login) OR if user is on a public/auth page
+                 const isPublicOrAuthPage = ['home', 'login', 'register', 'guest_login'].includes(activeTabRef.current);
+                 if (forceRedirect || isPublicOrAuthPage) {
                      setActiveTab('dashboard');
                  }
              } else {
@@ -130,19 +133,19 @@ const App: React.FC = () => {
              }
           }
 
-          if (isInitialLoad) {
+          // Role-based redirection logic (Only on explicit force redirect or initial load)
+          if (forceRedirect) {
             const currentTab = activeTabRef.current;
+            // Only redirect if we are NOT on a specific internal page
             if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab)) {
-               if(currentTab === 'guest_login') setActiveTab('my_bookings'); // Redirect guest to bookings after login
+               if(currentTab === 'guest_login') setActiveTab('my_bookings');
             } else {
-                if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
-                else if (profile.role === 'user') setActiveTab('browse');
+                if (profile.role === 'super_admin' && currentTab === 'home') setActiveTab('admin_dashboard');
+                else if (profile.role === 'user' && currentTab === 'home') setActiveTab('browse');
             }
           }
         } else {
-            // No profile found, likely a guest login via Magic Link but without a profile entry
-            // Create a temporary/guest profile or just allow viewing bookings
-            // For now, assume simple user role
+             // Guest User Logic
              const user = (await supabase.auth.getUser()).data.user;
              if(user) {
                  const newProfile = {
@@ -156,7 +159,10 @@ const App: React.FC = () => {
                      service_limit: 0
                  };
                  setUserProfile(newProfile);
-                 setActiveTab('my_bookings');
+                 // Only redirect if strictly needed
+                 if (activeTabRef.current === 'guest_login' || activeTabRef.current === 'login') {
+                    setActiveTab('my_bookings');
+                 }
              }
         }
     } catch (error) {
@@ -167,6 +173,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchProfile(session.user.id, true);
@@ -175,16 +182,25 @@ const App: React.FC = () => {
       }
     });
     
+    // Auth Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignore token refreshes to prevent UI flickering/resets
       if (event === 'TOKEN_REFRESHED') return;
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        if (session?.user) fetchProfile(session.user.id, event === 'SIGNED_IN');
+        if (session?.user) {
+            // Only force redirect if it's a fresh sign-in, not just a session recovery
+            const isFreshSignIn = event === 'SIGNED_IN';
+            fetchProfile(session.user.id, isFreshSignIn);
+        }
       } else if (event === 'SIGNED_OUT') {
-        setUserProfile(null);
-        profileIdRef.current = null;
-        setLoading(false);
-        setActiveTab('login');
+        // Ensure session is actually gone before clearing state to prevent blips
+        if (!session) {
+            setUserProfile(null);
+            profileIdRef.current = null;
+            setLoading(false);
+            setActiveTab('login');
+        }
       }
     });
 
