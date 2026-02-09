@@ -8,13 +8,13 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  AlertCircle, Palmtree, Users, Calendar, Plus, Minus, CreditCard, Lock
+  AlertCircle, Palmtree, Users, Calendar, Plus, Minus, CreditCard, Lock, Clock, Mail
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format, differenceInCalendarDays, addDays, isSameDay } from 'date-fns';
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from '../components/ui/DatePickerWithRange';
-import { Modal } from '../components/ui/Modal'; // Import standard modal for payment
+import { Modal } from '../components/ui/Modal'; 
 
 interface ChaletDetailsProps {
   item: Hall & { vendor?: UserProfile };
@@ -31,15 +31,14 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   
-  // Guest Counts
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   
-  // Guest Info
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
-  
-  // Addons
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
+  
+  // New: Payment Method State for Chalets too
+  const [paymentMethod, setPaymentMethod] = useState<'full' | 'hold'>('full');
 
   const { toast } = useToast();
 
@@ -65,11 +64,10 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
     fetchAvailability();
   }, [item.id]);
 
-  // Pricing Logic
   const nights = useMemo(() => dateRange?.from && dateRange?.to ? Math.max(1, differenceInCalendarDays(dateRange.to, dateRange.from)) : 1, [dateRange]);
   
   const accommodationCostPerNight = useMemo(() => {
-      const adultCost = adults * (item.price_per_adult || item.price_per_night || 0); // Fallback to per night if per adult not set
+      const adultCost = adults * (item.price_per_adult || item.price_per_night || 0); 
       const childCost = children * (item.price_per_child || 0);
       return adultCost + childCost;
   }, [adults, children, item]);
@@ -95,13 +93,20 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
     if (!checkAvailability()) { toast({ title: 'نعتذر', description: 'بعض الأيام المختارة غير متاحة', variant: 'destructive' }); return; }
     if (!guestData.name || !guestData.phone || !guestData.email) { toast({ title: 'تنبيه', description: 'أكمل بيانات التواصل والبريد الإلكتروني', variant: 'destructive' }); return; }
     
-    // Open Payment Modal
-    setShowPaymentModal(true);
+    // If holding, skip payment modal
+    if (paymentMethod === 'hold') {
+        handleBookingSubmission('hold');
+    } else {
+        setShowPaymentModal(true);
+    }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handleBookingSubmission = async (method: 'full' | 'hold') => {
     setIsBooking(true);
     try {
+      const status = method === 'hold' ? 'on_hold' : 'confirmed';
+      const payStatus = method === 'hold' ? 'unpaid' : 'paid';
+      
       const payload = {
         hall_id: item.id,
         vendor_id: item.vendor_id,
@@ -109,23 +114,23 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
         check_out_date: format(dateRange!.to!, 'yyyy-MM-dd'),
         total_amount: grandTotal,
         vat_amount: vatAmount,
-        paid_amount: grandTotal, // Fully Paid
-        payment_status: 'paid',
-        status: 'confirmed',
-        booking_method: 'full',
+        paid_amount: method === 'full' ? grandTotal : 0, 
+        payment_status: payStatus,
+        status: status,
+        booking_method: method,
         guest_name: guestData.name,
         guest_phone: guestData.phone,
         guest_email: guestData.email,
         guests_adults: adults,
         guests_children: children,
-        user_id: user?.id || null, // Can be null for guests
+        user_id: user?.id || null, 
         items: selectedAddons.map(addon => ({ name: addon.name, price: addon.price, qty: 1, type: 'addon' }))
       };
 
       const { data, error } = await supabase.from('bookings').insert([payload]).select().single();
       if (error) throw error;
       
-      // Also register client in CRM if guest
+      // Register client in CRM
       if (!user) {
           await supabase.from('vendor_clients').insert([{
               vendor_id: item.vendor_id,
@@ -138,7 +143,12 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
       setCompletedBooking(data as any);
       setShowPaymentModal(false);
       setShowInvoice(true);
-      toast({ title: 'تم الحجز بنجاح', description: 'تم إصدار الفاتورة وإرسال تفاصيل الدخول.', variant: 'success' });
+      
+      if (method === 'hold') {
+          toast({ title: 'تم الحجز المبدئي', description: 'تم حجز الشاليه لمدة 48 ساعة.', variant: 'success' });
+      } else {
+          toast({ title: 'تم الحجز بنجاح', description: 'تم إصدار الفاتورة وإرسال تفاصيل الدخول.', variant: 'success' });
+      }
 
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
@@ -237,7 +247,8 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                 <div className="sticky top-28 bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-xl space-y-6">
                     <div className="space-y-4">
                         <label className="text-xs font-black text-gray-400 uppercase tracking-widest">تاريخ الحجز</label>
-                        <div className="bg-gray-50 p-2 rounded-2xl">
+                        {/* Unified Flat Calendar Container */}
+                        <div className="bg-gray-50 p-2 rounded-[2rem] border border-gray-100">
                             <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
                         </div>
                     </div>
@@ -264,7 +275,11 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                     <div className="space-y-3">
                         <Input placeholder="الاسم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-12 rounded-xl bg-gray-50" />
                         <Input placeholder="الجوال (للدخول لاحقاً)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} className="h-12 rounded-xl bg-gray-50" />
-                        <Input placeholder="البريد الإلكتروني (للفاتورة)" type="email" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} className="h-12 rounded-xl bg-gray-50" />
+                        <div className="relative">
+                            <Input placeholder="البريد الإلكتروني (للفاتورة)" type="email" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} className="h-12 rounded-xl bg-gray-50 pr-10" />
+                            <Mail className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        </div>
+                        <p className="text-[9px] text-gray-400 pr-1">* البريد الإلكتروني ضروري لاستلام الفاتورة</p>
                     </div>
 
                     <div className="pt-6 border-t border-gray-100 space-y-3">
@@ -288,10 +303,17 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                         </div>
                     </div>
 
+                    {/* Payment Toggles */}
+                    <div className="flex flex-col gap-2">
+                        <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-xl">
+                            <button onClick={() => setPaymentMethod('full')} className={`py-2 rounded-lg text-[10px] font-black transition-all ${paymentMethod === 'full' ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>دفع كامل</button>
+                            <button onClick={() => setPaymentMethod('hold')} className={`py-2 rounded-lg text-[10px] font-black transition-all ${paymentMethod === 'hold' ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}>حجز 48 ساعة</button>
+                        </div>
+                    </div>
+
                     <Button onClick={initiateBooking} disabled={isBooking} className="w-full h-14 rounded-2xl font-black text-lg bg-gray-900 text-white shadow-xl hover:bg-black transition-all">
-                        {isBooking ? <Loader2 className="animate-spin" /> : 'الانتقال للدفع'}
+                        {isBooking ? <Loader2 className="animate-spin" /> : (paymentMethod === 'hold' ? 'تأكيد الحجز المبدئي' : 'الانتقال للدفع')}
                     </Button>
-                    <p className="text-[10px] text-gray-400 text-center font-bold">يمكنك الدخول لحسابك لاحقاً برقم الجوال والبريد المسجل</p>
                 </div>
             </div>
         </div>
@@ -317,15 +339,9 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                   </div>
               </div>
 
-              <Button onClick={handlePaymentSuccess} disabled={isBooking} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 text-white">
+              <Button onClick={() => handleBookingSubmission('full')} disabled={isBooking} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 text-white">
                   {isBooking ? <Loader2 className="animate-spin" /> : `دفع ${grandTotal.toLocaleString()} ر.س`}
               </Button>
-              <div className="flex justify-center gap-2 opacity-50">
-                  {/* Payment Icons Placeholders */}
-                  <div className="w-8 h-5 bg-gray-200 rounded"></div>
-                  <div className="w-8 h-5 bg-gray-200 rounded"></div>
-                  <div className="w-8 h-5 bg-gray-200 rounded"></div>
-              </div>
           </div>
       </Modal>
 

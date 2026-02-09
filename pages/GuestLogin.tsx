@@ -3,42 +3,68 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Loader2, ArrowRight, Smartphone, Mail, KeyRound } from 'lucide-react';
+import { Loader2, ArrowRight, Smartphone, KeyRound } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState(''); // Retrieved from backend
   const [otp, setOtp] = useState('');
   const { toast } = useToast();
 
-  const handleSendOtp = async () => {
-    if (!email || !phone) {
-        toast({ title: 'بيانات ناقصة', description: 'يرجى إدخال البريد الإلكتروني ورقم الجوال.', variant: 'destructive' });
+  const handleLookupAndSendOtp = async () => {
+    if (!phone) {
+        toast({ title: 'رقم الجوال مطلوب', description: 'يرجى إدخال رقم الجوال المسجل في الحجوزات.', variant: 'destructive' });
         return;
     }
     setLoading(true);
     
-    // In a real scenario, you'd check if a booking exists for this email/phone pair first.
-    // For this demo, we use Supabase Magic Link via Email.
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    
-    setLoading(false);
-    if (error) {
-        toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
-    } else {
-        toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
+    try {
+        // 1. Lookup Email associated with this phone from bookings or vendor_clients
+        // Using `bookings` is safer as it guarantees they made a booking
+        const { data, error: lookupError } = await supabase
+            .from('bookings')
+            .select('guest_email')
+            .eq('guest_phone', phone)
+            .not('guest_email', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (lookupError || !data?.guest_email) {
+            toast({ title: 'غير مسجل', description: 'لم نجد أي حجوزات مرتبطة برقم الجوال هذا.', variant: 'destructive' });
+            setLoading(false);
+            return;
+        }
+
+        const foundEmail = data.guest_email;
+        setEmail(foundEmail); // Store for verification step
+
+        // 2. Send OTP to the found email
+        const { error: authError } = await supabase.auth.signInWithOtp({ email: foundEmail });
+        
+        if (authError) throw authError;
+
+        toast({ title: 'تم الإرسال', description: `تم إرسال رمز الدخول إلى بريدك الإلكتروني المرتبط (${foundEmail.slice(0, 3)}***).`, variant: 'success' });
         setStep(2);
+
+    } catch (err: any) {
+        console.error(err);
+        toast({ title: 'خطأ', description: 'حدث خطأ أثناء محاولة الدخول.', variant: 'destructive' });
+    } finally {
+        setLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
+    if (!otp || !email) return;
     setLoading(true);
+    
     const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'magiclink' });
+    
     if (error) {
-        // Fallback for signup type if magiclink fails (sometimes happens in dev)
         const { error: signupError } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
         if(signupError) {
             toast({ title: 'رمز خاطئ', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
@@ -57,26 +83,32 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             
             <div className="text-center mb-8">
                 <h2 className="text-2xl font-black text-primary">دخول الضيوف</h2>
-                <p className="text-gray-500 font-bold mt-2 text-sm">تابع حجوزاتك وفواتيرك السابقة</p>
+                <p className="text-gray-500 font-bold mt-2 text-sm">أدخل رقم الجوال لاستلام رمز الدخول</p>
             </div>
 
             {step === 1 ? (
                 <div className="space-y-4 animate-in slide-in-from-right">
-                    <Input label="رقم الجوال المسجل" value={phone} onChange={e => setPhone(e.target.value)} icon={<Smartphone className="w-4 h-4" />} className="h-12 rounded-xl" />
-                    <Input label="البريد الإلكتروني المسجل" type="email" value={email} onChange={e => setEmail(e.target.value)} icon={<Mail className="w-4 h-4" />} className="h-12 rounded-xl" />
-                    <Button onClick={handleSendOtp} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg shadow-primary/20 mt-4">
+                    <Input 
+                        label="رقم الجوال المسجل" 
+                        value={phone} 
+                        onChange={e => setPhone(e.target.value)} 
+                        icon={<Smartphone className="w-4 h-4" />} 
+                        className="h-12 rounded-xl text-center font-bold text-lg" 
+                        placeholder="05xxxxxxxx"
+                    />
+                    <Button onClick={handleLookupAndSendOtp} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg shadow-primary/20 mt-4">
                         {loading ? <Loader2 className="animate-spin" /> : 'إرسال رمز التحقق'}
                     </Button>
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-right text-center">
                     <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600 mb-4"><KeyRound className="w-8 h-8" /></div>
-                    <p className="text-sm font-bold text-gray-500">تم إرسال الرمز إلى {email}</p>
-                    <Input placeholder="أدخل الرمز (6 أرقام)" value={otp} onChange={e => setOtp(e.target.value)} className="h-14 rounded-xl text-center text-2xl font-black tracking-widest" maxLength={6} />
+                    <p className="text-sm font-bold text-gray-500">أدخل الرمز المرسل إلى بريدك الإلكتروني</p>
+                    <Input placeholder="------" value={otp} onChange={e => setOtp(e.target.value)} className="h-14 rounded-xl text-center text-2xl font-black tracking-widest" maxLength={6} />
                     <Button onClick={handleVerifyOtp} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg shadow-primary/20">
                         {loading ? <Loader2 className="animate-spin" /> : 'تحقق ودخول'}
                     </Button>
-                    <button onClick={() => setStep(1)} className="text-xs font-bold text-gray-400 underline">تغيير البيانات</button>
+                    <button onClick={() => setStep(1)} className="text-xs font-bold text-gray-400 underline">تغيير الرقم</button>
                 </div>
             )}
         </div>
