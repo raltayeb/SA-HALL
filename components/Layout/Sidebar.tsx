@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {
         title: "المتجر",
         items: [
-          { id: 'brand_settings', label: 'الهوية والتواصل', icon: <Palette className="w-5 h-5" /> },
+          { id: 'brand_settings', label: 'الإعدادات', icon: <Settings className="w-5 h-5" /> },
         ]
       }
     ];
