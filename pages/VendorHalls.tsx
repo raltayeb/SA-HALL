@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Hall, Booking, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES } from '../types';
+import { UserProfile, Hall, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Plus, MapPin, X, Loader2, Building2, Lock, ArrowUpRight, Filter, Trash2, ClipboardList, Sparkles, Minus, Package, Users, CheckSquare
+  Plus, MapPin, X, Loader2, Building2, Trash2, Sparkles, Minus, Package, CheckSquare
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -56,7 +56,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('hall-images').getPublicUrl(fileName);
       const newImages = [...(currentHall.images || []), publicUrl];
-      setCurrentHall(prev => ({ ...prev, images: newImages, image_url: newImages[0] })); // Set first image as cover
+      setCurrentHall(prev => ({ ...prev, images: newImages, image_url: newImages[0] })); 
       toast({ title: 'تم الرفع', variant: 'success' });
     } catch (error: any) {
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
@@ -115,19 +115,19 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 pb-10">
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-200">
         <div>
            <h2 className="text-3xl font-black text-primary">إدارة القاعات</h2>
            <p className="text-sm text-gray-400 mt-1 font-bold">إضافة وتعديل القاعات والأسعار.</p>
         </div>
-        <Button onClick={() => { setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [], packages: [], type: 'hall' }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
+        <Button onClick={() => { setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [], packages: [], type: 'hall' }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow">
             <Plus className="w-4 h-4" /> إضافة قاعة
         </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loading ? [1, 2, 3].map(i => <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>) : halls.map(hall => (
-            <div key={hall.id} className="bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden flex flex-col group hover:border-primary/30 transition-all">
+            <div key={hall.id} className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden flex flex-col group hover:border-primary/50 transition-all">
               <div className="aspect-[4/3] bg-gray-50 relative overflow-hidden">
                 {hall.image_url && <img src={hall.image_url} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />}
                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black">{hall.city}</div>
@@ -138,8 +138,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     <p className="text-[10px] text-gray-400 font-bold mt-1">السعة: {hall.capacity} شخص</p>
                 </div>
                 <PriceTag amount={hall.price_per_night} className="text-xl" />
-                <div className="mt-auto pt-4 border-t border-gray-50">
-                  <Button variant="outline" className="w-full rounded-xl h-10 text-xs font-black" onClick={() => { setCurrentHall(hall); setIsEditing(true); }}>تعديل التفاصيل</Button>
+                <div className="mt-auto pt-4 border-t border-gray-100">
+                  <Button variant="outline" className="w-full rounded-xl h-10 text-xs font-black border-gray-200" onClick={() => { setCurrentHall(hall); setIsEditing(true); }}>تعديل التفاصيل</Button>
                 </div>
               </div>
             </div>
@@ -148,7 +148,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="w-full md:max-w-4xl h-full bg-white border-l border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="w-full md:max-w-4xl h-full bg-white border-l border-gray-200 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
               <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10">
                 <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-50 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"><X className="w-5 h-5" /></button>
                 <div className="text-right">
@@ -158,13 +158,13 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               
               <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar text-right">
                  {/* Basic Info */}
-                 <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                 <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                     <h3 className="text-sm font-black text-primary mb-4">البيانات الأساسية</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <Input label="اسم القاعة" value={currentHall.name || ''} onChange={e => setCurrentHall({...currentHall, name: e.target.value})} className="h-12 rounded-xl" />
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-gray-500">المدينة</label>
-                            <select className="w-full h-12 border rounded-xl px-4 bg-white outline-none font-bold" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
+                            <select className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm" value={currentHall.city} onChange={e => setCurrentHall({...currentHall, city: e.target.value})}>
                                 {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
@@ -181,11 +181,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  </div>
 
                  {/* Amenities */}
-                 <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                 <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                     <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> المرافق والخدمات</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                         {HALL_AMENITIES.map(amenity => (
-                            <label key={amenity} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${currentHall.amenities?.includes(amenity) ? 'bg-primary/5 border-primary text-primary' : 'bg-white border-gray-100 text-gray-500'}`}>
+                            <label key={amenity} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${currentHall.amenities?.includes(amenity) ? 'bg-primary/5 border-primary text-primary' : 'bg-white border-gray-200 text-gray-500'}`}>
                                 <input type="checkbox" checked={currentHall.amenities?.includes(amenity)} onChange={() => handleAmenityToggle(amenity)} className="hidden" />
                                 <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${currentHall.amenities?.includes(amenity) ? 'bg-primary text-white border-primary' : 'bg-gray-100'}`}>
                                     {currentHall.amenities?.includes(amenity) && <CheckSquare className="w-3 h-3" />}
@@ -197,7 +197,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  </div>
 
                  {/* Packages */}
-                 <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                 <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                     <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><Package className="w-4 h-4" /> الباقات (اختياري)</h3>
                     <div className="flex gap-2 mb-4">
                         <Button onClick={addPackage} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
@@ -207,7 +207,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     </div>
                     <div className="space-y-2">
                         {currentHall.packages?.map((pkg, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                                 <button onClick={() => setCurrentHall(prev => ({...prev, packages: prev.packages?.filter((_, i) => i !== idx)}))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
                                 <div className="flex items-center gap-4 flex-1 justify-end">
                                     <span className="text-xs text-gray-500">{pkg.description}</span>
@@ -220,7 +220,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  </div>
 
                  {/* Addons */}
-                 <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                 <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                     <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4" /> خدمات إضافية</h3>
                     <div className="flex gap-2 mb-4">
                         <Button onClick={addAddon} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
@@ -229,7 +229,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     </div>
                     <div className="space-y-2">
                         {currentHall.addons?.map((addon, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
                                 <button onClick={() => setCurrentHall(prev => ({...prev, addons: prev.addons?.filter((_, i) => i !== idx)}))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
                                 <div className="flex items-center gap-4">
                                     <span className="font-bold text-gray-900">{addon.name}</span>
@@ -241,7 +241,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  </div>
 
                  {/* Images */}
-                 <div className="bg-white border border-gray-100 rounded-2xl p-6">
+                 <div className="bg-white border border-gray-200 rounded-2xl p-6">
                     <h3 className="text-sm font-black text-primary mb-6 text-right">معرض الصور</h3>
                     <div className="flex flex-wrap gap-4 justify-end">
                         <div onClick={() => fileInputRef.current?.click()} className="w-40 h-40 rounded-xl bg-purple-50 border-2 border-dashed border-purple-200 flex items-center justify-center cursor-pointer hover:bg-purple-100 transition-all group">

@@ -17,7 +17,6 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ContentCMS } from './pages/ContentCMS';
 import { ServiceCategories } from './pages/ServiceCategories'; 
 import { AdminStore } from './pages/AdminStore'; 
-import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorCoupons } from './pages/VendorCoupons';
 import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorServices } from './pages/VendorServices';
@@ -31,8 +30,7 @@ import { VendorAccounting } from './pages/VendorAccounting';
 import { HallDetails } from './pages/HallDetails';
 import { ChaletDetails } from './pages/ChaletDetails';
 import { ServiceDetails } from './pages/ServiceDetails';
-import { VendorClients } from './pages/VendorClients';
-import { GuestLogin } from './pages/GuestLogin'; // Import Guest Login
+import { GuestLogin } from './pages/GuestLogin'; 
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -95,7 +93,6 @@ const App: React.FC = () => {
   }, [activeTab, regStep]);
 
   const fetchProfile = async (id: string, forceRedirect = false) => {
-    // Avoid re-fetching if we already have the profile loaded and it's the same user
     if (profileIdRef.current === id && userProfile) {
         setLoading(false);
         return;
@@ -120,7 +117,6 @@ const App: React.FC = () => {
              ]);
              
              if ((hallCount || 0) > 0 || (serviceCount || 0) > 0) {
-                 // Only redirect if explicitly forced (Initial login) OR if user is on a public/auth page
                  const isPublicOrAuthPage = ['home', 'login', 'register', 'guest_login'].includes(activeTabRef.current);
                  if (forceRedirect || isPublicOrAuthPage) {
                      setActiveTab('dashboard');
@@ -133,7 +129,6 @@ const App: React.FC = () => {
              }
           }
 
-          // Role-based redirection logic
           if (forceRedirect) {
             const currentTab = activeTabRef.current;
             const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab);
@@ -141,15 +136,12 @@ const App: React.FC = () => {
             if (profile.role === 'super_admin' && (isPublicPage || currentTab === 'home')) {
                 setActiveTab('admin_dashboard');
             } else if (profile.role === 'user') {
-                // FORCE USER/GUEST TO BOOKINGS ONLY
                 setActiveTab('my_bookings');
             } else if (profile.role === 'vendor' && currentTab === 'guest_login') {
                 setActiveTab('dashboard');
             }
           }
         } else {
-             // Guest User Logic (Just created via GuestLogin trigger, typically)
-             // But if we are here, we usually have a profile. If not, handle graceful fallback.
              const user = (await supabase.auth.getUser()).data.user;
              if(user) {
                  const newProfile = {
@@ -163,7 +155,6 @@ const App: React.FC = () => {
                      service_limit: 0
                  };
                  setUserProfile(newProfile);
-                 // Redirect guest to bookings immediately
                  setActiveTab('my_bookings');
              }
         }
@@ -175,7 +166,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchProfile(session.user.id, true);
@@ -184,16 +174,11 @@ const App: React.FC = () => {
       }
     });
     
-    // Auth Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // Ignore token refreshes to prevent UI flickering/resets
       if (event === 'TOKEN_REFRESHED') return;
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session?.user) {
-            // CRITICAL FIX: Only fetch profile and redirect if the user ID has actually changed 
-            // or if we haven't loaded a profile yet.
-            // This prevents page resets when switching browser tabs.
             if (profileIdRef.current !== session.user.id) {
                 fetchProfile(session.user.id, true);
             }
@@ -572,13 +557,11 @@ const App: React.FC = () => {
                 {activeTab === 'my_services' && <VendorServices user={userProfile} />}
                 {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
                 {activeTab === 'hall_bookings' && <Bookings user={userProfile} />}
-                {activeTab === 'vendor_marketplace' && <VendorMarketplace user={userProfile} />}
                 {activeTab === 'coupons' && <VendorCoupons user={userProfile} />}
                 {activeTab === 'accounting' && <VendorAccounting user={userProfile} />}
                 {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
                 {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
                 {activeTab === 'my_bookings' && <Bookings user={userProfile} />}
-                {activeTab === 'my_clients' && <VendorClients user={userProfile} />}
                 {activeTab === 'admin_dashboard' && userProfile.role === 'super_admin' && <AdminDashboard />}
                 {activeTab === 'admin_users' && userProfile.role === 'super_admin' && <UsersManagement />}
                 {activeTab === 'admin_requests' && userProfile.role === 'super_admin' && <AdminRequests />}

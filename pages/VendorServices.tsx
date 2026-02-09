@@ -55,12 +55,11 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('service-images').getPublicUrl(fileName);
       
-      // Update images array (Portfolio)
       const newImages = [...(currentService.images || []), publicUrl];
       setCurrentService(prev => ({ 
           ...prev, 
           images: newImages,
-          image_url: newImages[0] // Main image is first one
+          image_url: newImages[0]
       }));
       toast({ title: 'نجاح', description: 'تم رفع الصورة بنجاح.', variant: 'success' });
     } catch (error: any) {
@@ -112,31 +111,31 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 pb-10 font-sans text-right">
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-200">
         <div>
           <h2 className="text-3xl font-black text-primary">إدارة الخدمات</h2>
           <p className="text-sm text-muted-foreground mt-1 font-bold">باقات إضافية، ضيافة، وتجهيزات.</p>
         </div>
-        <Button onClick={handleAddNew} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
+        <Button onClick={handleAddNew} className="rounded-xl h-12 px-8 font-black gap-2 shadow">
             <Plus className="w-4 h-4" /> خدمة جديدة
         </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loading ? [1,2,3].map(i => <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>) : services.map(s => (
-            <div key={s.id} className="group bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col relative">
+            <div key={s.id} className="group bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col relative">
               <div className="aspect-[4/3] bg-gray-50 relative overflow-hidden">
                 {s.image_url ? (
                     <img src={s.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 ) : (
                     <div className="flex h-full items-center justify-center opacity-10"><Package className="w-16 h-16" /></div>
                 )}
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black shadow-sm text-primary">{s.category}</div>
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black border border-gray-100 text-primary">{s.category}</div>
               </div>
               <div className="p-6 flex-1 flex flex-col gap-3">
                 <h3 className="font-black text-lg text-gray-900 truncate">{s.name}</h3>
                 <PriceTag amount={s.price} className="text-xl text-primary" />
-                <Button variant="outline" className="mt-auto w-full rounded-xl text-xs font-bold" onClick={() => { setCurrentService(s); setIsEditing(true); }}>تعديل</Button>
+                <Button variant="outline" className="mt-auto w-full rounded-xl text-xs font-bold border-gray-200" onClick={() => { setCurrentService(s); setIsEditing(true); }}>تعديل</Button>
               </div>
             </div>
         ))}
@@ -147,14 +146,14 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
           <Input label="اسم الخدمة" value={currentService.name || ''} onChange={e => setCurrentService({...currentService, name: e.target.value})} className="h-12 rounded-xl text-right font-bold" />
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">التصنيف</label>
-            <select className="w-full h-12 border rounded-xl px-4 text-sm font-bold bg-white outline-none" value={currentService.category || ''} onChange={e => setCurrentService({...currentService, category: e.target.value})}>
+            <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none" value={currentService.category || ''} onChange={e => setCurrentService({...currentService, category: e.target.value})}>
               {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
             </select>
           </div>
           <Input label="سعر الخدمة (ر.س) / يبدأ من" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
           <div className="space-y-2">
              <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">الوصف التفصيلي</label>
-             <textarea className="w-full h-32 border rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentService.description || ''} onChange={e => setCurrentService({...currentService, description: e.target.value})} />
+             <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentService.description || ''} onChange={e => setCurrentService({...currentService, description: e.target.value})} />
           </div>
           
           <div className="space-y-4 pt-4 border-t border-gray-100">
@@ -174,8 +173,8 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
           </div>
 
           <div className="flex gap-3 justify-end mt-8 border-t border-gray-100 pt-6">
-            <Button variant="outline" onClick={() => setIsEditing(false)} className="h-12 rounded-xl px-6 font-bold flex-1">إلغاء</Button>
-            <Button onClick={handleSave} disabled={uploading || saving} className="h-12 px-10 rounded-xl font-black shadow-xl shadow-primary/20 flex-[2]">
+            <Button variant="outline" onClick={() => setIsEditing(false)} className="h-12 rounded-xl px-6 font-bold flex-1 border-gray-200">إلغاء</Button>
+            <Button onClick={handleSave} disabled={uploading || saving} className="h-12 px-10 rounded-xl font-black shadow flex-[2]">
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تأكيد وحفظ'}
             </Button>
           </div>
