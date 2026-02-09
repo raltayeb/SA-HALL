@@ -16,10 +16,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   if (!booking) return null;
 
   const isConsultation = booking.booking_type === 'consultation';
+  const isPackageBooking = !!booking.package_name; // Check if a package was selected
   
   // Calculate Totals based on stored data or recalculate if needed
-  const rawSubtotal = (booking.halls?.price_per_night || 0) + (booking.services?.price || 0);
-  // Add items total
+  // If it's a package booking, the base hall price is 0 (covered by the package item in items list)
+  const rawSubtotal = isPackageBooking ? 0 : (booking.halls?.price_per_night || booking.services?.price || 0);
+  
+  // Add items total (includes package price if applicable)
   const itemsTotal = booking.items ? booking.items.reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
   
   const totalSubWithItems = rawSubtotal + itemsTotal;
@@ -34,7 +37,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
 
   return (
-    // Updated max-h to 65vh as requested
+    // Updated max-h to 65vh
     <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "عرض سعر" : "الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[65vh] flex flex-col">
       <div className="space-y-4 text-right pb-2 overflow-y-auto custom-scrollbar flex-1 px-1" id="printable-invoice">
         {/* Header Compact */}
@@ -83,7 +86,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
                       <div className="text-[9px] text-gray-400 font-bold mt-0.5">{booking.booking_date}</div>
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-gray-900">
-                        {formatCurrency(booking.halls?.price_per_night || booking.services?.price || 0)}
+                        {isPackageBooking ? <span className="text-[9px] text-gray-400 font-medium">مشمول في الباقة</span> : formatCurrency(booking.halls?.price_per_night || booking.services?.price || 0)}
                     </td>
                   </tr>
               )}
