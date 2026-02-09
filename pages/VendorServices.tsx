@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Service, ServiceCategory } from '../types';
+import { UserProfile, Service, ServiceCategory, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Plus, Sparkles, Tag, Edit3, Trash2, Package, Upload, Loader2, X, Lock } from 'lucide-react';
+import { Plus, Sparkles, Tag, Edit3, Trash2, Package, Upload, Loader2, X, Lock, MapPin, Check } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 
@@ -69,6 +69,15 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
     }
   };
 
+  const toggleCity = (city: string) => {
+      const currentAreas = currentService.service_areas || [];
+      if (currentAreas.includes(city)) {
+          setCurrentService(prev => ({ ...prev, service_areas: currentAreas.filter(c => c !== city) }));
+      } else {
+          setCurrentService(prev => ({ ...prev, service_areas: [...currentAreas, city] }));
+      }
+  };
+
   const handleSave = async () => {
     if (!currentService.name || !currentService.price) {
       toast({ title: 'تنبيه', description: 'يرجى إدخال اسم الخدمة وسعرها.', variant: 'destructive' });
@@ -80,7 +89,8 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
       vendor_id: user.id, 
       price: Number(currentService.price),
       is_active: currentService.is_active ?? true,
-      category: currentService.category || categories[0]?.name || 'عام'
+      category: currentService.category || categories[0]?.name || 'عام',
+      service_areas: currentService.service_areas || []
     };
 
     try {
@@ -105,13 +115,13 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
        toast({ title: 'الحد الأقصى', description: 'وصلت للحد المسموح من الخدمات.', variant: 'warning' });
        return;
     }
-    setCurrentService({ is_active: true, category: categories[0]?.name || '', images: [] }); 
+    setCurrentService({ is_active: true, category: categories[0]?.name || '', images: [], service_areas: [] }); 
     setIsEditing(true);
   };
 
   return (
     <div className="space-y-8 pb-10 font-sans text-right">
-      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-200">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100">
         <div>
           <h2 className="text-3xl font-black text-primary">إدارة الخدمات</h2>
           <p className="text-sm text-muted-foreground mt-1 font-bold">باقات إضافية، ضيافة، وتجهيزات.</p>
@@ -123,7 +133,7 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {loading ? [1,2,3].map(i => <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>) : services.map(s => (
-            <div key={s.id} className="group bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col relative">
+            <div key={s.id} className="group bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden hover:border-primary/50 transition-all duration-300 flex flex-col relative">
               <div className="aspect-[4/3] bg-gray-50 relative overflow-hidden">
                 {s.image_url ? (
                     <img src={s.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -134,8 +144,18 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
               </div>
               <div className="p-6 flex-1 flex flex-col gap-3">
                 <h3 className="font-black text-lg text-gray-900 truncate">{s.name}</h3>
+                <div className="flex flex-wrap gap-1 mb-2">
+                    {s.service_areas && s.service_areas.length > 0 ? (
+                        s.service_areas.slice(0, 2).map((city, idx) => (
+                            <span key={idx} className="text-[10px] bg-gray-50 px-2 py-1 rounded-md text-gray-500 font-bold">{city}</span>
+                        ))
+                    ) : (
+                        <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded-md font-bold">كل المناطق</span>
+                    )}
+                    {(s.service_areas?.length || 0) > 2 && <span className="text-[10px] bg-gray-50 px-2 py-1 rounded-md text-gray-500 font-bold">+{s.service_areas!.length - 2}</span>}
+                </div>
                 <PriceTag amount={s.price} className="text-xl text-primary" />
-                <Button variant="outline" className="mt-auto w-full rounded-xl text-xs font-bold border-gray-200" onClick={() => { setCurrentService(s); setIsEditing(true); }}>تعديل</Button>
+                <Button variant="outline" className="mt-auto w-full rounded-xl text-xs font-bold border-gray-100" onClick={() => { setCurrentService(s); setIsEditing(true); }}>تعديل</Button>
               </div>
             </div>
         ))}
@@ -151,6 +171,27 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
             </select>
           </div>
           <Input label="سعر الخدمة (ر.س) / يبدأ من" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
+          
+          {/* Service Areas */}
+          <div className="space-y-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-primary" /> مناطق تقديم الخدمة
+             </label>
+             <div className="grid grid-cols-3 md:grid-cols-4 gap-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                {SAUDI_CITIES.map(city => (
+                    <button 
+                        key={city}
+                        onClick={() => toggleCity(city)}
+                        className={`text-[10px] font-bold py-2 px-1 rounded-xl transition-all border flex items-center justify-center gap-1 ${currentService.service_areas?.includes(city) ? 'bg-primary text-white border-primary shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:border-primary/30'}`}
+                    >
+                        {currentService.service_areas?.includes(city) && <Check className="w-3 h-3" />}
+                        {city}
+                    </button>
+                ))}
+             </div>
+             <p className="text-[10px] text-gray-400 font-bold text-center">تحديد مدن محددة أو تركها فارغة لتشمل جميع المناطق</p>
+          </div>
+
           <div className="space-y-2">
              <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">الوصف التفصيلي</label>
              <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentService.description || ''} onChange={e => setCurrentService({...currentService, description: e.target.value})} />

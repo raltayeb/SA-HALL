@@ -167,6 +167,7 @@ export interface Service {
   description: string;
   image_url: string;
   images?: string[]; 
+  service_areas?: string[]; // Added: Areas where service is provided
   is_active: boolean;
   created_at?: string;
 }

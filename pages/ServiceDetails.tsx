@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Input } from '../components/ui/Input';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
-import { ArrowRight, Sparkles, User, MessageCircle, Share2, Heart, CheckCircle2, Calendar as CalendarIcon, Phone, Loader2, Image as ImageIcon, Mail, Clock } from 'lucide-react';
+import { ArrowRight, Sparkles, User, MessageCircle, Share2, Heart, CheckCircle2, Calendar as CalendarIcon, Phone, Loader2, Image as ImageIcon, Mail, Clock, MapPin } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Calendar } from '../components/ui/Calendar';
 import { format, isBefore, startOfDay, isSameDay, parse } from 'date-fns';
@@ -28,8 +28,8 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
   
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '', notes: '' });
   
-  // Payment methods: 'full', 'deposit', 'hold'
-  const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit' | 'hold'>('deposit');
+  // Service booking always requires full payment
+  const paymentMethod = 'full';
 
   const { toast } = useToast();
 
@@ -43,7 +43,6 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
   const basePrice = Number(item.price);
   const vat = basePrice * VAT_RATE;
   const grandTotal = basePrice + vat;
-  const depositAmount = grandTotal * 0.30; 
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -63,9 +62,11 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
     setIsBooking(true);
     try {
       const normalizedPhone = normalizeNumbers(guestData.phone);
-      const status = paymentMethod === 'hold' ? 'on_hold' : 'pending';
-      const paymentStatus = paymentMethod === 'full' ? 'paid' : paymentMethod === 'deposit' ? 'partial' : 'unpaid';
-      const paidAmount = paymentMethod === 'full' ? grandTotal : paymentMethod === 'deposit' ? depositAmount : 0;
+      // Force status to pending/unpaid initially or paid if integrated with gateway. 
+      // Assuming manual payment or immediate capture simulation:
+      const status = 'pending'; 
+      const paymentStatus = 'paid'; // As per request "Full amount paid" - simulation
+      const paidAmount = grandTotal; 
       
       const payload = {
         service_id: item.id,
@@ -101,11 +102,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
       setCompletedBooking(data);
       setShowInvoice(true);
       
-      if (paymentMethod === 'hold') {
-          toast({ title: 'تم الحجز المبدئي', description: 'تم حجز الخدمة مؤقتاً.', variant: 'success' });
-      } else {
-          toast({ title: 'تم الطلب بنجاح', description: 'تم إصدار الفاتورة وإرسال التفاصيل لبريدك الإلكتروني.', variant: 'success' });
-      }
+      toast({ title: 'تم الطلب بنجاح', description: 'تم إصدار الفاتورة وإرسال التفاصيل لبريدك الإلكتروني.', variant: 'success' });
 
     } catch (e: any) { 
         toast({ title: 'خطأ', description: e.message, variant: 'destructive' });
@@ -162,12 +159,33 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
                         </div>
                     </div>
 
-                    {/* 2. Description Card */}
+                    {/* 2. Description & Areas Card */}
                     <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
-                        <h3 className="text-xl font-black text-gray-900">تفاصيل الخدمة</h3>
-                        <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
+                        <div>
+                            <h3 className="text-xl font-black text-gray-900 mb-4">تفاصيل الخدمة</h3>
+                            <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
+                        </div>
                         
-                        <div className="flex flex-wrap gap-3 pt-4">
+                        <div className="pt-6 border-t border-gray-50">
+                            <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                                <MapPin className="w-5 h-5 text-primary" /> مناطق التغطية
+                            </h3>
+                            <div className="flex flex-wrap gap-3">
+                                {item.service_areas && item.service_areas.length > 0 ? (
+                                    item.service_areas.map((area, i) => (
+                                        <div key={i} className="bg-gray-50 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold border border-gray-100">
+                                            {area}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="bg-green-50 text-green-700 px-4 py-2 rounded-xl text-xs font-bold border border-green-100">
+                                        متوفر في جميع المناطق
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 pt-6 border-t border-gray-50">
                             <div className="bg-orange-50 text-orange-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border border-orange-100">
                                 <CheckCircle2 className="w-4 h-4" /> خدمة موثقة
                             </div>
@@ -247,31 +265,13 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
                                 <PriceTag amount={vat} />
                             </div>
                             <div className="flex justify-between text-xl font-black text-orange-600 pt-2 border-t border-dashed border-gray-200">
-                                <span>الإجمالي</span>
+                                <span>الإجمالي (دفع كامل)</span>
                                 <PriceTag amount={grandTotal} />
                             </div>
                         </div>
 
-                        {/* Payment Toggle */}
-                        <div className="flex flex-col gap-2">
-                            <div className="grid grid-cols-2 gap-2 bg-gray-50 p-1 rounded-xl">
-                                <button onClick={() => setPaymentMethod('deposit')} className={`py-2 rounded-lg text-[10px] font-black transition-all ${paymentMethod === 'deposit' ? 'bg-white shadow text-purple-600' : 'text-gray-400'}`}>عربون (30%)</button>
-                                <button onClick={() => setPaymentMethod('full')} className={`py-2 rounded-lg text-[10px] font-black transition-all ${paymentMethod === 'full' ? 'bg-white shadow text-purple-600' : 'text-gray-400'}`}>دفع كامل</button>
-                            </div>
-                            <button 
-                                onClick={() => setPaymentMethod('hold')} 
-                                className={`w-full py-2.5 rounded-xl text-[10px] font-black border-2 transition-all flex items-center justify-center gap-2 ${paymentMethod === 'hold' ? 'border-purple-600 text-purple-600 bg-purple-50' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
-                            >
-                                <Clock className="w-3 h-3" /> حجز مبدئي (48 ساعة)
-                            </button>
-                        </div>
-
                         <Button onClick={handleBooking} disabled={isBooking} className="w-full h-14 rounded-2xl font-black text-lg bg-gray-900 text-white shadow hover:bg-black transition-all active:scale-95">
-                            {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : 
-                                (paymentMethod === 'deposit' ? `دفع العربون (${depositAmount.toLocaleString()} ر.س)` : 
-                                paymentMethod === 'hold' ? 'تأكيد الحجز المبدئي' : 
-                                'دفع وتأكيد الطلب')
-                            }
+                            {isBooking ? <Loader2 className="w-6 h-6 animate-spin" /> : 'دفع وتأكيد الطلب'}
                         </Button>
                     </div>
                 </div>

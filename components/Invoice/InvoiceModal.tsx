@@ -3,7 +3,7 @@ import React from 'react';
 import { Modal } from '../ui/Modal';
 import { Booking, VAT_RATE } from '../../types';
 import { formatCurrency } from '../../utils/currency';
-import { Printer, Download, CheckCircle2, QrCode, Tag, Package } from 'lucide-react';
+import { Printer, Download, QrCode } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface InvoiceModalProps {
@@ -34,8 +34,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
 
   return (
-    // Updated className for smaller size, centering, and high z-index
-    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "عرض سعر" : "الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[85vh] flex flex-col">
+    // Updated max-h to 65vh as requested
+    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "عرض سعر" : "الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[65vh] flex flex-col">
       <div className="space-y-4 text-right pb-2 overflow-y-auto custom-scrollbar flex-1 px-1" id="printable-invoice">
         {/* Header Compact */}
         <div className="flex flex-col-reverse justify-between items-center border-b pb-4 gap-4 text-center">
