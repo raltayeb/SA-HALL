@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { 
   Palette, Upload, Loader2, MessageCircle, Mail, Phone, Globe, 
-  Facebook, Instagram, Twitter, Link as LinkIcon, Printer, Receipt, Store
+  Facebook, Instagram, Twitter, Link as LinkIcon, Printer, Receipt, Store, List, Plus, X
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -16,7 +16,7 @@ interface VendorBrandSettingsProps {
 }
 
 export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'brand' | 'pos'>('brand');
+  const [activeTab, setActiveTab] = useState<'brand' | 'pos' | 'amenities'>('brand');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
@@ -40,6 +40,10 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
     printer_width: user.pos_config?.printer_width ?? '80mm',
     auto_print: user.pos_config?.auto_print ?? false,
   });
+
+  // Amenities State
+  const [customAmenities, setCustomAmenities] = useState<string[]>(user.vendor_amenities || []);
+  const [newAmenity, setNewAmenity] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -66,6 +70,17 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
     }
   };
 
+  const addAmenity = () => {
+      if (newAmenity.trim() && !customAmenities.includes(newAmenity.trim())) {
+          setCustomAmenities([...customAmenities, newAmenity.trim()]);
+          setNewAmenity('');
+      }
+  };
+
+  const removeAmenity = (am: string) => {
+      setCustomAmenities(customAmenities.filter(a => a !== am));
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -83,7 +98,9 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
           instagram_url: formData.instagram_url,
           twitter_url: formData.twitter_url,
           // POS Data
-          pos_config: posConfig
+          pos_config: posConfig,
+          // Amenities
+          vendor_amenities: customAmenities
         })
         .eq('id', user.id);
 
@@ -98,13 +115,13 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
   };
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 font-tajawal text-right">
       <div className="flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
           <h2 className="text-3xl font-black tracking-tighter flex items-center gap-2">
             <Palette className="w-8 h-8 text-primary" /> إعدادات الهوية والنظام
           </h2>
-          <p className="text-muted-foreground mt-1 text-right">خصص مظهر بوابتك، تفاصيل التواصل، وإعدادات نقاط البيع.</p>
+          <p className="text-muted-foreground mt-1">خصص مظهر بوابتك، تفاصيل التواصل، المميزات، وإعدادات نقاط البيع.</p>
         </div>
         
         <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
@@ -113,6 +130,12 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
              className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'brand' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
            >
              الهوية والتواصل
+           </button>
+           <button 
+             onClick={() => setActiveTab('amenities')}
+             className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'amenities' ? 'bg-primary text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+           >
+             <List className="w-4 h-4" /> مميزات الشاليه
            </button>
            <button 
              onClick={() => setActiveTab('pos')}
@@ -125,6 +148,7 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
 
       {activeTab === 'brand' && (
         <div className="grid gap-8 lg:grid-cols-3 animate-in fade-in slide-in-from-bottom-4">
+          {/* ... Existing Brand Settings Code ... */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
               <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
@@ -228,7 +252,6 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
             </div>
           </div>
 
-          {/* Social & Preview */}
           <div className="space-y-6">
             <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
               <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
@@ -270,9 +293,53 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
         </div>
       )}
 
+      {activeTab === 'amenities' && (
+          <div className="grid gap-8 lg:grid-cols-2 animate-in fade-in slide-in-from-bottom-4">
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
+                  <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
+                      تعريف مميزات الشاليه <List className="w-5 h-5 text-primary" />
+                  </h3>
+                  <div className="space-y-4">
+                      <p className="text-sm text-gray-500 font-bold">أضف المميزات التي تتوفر في شاليهاتك (مثل: مسبح، ألعاب مائية، مجلس خارجي) لتظهر عند إضافة شاليه جديد.</p>
+                      <div className="flex gap-2">
+                          <Button onClick={addAmenity} className="rounded-xl h-12 w-12 p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
+                          <Input 
+                              placeholder="اسم الميزة (مثال: نطيطة هوائية)" 
+                              value={newAmenity} 
+                              onChange={e => setNewAmenity(e.target.value)} 
+                              onKeyDown={e => e.key === 'Enter' && addAmenity()}
+                              className="h-12 rounded-xl text-right font-bold"
+                          />
+                      </div>
+                      <div className="flex flex-wrap gap-3 mt-4">
+                          {customAmenities.map((am, i) => (
+                              <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 flex items-center gap-2 font-bold text-gray-700">
+                                  <button onClick={() => removeAmenity(am)} className="text-gray-400 hover:text-red-500 transition-colors"><X className="w-4 h-4" /></button>
+                                  <span>{am}</span>
+                              </div>
+                          ))}
+                          {customAmenities.length === 0 && <span className="text-gray-400 text-sm">لا توجد مميزات مضافة.</span>}
+                      </div>
+                  </div>
+              </div>
+              <div className="flex flex-col justify-end">
+                  <div className="bg-blue-50 border border-blue-100 p-6 rounded-[2.5rem] text-center mb-6">
+                      <p className="text-blue-800 font-bold text-sm">هذه القائمة ستظهر لك عند إضافة أو تعديل أي شاليه، مما يسهل عليك اختيار المواصفات المتوفرة لكل وحدة.</p>
+                  </div>
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={loading} 
+                    className="w-full h-16 rounded-[2rem] font-black text-lg shadow-xl shadow-primary/20"
+                  >
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'حفظ المميزات'}
+                  </Button>
+              </div>
+          </div>
+      )}
+
       {activeTab === 'pos' && (
         <div className="grid gap-8 lg:grid-cols-2 animate-in fade-in slide-in-from-bottom-4">
-           {/* Receipt Settings */}
+           {/* ... Existing POS Settings Code ... */}
            <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
               <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
                  تخصيص الإيصال <Receipt className="w-5 h-5 text-primary" />
@@ -304,7 +371,6 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
               </div>
            </div>
 
-           {/* System Settings */}
            <div className="space-y-6">
               <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm space-y-8">
                  <h3 className="text-xl font-black flex items-center justify-end gap-2 border-b pb-4">
@@ -344,22 +410,6 @@ export const VendorBrandSettings: React.FC<VendorBrandSettingsProps> = ({ user, 
                        />
                        <span className="text-sm font-bold">طباعة تلقائية عند الدفع</span>
                     </div>
-                 </div>
-              </div>
-
-              {/* Receipt Preview */}
-              <div className="bg-gray-100 p-6 rounded-[2rem] flex justify-center">
-                 <div className={`bg-white shadow-lg p-4 text-center font-mono text-[10px] space-y-2 ${posConfig.printer_width === '80mm' ? 'w-64' : 'w-48'}`}>
-                    <div className="font-bold text-sm border-b pb-2">{formData.business_name || 'اسم المتجر'}</div>
-                    <div className="text-gray-500 whitespace-pre-wrap">{posConfig.receipt_header}</div>
-                    <div className="py-2 border-y border-dashed my-2 space-y-1">
-                       <div className="flex justify-between"><span>منتج 1</span><span>10.00</span></div>
-                       <div className="flex justify-between"><span>منتج 2</span><span>20.00</span></div>
-                    </div>
-                    <div className="flex justify-between font-bold"><span>المجموع</span><span>30.00</span></div>
-                    <div className="flex justify-between text-gray-500"><span>الضريبة ({posConfig.tax_rate}%)</span><span>4.50</span></div>
-                    <div className="text-gray-500 mt-4 whitespace-pre-wrap">{posConfig.receipt_footer}</div>
-                    <div className="mt-2 pt-2 border-t text-[8px]">الرقم الضريبي: {posConfig.tax_id}</div>
                  </div>
               </div>
 

@@ -32,6 +32,7 @@ import { HallDetails } from './pages/HallDetails';
 import { ChaletDetails } from './pages/ChaletDetails';
 import { ServiceDetails } from './pages/ServiceDetails';
 import { VendorClients } from './pages/VendorClients';
+import { GuestLogin } from './pages/GuestLogin'; // Import Guest Login
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -54,7 +55,6 @@ const App: React.FC = () => {
   const profileIdRef = useRef<string | null>(null);
   const activeTabRef = useRef(activeTab);
   const regStepRef = useRef<RegStep>(0); 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [regStep, setRegStep] = useState<RegStep>(0);
   const [regData, setRegData] = useState({
@@ -79,12 +79,6 @@ const App: React.FC = () => {
     capacity_men: '',
     capacity_women: '',
     images: [] as string[]
-  });
-  const [paymentData, setPaymentData] = useState({
-    number: '',
-    expiry: '',
-    cvc: '',
-    holder: ''
   });
 
   const { toast } = useToast();
@@ -125,7 +119,7 @@ const App: React.FC = () => {
              ]);
              
              if ((hallCount || 0) > 0 || (serviceCount || 0) > 0) {
-                 if (isInitialLoad || activeTabRef.current === 'login' || activeTabRef.current === 'register') {
+                 if (isInitialLoad || activeTabRef.current === 'login' || activeTabRef.current === 'register' || activeTabRef.current === 'guest_login') {
                      setActiveTab('dashboard');
                  }
              } else {
@@ -138,13 +132,32 @@ const App: React.FC = () => {
 
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
-            if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(currentTab)) {
-               // Stay
+            if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab)) {
+               if(currentTab === 'guest_login') setActiveTab('my_bookings'); // Redirect guest to bookings after login
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
                 else if (profile.role === 'user') setActiveTab('browse');
             }
           }
+        } else {
+            // No profile found, likely a guest login via Magic Link but without a profile entry
+            // Create a temporary/guest profile or just allow viewing bookings
+            // For now, assume simple user role
+             const user = (await supabase.auth.getUser()).data.user;
+             if(user) {
+                 const newProfile = {
+                     id: user.id,
+                     email: user.email!,
+                     full_name: 'ضيف',
+                     role: 'user' as const,
+                     status: 'approved' as const,
+                     is_enabled: true,
+                     hall_limit: 0,
+                     service_limit: 0
+                 };
+                 setUserProfile(newProfile);
+                 setActiveTab('my_bookings');
+             }
         }
     } catch (error) {
         console.error("Profile fetch error:", error);
@@ -263,24 +276,6 @@ const App: React.FC = () => {
     setAuthLoading(false);
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    try {
-      const user = (await supabase.auth.getUser()).data.user;
-      if(!user) return;
-      const file = files[0];
-      const fileName = `${user.id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from('hall-images').upload(fileName, file);
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('hall-images').getPublicUrl(fileName);
-      setAssetData(prev => ({ ...prev, images: [...prev.images, publicUrl] }));
-      toast({ title: 'تم الرفع', variant: 'success' });
-    } catch (error: any) {
-      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
-    }
-  };
-
   const handleAssetSetupAndPay = async () => {
     if (!assetData.name) {
         toast({ title: 'بيانات ناقصة', description: 'يرجى إكمال الحقول الأساسية.', variant: 'destructive' });
@@ -357,9 +352,9 @@ const App: React.FC = () => {
     return activeTab;
   }, [activeTab, selectedEntity]);
 
-  const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(activeTab);
+  const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(activeTab);
   const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
-  const isAuthPage = ['login', 'register'].includes(activeTab);
+  const isAuthPage = ['login', 'register', 'guest_login'].includes(activeTab);
   const showNavbar = isPublicPage && !isAuthPage;
 
   const renderContent = () => {
@@ -369,6 +364,8 @@ const App: React.FC = () => {
           <div className="text-xl font-ruqaa text-primary">القاعة</div>
         </div>
     );
+
+    if (activeTab === 'guest_login') return <GuestLogin onBack={() => { setActiveTab('home'); }} />;
 
     if (activeTab === 'login') return (
         <div className="min-h-screen flex flex-col lg:flex-row bg-white">
@@ -387,9 +384,16 @@ const App: React.FC = () => {
                         <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
                             {authLoading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}
                         </Button>
-                        <div className="text-center pt-4">
-                            <span className="text-xs font-bold text-gray-400">ليس لديك حساب؟ </span>
-                            <button type="button" onClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
+                        
+                        <div className="text-center space-y-2 pt-4">
+                            <div>
+                                <span className="text-xs font-bold text-gray-400">حجزت سابقاً؟ </span>
+                                <button type="button" onClick={() => { setActiveTab('guest_login'); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">دخول الضيوف</button>
+                            </div>
+                            <div>
+                                <span className="text-xs font-bold text-gray-400">ليس لديك حساب؟ </span>
+                                <button type="button" onClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }} className="text-xs font-black text-primary hover:underline">انضم كشريك الآن</button>
+                            </div>
                         </div>
                         <div className="text-center">
                             <button type="button" onClick={() => { setActiveTab('home'); window.scrollTo(0,0); }} className="text-xs font-bold text-gray-400 hover:text-gray-600">العودة للرئيسية</button>

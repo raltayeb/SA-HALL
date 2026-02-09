@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Hall, SAUDI_CITIES, CHALET_AMENITIES } from '../types';
+import { UserProfile, Hall, SAUDI_CITIES, CHALET_AMENITIES, HallAddon } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Plus, X, Loader2, Palmtree, Trash2, CheckSquare, FileText
+  Plus, X, Loader2, Palmtree, Trash2, CheckSquare, FileText, Sparkles, Minus
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -20,10 +20,14 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
   const [currentChalet, setCurrentChalet] = useState<Partial<Hall>>({ 
-      images: [], amenities: [], city: SAUDI_CITIES[0], type: 'chalet', policies: ''
+      images: [], amenities: [], city: SAUDI_CITIES[0], type: 'chalet', policies: '', addons: [], price_per_adult: 0, price_per_child: 0
   });
   
+  const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0 });
+  const [vendorCustomAmenities, setVendorCustomAmenities] = useState<string[]>([]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -32,12 +36,17 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
     try {
       const { data } = await supabase.from('halls').select('*').eq('vendor_id', user.id).in('type', ['chalet', 'resort']);
       setChalets(data || []);
+      
+      // Load Vendor Defined Amenities
+      if (user.vendor_amenities) {
+          setVendorCustomAmenities(user.vendor_amenities);
+      }
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل البيانات', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [user.id, toast]);
+  }, [user.id, toast, user.vendor_amenities]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -70,6 +79,12 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
       }
   };
 
+  const addAddon = () => {
+      if (!newAddon.name || newAddon.price < 0) return;
+      setCurrentChalet(prev => ({ ...prev, addons: [...(prev.addons || []), newAddon] }));
+      setNewAddon({ name: '', price: 0 });
+  };
+
   const handleSave = async () => {
     if (!currentChalet.name || !currentChalet.city) {
       toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الأساسية.', variant: 'destructive' });
@@ -82,6 +97,7 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
           vendor_id: user.id, 
           image_url: currentChalet.images?.[0] || '',
           capacity: Number(currentChalet.capacity) || 0,
+          price_per_night: Number(currentChalet.price_per_adult), // Fallback or base
           type: 'chalet' 
       };
       
@@ -95,6 +111,9 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
     } finally { setSaving(false); }
   };
 
+  // Combine standard and custom amenities
+  const allAmenities = [...CHALET_AMENITIES, ...vendorCustomAmenities];
+
   return (
     <div className="space-y-8 pb-10">
       <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
@@ -102,7 +121,7 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
            <h2 className="text-3xl font-black text-primary flex items-center gap-2"><Palmtree className="w-8 h-8" /> إدارة الشاليهات</h2>
            <p className="text-sm text-gray-400 mt-1 font-bold">إدارة الاستراحات والمنتجعات الخاصة بك.</p>
         </div>
-        <Button onClick={() => { setCurrentChalet({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, type: 'chalet', policies: '' }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
+        <Button onClick={() => { setCurrentChalet({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, type: 'chalet', policies: '', addons: [], price_per_adult: 0, price_per_child: 0 }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
             <Plus className="w-4 h-4" /> إضافة شاليه
         </Button>
       </div>
@@ -119,7 +138,14 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
                     <h3 className="font-black text-xl truncate text-gray-900">{chalet.name}</h3>
                     <p className="text-[10px] text-gray-400 font-bold mt-1">السعة: {chalet.capacity} شخص</p>
                 </div>
-                <PriceTag amount={chalet.price_per_night} className="text-xl" />
+                <div className="flex gap-4">
+                    <div className="text-xs font-bold text-gray-500">
+                        البالغ: <span className="text-primary">{chalet.price_per_adult}</span>
+                    </div>
+                    <div className="text-xs font-bold text-gray-500">
+                        الطفل: <span className="text-primary">{chalet.price_per_child}</span>
+                    </div>
+                </div>
                 <div className="mt-auto pt-4 border-t border-gray-50">
                   <Button variant="outline" className="w-full rounded-xl h-10 text-xs font-black" onClick={() => { setCurrentChalet(chalet); setIsEditing(true); }}>تعديل</Button>
                 </div>
@@ -152,9 +178,10 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
                             </select>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <Input label="السعة (أشخاص)" type="number" value={currentChalet.capacity || ''} onChange={e => setCurrentChalet({...currentChalet, capacity: Number(e.target.value)})} className="h-12 rounded-xl" />
-                        <Input label="سعر الليلة (ر.س)" type="number" value={currentChalet.price_per_night || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_night: Number(e.target.value)})} className="h-12 rounded-xl" />
+                        <Input label="سعر الفرد البالغ" type="number" value={currentChalet.price_per_adult || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_adult: Number(e.target.value)})} className="h-12 rounded-xl" />
+                        <Input label="سعر الطفل" type="number" value={currentChalet.price_per_child || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_child: Number(e.target.value)})} className="h-12 rounded-xl" />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500">الوصف</label>
@@ -164,9 +191,9 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
 
                  {/* Amenities */}
                  <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-                    <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> المرافق والخدمات</h3>
+                    <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><CheckSquare className="w-4 h-4" /> مميزات الشاليه (تم تعريفها في الإعدادات)</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {CHALET_AMENITIES.map(amenity => (
+                        {allAmenities.map(amenity => (
                             <label key={amenity} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${currentChalet.amenities?.includes(amenity) ? 'bg-primary/5 border-primary text-primary' : 'bg-white border-gray-100 text-gray-500'}`}>
                                 <input type="checkbox" checked={currentChalet.amenities?.includes(amenity)} onChange={() => handleAmenityToggle(amenity)} className="hidden" />
                                 <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${currentChalet.amenities?.includes(amenity) ? 'bg-primary text-white border-primary' : 'bg-gray-100'}`}>
@@ -174,6 +201,27 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
                                 </div>
                                 <span className="text-xs font-bold">{amenity}</span>
                             </label>
+                        ))}
+                    </div>
+                 </div>
+
+                 {/* Addons */}
+                 <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+                    <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4" /> خدمات إضافية (اختياري)</h3>
+                    <div className="flex gap-2 mb-4">
+                        <Button onClick={addAddon} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
+                        <Input placeholder="السعر" type="number" value={newAddon.price || ''} onChange={e => setNewAddon({...newAddon, price: Number(e.target.value)})} className="h-12 w-32 rounded-xl" />
+                        <Input placeholder="اسم الخدمة (مثال: فطور صباحي)" value={newAddon.name} onChange={e => setNewAddon({...newAddon, name: e.target.value})} className="h-12 flex-1 rounded-xl" />
+                    </div>
+                    <div className="space-y-2">
+                        {currentChalet.addons?.map((addon, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <button onClick={() => setCurrentChalet(prev => ({...prev, addons: prev.addons?.filter((_, i) => i !== idx)}))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
+                                <div className="flex items-center gap-4">
+                                    <span className="font-bold text-gray-900">{addon.name}</span>
+                                    <span className="font-mono text-primary font-bold">{addon.price} SAR</span>
+                                </div>
+                            </div>
                         ))}
                     </div>
                  </div>

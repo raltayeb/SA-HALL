@@ -34,6 +34,7 @@ export interface UserProfile {
   instagram_url?: string;
   twitter_url?: string;
   pos_config?: POSConfig;
+  vendor_amenities?: string[]; // New: Custom amenities defined by vendor
 }
 
 export interface VendorClient {
@@ -143,9 +144,11 @@ export interface Hall {
   capacity_men?: number;
   capacity_women?: number;
   price_per_night: number;
+  price_per_adult?: number; // New
+  price_per_child?: number; // New
   description: string;
   description_en?: string;
-  policies?: string; // New: Terms & Conditions
+  policies?: string; 
   image_url: string;
   images: string[];
   amenities: string[];
@@ -163,7 +166,7 @@ export interface Service {
   price: number;
   description: string;
   image_url: string;
-  images?: string[]; // Added: Portfolio images
+  images?: string[]; 
   is_active: boolean;
   created_at?: string;
 }
@@ -183,7 +186,7 @@ export interface Booking {
   user_id: string | null; 
   vendor_id: string;
   booking_date: string;
-  check_out_date?: string; // New: For Chalets
+  check_out_date?: string; 
   start_time?: string;
   end_time?: string;
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
@@ -199,8 +202,9 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold'; 
   guest_name?: string;
   guest_phone?: string;
-  guests_adults?: number; // New
-  guests_children?: number; // New
+  guest_email?: string; // New
+  guests_adults?: number; 
+  guests_children?: number; 
   notes?: string;
   created_at?: string;
   halls?: Hall;
