@@ -13,6 +13,7 @@ import {
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
 import { format, isBefore, startOfDay, parse, isSameDay } from 'date-fns';
+import { normalizeNumbers } from '../utils/helpers';
 
 interface HallDetailsProps {
   item: Hall & { vendor?: UserProfile };
@@ -79,6 +80,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
     setIsBooking(true);
     try {
+      const normalizedPhone = normalizeNumbers(guestData.phone);
       const status = paymentMethod === 'hold' ? 'on_hold' : 'pending';
       const paymentStatus = paymentMethod === 'full' ? 'paid' : paymentMethod === 'deposit' ? 'partial' : 'unpaid';
       const paidAmount = paymentMethod === 'full' ? grandTotal : paymentMethod === 'deposit' ? depositAmount : 0;
@@ -95,7 +97,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
         booking_method: paymentMethod,
         package_name: selectedPackage?.name,
         guest_name: guestData.name,
-        guest_phone: guestData.phone,
+        guest_phone: normalizedPhone,
         guest_email: guestData.email,
         user_id: user?.id || null,
         items: [
@@ -107,14 +109,12 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
       const { data, error } = await supabase.from('bookings').insert([payload]).select().single();
       if (error) throw error;
       
-      // Also register client in CRM if guest
       if (!user) {
-          // Check if exists first to avoid dupes error if unique constraint exists, or just insert (Supabase doesn't dedupe by default unless configured)
-          // Simplified insert for now
+          // Sync guest to CRM immediately
           await supabase.from('vendor_clients').insert([{
               vendor_id: item.vendor_id,
               full_name: guestData.name,
-              phone_number: guestData.phone,
+              phone_number: normalizedPhone,
               email: guestData.email
           }]);
       }
@@ -153,8 +153,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
             
             {/* --- RIGHT COLUMN (Content) --- */}
             <div className="lg:col-span-2 space-y-8">
-                
-                {/* 1. Hero Card */}
+                {/* Hero Card */}
                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
                     <div className="h-[400px] rounded-[2rem] overflow-hidden mb-6 relative group">
                         <img src={allImages[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
@@ -177,7 +176,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                     </div>
                 </div>
 
-                {/* 2. Description Card */}
+                {/* Description Card */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Info className="w-5 h-5 text-gray-400" /> تفاصيل المكان</h3>
                     <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
@@ -192,7 +191,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                     </div>
                 </div>
 
-                {/* 3. Amenities Card */}
+                {/* Amenities Card */}
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900">المرافق والخدمات</h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -204,7 +203,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                     </div>
                 </div>
 
-                {/* 4. Packages Card (If any) */}
+                {/* Packages Card */}
                 {item.packages && item.packages.length > 0 && (
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Package className="w-5 h-5 text-gray-400" /> باقات الحجز</h3>
@@ -229,7 +228,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                     </div>
                 )}
 
-                {/* 5. Additional Services (Addons) - EXPLICIT SECTION */}
+                {/* Additional Services */}
                 {item.addons && item.addons.length > 0 && (
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
@@ -269,7 +268,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                     <div className="space-y-4">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">اختر التاريخ</label>
-                        {/* Unified Flat Calendar Design (No Shadow) */}
                         <div className="bg-gray-50 p-2 rounded-[2rem] border border-gray-100">
                             <Calendar 
                                 mode="single" selected={bookingDate} onSelect={setBookingDate}
@@ -281,8 +279,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                     <div className="space-y-3">
                         <Input placeholder="الاسم الكريم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-12 rounded-xl bg-white border-gray-200" />
-                        <Input placeholder="رقم الجوال" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} className="h-12 rounded-xl bg-white border-gray-200" />
-                        {/* Mandatory Email Field */}
+                        <Input placeholder="رقم الجوال (05xxxxxxxx)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: normalizeNumbers(e.target.value)})} className="h-12 rounded-xl bg-white border-gray-200" />
                         <div className="relative">
                             <Input 
                                 placeholder="البريد الإلكتروني (للفاتورة والدخول)" 

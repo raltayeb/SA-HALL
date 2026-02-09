@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Loader2, ArrowRight, Smartphone, KeyRound } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { normalizeNumbers } from '../utils/helpers';
 
 export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep] = useState(1);
@@ -19,15 +20,14 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         toast({ title: 'رقم الجوال مطلوب', description: 'يرجى إدخال رقم الجوال المسجل في الحجوزات.', variant: 'destructive' });
         return;
     }
+    const normalizedPhone = normalizeNumbers(phone);
     setLoading(true);
     
     try {
-        // 1. Lookup Email associated with this phone from bookings or vendor_clients
-        // Using `bookings` is safer as it guarantees they made a booking
         const { data, error: lookupError } = await supabase
             .from('bookings')
             .select('guest_email')
-            .eq('guest_phone', phone)
+            .eq('guest_phone', normalizedPhone)
             .not('guest_email', 'is', null)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -40,9 +40,8 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         }
 
         const foundEmail = data.guest_email;
-        setEmail(foundEmail); // Store for verification step
+        setEmail(foundEmail); 
 
-        // 2. Send OTP to the found email
         const { error: authError } = await supabase.auth.signInWithOtp({ email: foundEmail });
         
         if (authError) throw authError;
@@ -62,17 +61,16 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!otp || !email) return;
     setLoading(true);
     
-    const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'magiclink' });
+    const { error } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'magiclink' });
     
     if (error) {
-        const { error: signupError } = await supabase.auth.verifyOtp({ email, token: otp, type: 'signup' });
+        const { error: signupError } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'signup' });
         if(signupError) {
             toast({ title: 'رمز خاطئ', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
             setLoading(false);
             return;
         }
     }
-    // Success - App.tsx auth listener will handle redirection
     setLoading(false);
   };
 
@@ -91,7 +89,7 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <Input 
                         label="رقم الجوال المسجل" 
                         value={phone} 
-                        onChange={e => setPhone(e.target.value)} 
+                        onChange={e => setPhone(normalizeNumbers(e.target.value))} 
                         icon={<Smartphone className="w-4 h-4" />} 
                         className="h-12 rounded-xl text-center font-bold text-lg" 
                         placeholder="05xxxxxxxx"
@@ -104,7 +102,7 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 <div className="space-y-6 animate-in slide-in-from-right text-center">
                     <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600 mb-4"><KeyRound className="w-8 h-8" /></div>
                     <p className="text-sm font-bold text-gray-500">أدخل الرمز المرسل إلى بريدك الإلكتروني</p>
-                    <Input placeholder="------" value={otp} onChange={e => setOtp(e.target.value)} className="h-14 rounded-xl text-center text-2xl font-black tracking-widest" maxLength={6} />
+                    <Input placeholder="------" value={otp} onChange={e => setOtp(normalizeNumbers(e.target.value))} className="h-14 rounded-xl text-center text-2xl font-black tracking-widest" maxLength={6} />
                     <Button onClick={handleVerifyOtp} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg shadow-primary/20">
                         {loading ? <Loader2 className="animate-spin" /> : 'تحقق ودخول'}
                     </Button>

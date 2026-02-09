@@ -7,14 +7,15 @@ import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
-import { GuestBookingDetailsModal } from '../components/Booking/GuestBookingDetailsModal'; // Import New Component
+import { GuestBookingDetailsModal } from '../components/Booking/GuestBookingDetailsModal';
 import { 
-  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2, Eye
+  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2, Eye, UserCheck
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
+import { normalizeNumbers } from '../utils/helpers';
 
 interface BookingsProps {
   user: UserProfile;
@@ -25,7 +26,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -34,9 +34,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isGuestDetailsOpen, setIsGuestDetailsOpen] = useState(false); // New State
+  const [isGuestDetailsOpen, setIsGuestDetailsOpen] = useState(false); 
   
-  // Column Filters
   const [columnFilters, setColumnFilters] = useState({
     client: '',
     date: '',
@@ -50,9 +49,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Halls first for filter
       if (user.role === 'vendor') {
-          // Fix: Select all fields (*) so the returned data matches the Hall interface
           const { data: hData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
           setHalls(hData as Hall[] || []);
       }
@@ -70,9 +67,13 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
       } else if (user.role === 'user') {
-        // For guest/user, we fetch bookings where they are the user_id (registered) OR matched by guest logic handled in backend/insertion
-        // Since RLS policies handle visibility, we just query for user_id match or if we are a guest session (handled by supbase auth usually)
-        query = query.eq('user_id', user.id);
+        // CRITICAL FIX: Fetch bookings by User ID OR Guest Phone
+        const normalizedPhone = normalizeNumbers(user.phone_number || '');
+        if (normalizedPhone) {
+            query = query.or(`user_id.eq.${user.id},guest_phone.eq.${normalizedPhone}`);
+        } else {
+            query = query.eq('user_id', user.id);
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -80,38 +81,32 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       if (error) throw error;
       setBookings(data as any[] || []);
     } catch (err: any) {
+      console.error(err);
       toast({ title: 'خطأ', description: 'فشل في تحميل الحجوزات.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [user.id, user.role, toast]);
+  }, [user.id, user.role, user.phone_number, toast]);
 
-  // Realtime Subscription
   useEffect(() => {
     fetchBookings();
-
     const channel = supabase.channel('bookings_realtime')
       .on('postgres_changes', { 
           event: '*', 
           schema: 'public', 
-          table: 'bookings',
-          filter: user.role === 'vendor' ? `vendor_id=eq.${user.id}` : `user_id=eq.${user.id}`
+          table: 'bookings'
       }, () => {
           fetchBookings(); 
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchBookings, user.id, user.role]);
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchBookings]);
 
-  // Handle Mark as Read / View Details
   const handleBookingClick = async (booking: Booking) => {
       setSelectedBooking(booking);
       if (user.role === 'vendor') {
           setIsEditModalOpen(true);
-          // Mark as read if not already
           if (!(booking as any).is_read) {
               const { error } = await supabase.from('bookings').update({ is_read: true }).eq('id', booking.id);
               if (!error) {
@@ -119,21 +114,19 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
               }
           }
       } else {
-          // For guests/users, open the new detailed modal
           setIsGuestDetailsOpen(true);
       }
   };
 
   const filteredBookings = bookings.filter(b => {
-    const matchClient = !columnFilters.client || 
-        (b.client?.full_name || b.guest_name || 'عميل خارجي').toLowerCase().includes(columnFilters.client.toLowerCase()) || 
-        (b.notes || '').toLowerCase().includes(columnFilters.client.toLowerCase()) || 
-        b.id.toLowerCase().includes(columnFilters.client.toLowerCase()); // Search by ID too
+    const searchTerm = normalizeNumbers(columnFilters.client.toLowerCase());
+    const matchClient = !searchTerm || 
+        (b.client?.full_name || b.guest_name || 'عميل').toLowerCase().includes(searchTerm) || 
+        normalizeNumbers(b.guest_phone || '')?.includes(searchTerm) ||
+        b.id.toLowerCase().includes(searchTerm);
     
     const matchDate = !columnFilters.date || b.booking_date.includes(columnFilters.date);
-    // Hall Filter Logic
     const matchHall = columnFilters.hall === 'all' || b.hall_id === columnFilters.hall;
-    
     const matchPayment = columnFilters.paymentStatus === 'all' || b.payment_status === columnFilters.paymentStatus;
     const matchStatus = columnFilters.status === 'all' || b.status === columnFilters.status;
 
@@ -152,7 +145,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans text-right">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
@@ -164,31 +157,31 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                 )}
             </div>
             <div>
-                <h2 className="text-3xl font-bold text-primary">سجل الحجوزات</h2>
+                <h2 className="text-3xl font-bold text-primary">{user.role === 'vendor' ? 'إدارة الحجوزات' : 'حجوزاتي'}</h2>
                 <p className="text-sm font-bold text-gray-400 mt-1">
                     {user.role === 'vendor' 
-                        ? `لديك ${bookings.filter(b => !(b as any).is_read).length} رسائل جديدة بانتظار القراءة.` 
-                        : 'يمكنك متابعة حالة حجوزاتك والدفعات من هنا.'}
+                        ? `لديك ${bookings.length} حجز مسجل في النظام.` 
+                        : 'قائمة بجميع حجوزاتك الحالية والسابقة.'}
                 </p>
             </div>
          </div>
-         <div className="flex gap-3 w-full md:w-auto">
-            {user.role === 'vendor' && (
+         {user.role === 'vendor' && (
+            <div className="flex gap-3 w-full md:w-auto">
                 <Button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none gap-2 h-12 rounded-xl font-bold shadow-lg shadow-primary/20">
                     <Plus className="w-4 h-4" /> حجز يدوي
                 </Button>
-            )}
-         </div>
+            </div>
+         )}
       </div>
 
       {/* Inbox Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-5 bg-gray-50/50 border-b border-gray-100">
             <div className="md:col-span-2 relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
-                    placeholder={user.role === 'vendor' ? "بحث برقم الحجز أو اسم العميل..." : "بحث برقم الحجز..."}
+                    placeholder={user.role === 'vendor' ? "بحث بالاسم، الجوال، أو رقم الحجز..." : "بحث برقم الحجز..."}
                     className="w-full h-10 bg-white border border-gray-200 rounded-xl pr-10 pl-4 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
                     value={columnFilters.client}
                     onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
@@ -225,9 +218,9 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto custom-scrollbar">
+        <div className="overflow-x-auto custom-scrollbar flex-1">
             <table className="w-full text-right border-collapse">
-                <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-bold uppercase tracking-wider sticky top-0">
                     <tr>
                         <th className="p-4 w-[25%]">{user.role === 'vendor' ? 'تفاصيل العميل' : 'رقم الحجز'}</th>
                         <th className="p-4 w-[20%]">الموعد والمكان</th>
@@ -241,7 +234,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                     {loading ? (
                         Array.from({length: 5}).map((_, i) => <tr key={i} className="animate-pulse bg-white"><td colSpan={6} className="p-6"><div className="h-4 bg-gray-100 rounded w-full"></div></td></tr>)
                     ) : currentData.length === 0 ? (
-                        <tr><td colSpan={6} className="p-16 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة</td></tr>
+                        <tr><td colSpan={6} className="p-20 text-center text-gray-400 font-bold flex flex-col items-center justify-center w-full gap-2">
+                            <Inbox className="w-10 h-10 opacity-50" />
+                            لا توجد حجوزات مطابقة
+                        </td></tr>
                     ) : currentData.map((b) => {
                         const isRead = (b as any).is_read;
                         return (
@@ -263,12 +259,13 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                             </div>
                                             <div className="flex gap-2 items-center mt-1">
                                                 <span className="text-[9px] font-mono bg-gray-100 px-1 rounded text-gray-500">#{b.id.slice(0,8)}</span>
-                                                <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{b.client?.phone_number || b.guest_phone}</span>
+                                                <span className="text-[10px] text-gray-400 truncate max-w-[100px] font-mono">{b.guest_phone || b.client?.phone_number}</span>
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-col gap-1">
                                             <span className="text-sm font-black font-mono text-gray-900">#{b.id.slice(0,8).toUpperCase()}</span>
+                                            <span className="text-[10px] font-bold text-gray-400">{b.vendor?.business_name}</span>
                                         </div>
                                     )}
                                 </td>
@@ -278,20 +275,20 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                             <Calendar className="w-3.5 h-3.5" />
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-800">{format(new Date(b.booking_date), 'yyyy-MM-dd')}</div>
+                                            <div className="text-xs text-gray-800 font-mono">{format(new Date(b.booking_date), 'yyyy-MM-dd')}</div>
                                             <div className="text-[10px] text-gray-400">{b.halls?.name || b.services?.name}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="p-4">
                                     <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
-                                        {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'طلب جديد' : 'ملغي'}
+                                        {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'طلب جديد' : b.status === 'cancelled' ? 'ملغي' : 'مكتمل'}
                                     </Badge>
                                 </td>
                                 <td className="p-4">
                                     <div className="flex flex-col gap-1">
-                                        <div className="text-sm font-bold">
-                                            {b.total_amount.toLocaleString()} <span className="text-[9px] font-normal text-gray-400">ر.س</span>
+                                        <div className="text-sm font-bold font-mono">
+                                            {b.total_amount.toLocaleString()} <span className="text-[9px] font-normal text-gray-400 font-sans">ر.س</span>
                                         </div>
                                         {getPaymentStatusBadge(b.payment_status)}
                                     </div>
@@ -327,7 +324,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
         <>
             <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} booking={{...selectedBooking, profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)}} />
             
-            {/* Guest Details Modal */}
             <GuestBookingDetailsModal 
                 isOpen={isGuestDetailsOpen} 
                 onClose={() => setIsGuestDetailsOpen(false)} 

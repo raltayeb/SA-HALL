@@ -2,16 +2,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking } from '../types';
-import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  CalendarCheck, Building2, Loader2, TrendingUp, Star, Users, CheckCircle2, Inbox, 
-  Wallet, ArrowUpRight, ArrowDownRight, PieChart, BarChart
+  CalendarCheck, Building2, Loader2, TrendingUp, Star, Inbox, 
+  Wallet, Users, CheckCircle2, Clock, PieChart, ArrowUpRight
 } from 'lucide-react';
 import { 
-  XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis, BarChart as ReBarChart, Bar
+  XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis
 } from 'recharts';
-import { format, subMonths, isSameMonth, getDaysInMonth, startOfYear, eachMonthOfInterval } from 'date-fns';
+import { format, subMonths, isSameMonth, startOfMonth, eachMonthOfInterval } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 
 interface DashboardProps {
@@ -19,18 +18,19 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ 
-    occupancyRate: 0,
     totalBookings: 0, 
+    confirmedBookings: 0,
     pendingRequests: 0,
-    avgRating: 5.0,
+    totalRevenue: 0,
+    paidAmount: 0,
+    outstandingAmount: 0,
     activeHalls: 0,
-    monthRevenue: 0,
-    totalRevenue: 0
+    clientsCount: 0
   });
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -38,53 +38,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     try {
       const today = new Date();
       
-      const [bookingsRes, hallsRes, reviewsRes] = await Promise.all([
-        supabase.from('bookings').select('*, halls(name), profiles:user_id(full_name)').eq('vendor_id', user.id).neq('status', 'cancelled').order('created_at', { ascending: false }),
-        supabase.from('halls').select('id').eq('vendor_id', user.id).eq('is_active', true),
-        supabase.from('reviews').select('rating').eq('hall_id', user.id) // Assuming vendor relation or fetch via halls
-      ]);
+      // Fetch Bookings
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('*, halls(name), profiles:user_id(full_name)')
+        .eq('vendor_id', user.id)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
 
-      const bookings = (bookingsRes.data as Booking[]) || [];
-      const totalBookings = bookings.length;
+      const allBookings = (bookings as Booking[]) || [];
       
-      // Revenue Calculations
-      const totalRevenue = bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-      const currentMonthBookings = bookings.filter(b => isSameMonth(new Date(b.booking_date), today));
-      const monthRevenue = currentMonthBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+      // Fetch Halls Count
+      const { count: hallCount } = await supabase.from('halls').select('*', { count: 'exact', head: true }).eq('vendor_id', user.id).eq('is_active', true);
+      
+      // Fetch Clients Count
+      const { count: clientsCount } = await supabase.from('vendor_clients').select('*', { count: 'exact', head: true }).eq('vendor_id', user.id);
 
-      // Calculate Occupancy for current month
-      const daysInMonth = getDaysInMonth(today);
-      const totalCapacityDays = (hallsRes.data?.length || 1) * daysInMonth;
-      const occupancyRate = totalCapacityDays > 0 ? Math.round((currentMonthBookings.length / totalCapacityDays) * 100) : 0;
-
-      // Avg Rating
-      const avgRating = 4.9; 
+      // Calculations
+      const totalRevenue = allBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+      const paidAmount = allBookings.reduce((sum, b) => sum + (Number(b.paid_amount) || 0), 0);
+      
+      setStats({
+        totalBookings: allBookings.length,
+        confirmedBookings: allBookings.filter(b => b.status === 'confirmed').length,
+        pendingRequests: allBookings.filter(b => b.status === 'pending').length,
+        totalRevenue,
+        paidAmount,
+        outstandingAmount: totalRevenue - paidAmount,
+        activeHalls: hallCount || 0,
+        clientsCount: clientsCount || 0
+      });
 
       // Chart Data (Last 6 Months)
-      const months = eachMonthOfInterval({
-          start: subMonths(today, 5),
-          end: today
-      });
-
+      const months = eachMonthOfInterval({ start: subMonths(today, 5), end: today });
       const monthlyData = months.map(month => {
-        const monthName = format(month, 'MMM', { locale: arSA });
-        const mBookings = bookings.filter(b => isSameMonth(new Date(b.booking_date), month));
+        const mBookings = allBookings.filter(b => isSameMonth(new Date(b.booking_date), month));
         const mRevenue = mBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
-        return { name: monthName, bookings: mBookings.length, revenue: mRevenue };
+        return { 
+            name: format(month, 'MMM', { locale: arSA }), 
+            revenue: mRevenue,
+            bookings: mBookings.length
+        };
       });
-
-      setStats({
-        occupancyRate,
-        totalBookings,
-        pendingRequests: bookings.filter(b => b.status === 'pending').length,
-        avgRating,
-        activeHalls: hallsRes.data?.length || 0,
-        monthRevenue,
-        totalRevenue
-      });
-
       setChartData(monthlyData);
-      setRecentBookings(bookings.slice(0, 5));
+      setRecentBookings(allBookings.slice(0, 5));
 
     } catch (err) {
       console.error(err);
@@ -104,82 +101,85 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10 font-sans text-right">
       
-      {/* 1. Welcome Header */}
-      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden shadow-sm">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-400 to-pink-300"></div>
-        <div>
-          <h2 className="text-3xl font-black text-gray-900">لوحة الأداء والتشغيل</h2>
-          <p className="text-gray-500 mt-2 font-bold text-sm">مؤشرات الأداء المالي والتشغيلي لمنشأتك.</p>
+      {/* 1. Overview Banner */}
+      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col lg:flex-row justify-between items-center gap-8 relative overflow-hidden shadow-sm">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-primary via-purple-400 to-pink-300"></div>
+        <div className="space-y-2 text-center lg:text-right">
+          <h2 className="text-3xl font-black text-gray-900">أهلاً بك، {user.business_name || user.full_name}</h2>
+          <p className="text-gray-500 font-bold text-sm">نظرة عامة على أداء منشأتك اليوم.</p>
         </div>
-        <div className="flex gap-6">
-           <div className="text-center px-4 border-l border-gray-100">
-              <p className="text-[10px] font-black text-gray-400 uppercase">إيرادات الشهر</p>
-              <PriceTag amount={stats.monthRevenue} className="text-xl font-black text-emerald-600" />
+        
+        <div className="flex flex-wrap justify-center gap-6">
+           <div className="bg-emerald-50 px-6 py-3 rounded-2xl border border-emerald-100 text-center min-w-[140px]">
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">المبالغ المحصلة</p>
+              <PriceTag amount={stats.paidAmount} className="text-xl font-black text-emerald-700 justify-center" />
            </div>
-           <div className="text-center px-4">
-              <p className="text-[10px] font-black text-gray-400 uppercase">إجمالي الإيرادات</p>
-              <PriceTag amount={stats.totalRevenue} className="text-xl font-black text-primary" />
+           <div className="bg-orange-50 px-6 py-3 rounded-2xl border border-orange-100 text-center min-w-[140px]">
+              <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">المبالغ الآجلة</p>
+              <PriceTag amount={stats.outstandingAmount} className="text-xl font-black text-orange-700 justify-center" />
            </div>
         </div>
       </div>
 
-      {/* 2. Efficiency Cards */}
+      {/* 2. Key Metrics Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Occupancy */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-purple-100 transition-all space-y-4 group">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-purple-50 rounded-2xl text-purple-600 group-hover:scale-110 transition-transform"><TrendingUp className="w-6 h-6" /></div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">نسبة الإشغال</span>
-           </div>
-           <div>
-             <div className="text-3xl font-black text-gray-900">{stats.occupancyRate}%</div>
-             <p className="text-[10px] text-gray-400 font-bold mt-1">معدل الحجوزات الشهري</p>
-           </div>
-        </div>
-
         {/* Total Bookings */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-blue-100 transition-all space-y-4 group">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform"><CalendarCheck className="w-6 h-6" /></div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي الحجوزات</span>
-           </div>
-           <div>
-             <div className="text-3xl font-black text-gray-900">{stats.totalBookings}</div>
-             <p className="text-[10px] text-gray-400 font-bold mt-1">حجز مؤكد منذ البداية</p>
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:shadow-lg transition-all group relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
+           <div className="relative z-10">
+               <div className="flex justify-between items-start mb-4">
+                   <div className="p-3 bg-blue-50 rounded-xl text-blue-600"><CalendarCheck className="w-6 h-6" /></div>
+                   <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">الكل</span>
+               </div>
+               <div className="text-3xl font-black text-gray-900">{stats.totalBookings}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">إجمالي الحجوزات المسجلة</p>
            </div>
         </div>
 
         {/* Pending Requests */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-orange-100 transition-all space-y-4 group">
-           <div className="flex items-center justify-between">
-              <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 group-hover:scale-110 transition-transform"><Inbox className="w-6 h-6" /></div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">طلبات الانتظار</span>
-           </div>
-           <div>
-             <div className="text-3xl font-black text-orange-500">{stats.pendingRequests}</div>
-             <p className="text-[10px] text-gray-400 font-bold mt-1">بحاجة لاتخاذ إجراء</p>
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:shadow-lg transition-all group relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
+           <div className="relative z-10">
+               <div className="flex justify-between items-start mb-4">
+                   <div className="p-3 bg-orange-50 rounded-xl text-orange-600"><Inbox className="w-6 h-6" /></div>
+                   {stats.pendingRequests > 0 && <span className="flex h-3 w-3 rounded-full bg-red-500 animate-pulse"></span>}
+               </div>
+               <div className="text-3xl font-black text-orange-600">{stats.pendingRequests}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">طلبات بانتظار الموافقة</p>
            </div>
         </div>
 
-        {/* Rating */}
-        <div className="bg-primary text-white p-6 rounded-[2rem] shadow-xl shadow-primary/20 space-y-4 relative overflow-hidden">
-           <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-           <div className="flex items-center justify-between relative z-10">
-              <div className="p-3 bg-white/20 rounded-2xl text-white backdrop-blur-md"><Star className="w-6 h-6 fill-current" /></div>
-              <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">تقييم العملاء</span>
-           </div>
+        {/* Active Halls */}
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:shadow-lg transition-all group relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
            <div className="relative z-10">
-             <div className="text-4xl font-black text-white">{stats.avgRating}</div>
-             <p className="text-[10px] text-white/70 font-bold mt-1">متوسط تقييم الخدمات</p>
+               <div className="flex justify-between items-start mb-4">
+                   <div className="p-3 bg-purple-50 rounded-xl text-purple-600"><Building2 className="w-6 h-6" /></div>
+               </div>
+               <div className="text-3xl font-black text-gray-900">{stats.activeHalls}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">وحدة متاحة للحجز</p>
+           </div>
+        </div>
+
+        {/* Clients Database */}
+        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:shadow-lg transition-all group relative overflow-hidden">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-pink-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
+           <div className="relative z-10">
+               <div className="flex justify-between items-start mb-4">
+                   <div className="p-3 bg-pink-50 rounded-xl text-pink-600"><Users className="w-6 h-6" /></div>
+               </div>
+               <div className="text-3xl font-black text-gray-900">{stats.clientsCount}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">عميل مسجل في القائمة</p>
            </div>
         </div>
       </div>
 
-      {/* 3. Charts & Activity */}
+      {/* 3. Charts & Recent Activity */}
       <div className="grid lg:grid-cols-3 gap-8">
-         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8">
+         {/* Chart */}
+         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
             <div className="flex justify-between items-center mb-8">
-               <h3 className="font-black text-xl text-gray-900 flex items-center gap-2"><BarChart className="w-5 h-5 text-primary" /> التحليل المالي</h3>
+               <h3 className="font-black text-xl text-gray-900 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> الأداء المالي</h3>
             </div>
             <div className="h-[300px] w-full" dir="ltr">
                <ResponsiveContainer width="100%" height="100%">
@@ -202,41 +202,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             </div>
          </div>
 
-         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col">
-            <h3 className="font-black text-xl mb-6 text-gray-900">آخر الحجوزات</h3>
-            <div className="flex-1 overflow-y-auto pr-2 space-y-4 no-scrollbar max-h-[350px]">
+         {/* Recent Bookings List */}
+         <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 flex flex-col shadow-sm">
+            <h3 className="font-black text-xl mb-6 text-gray-900">آخر العمليات</h3>
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar max-h-[350px]">
                {recentBookings.length === 0 ? (
                   <div className="text-center py-10 opacity-50">
-                     <Users className="w-8 h-8 mx-auto text-gray-300 mb-2" />
-                     <p className="text-gray-400 text-xs font-bold">لا توجد حجوزات حديثة</p>
+                     <Clock className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                     <p className="text-gray-400 text-xs font-bold">لا توجد عمليات حديثة</p>
                   </div>
                ) : recentBookings.map((b, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-colors hover:bg-white hover:shadow-sm">
-                     <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-purple-100 text-purple-600`}>
-                           <CalendarCheck className="w-5 h-5" />
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-colors hover:bg-white hover:shadow-md group">
+                     <div className="flex items-center gap-3 overflow-hidden">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${b.status === 'confirmed' ? 'bg-green-100 text-green-600' : b.status === 'pending' ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'}`}>
+                           {b.status === 'confirmed' ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                         </div>
-                        <div>
-                           <p className="text-xs font-black text-gray-900 truncate max-w-[120px]">
+                        <div className="min-w-0">
+                           <p className="text-xs font-black text-gray-900 truncate">
                               {b.profiles?.full_name || b.guest_name}
                            </p>
-                           <p className="text-[9px] font-bold text-gray-400 truncate max-w-[120px]">
+                           <p className="text-[10px] font-bold text-gray-400 truncate">
                               {b.halls?.name || b.services?.name}
                            </p>
                         </div>
                      </div>
-                     <div className="text-left">
-                        <p className="text-[10px] font-bold text-gray-500">{format(new Date(b.booking_date), 'dd MMM')}</p>
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg ${b.status === 'confirmed' ? 'text-green-600 bg-green-50' : 'text-orange-600 bg-orange-50'}`}>
-                            {b.status === 'confirmed' ? 'مؤكد' : 'انتظار'}
-                        </span>
+                     <div className="text-left shrink-0">
+                        <PriceTag amount={b.total_amount} className="text-sm font-black text-primary" />
+                        <p className="text-[9px] font-bold text-gray-400">{format(new Date(b.booking_date), 'dd MMM')}</p>
                      </div>
                   </div>
                ))}
             </div>
-            <Button variant="outline" className="w-full mt-6 rounded-xl font-bold border-gray-200 text-gray-600 hover:text-primary h-12" onClick={() => window.location.hash = 'hall_bookings'}>
-               إدارة الحجوزات
-            </Button>
+            <a href="#hall_bookings" className="mt-4 text-center text-xs font-black text-primary hover:underline flex items-center justify-center gap-1">
+                عرض كل الحجوزات <ArrowUpRight className="w-3 h-3" />
+            </a>
          </div>
       </div>
     </div>

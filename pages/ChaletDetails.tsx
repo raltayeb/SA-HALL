@@ -15,6 +15,7 @@ import { format, differenceInCalendarDays, addDays, isSameDay } from 'date-fns';
 import { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from '../components/ui/DatePickerWithRange';
 import { Modal } from '../components/ui/Modal'; 
+import { normalizeNumbers } from '../utils/helpers';
 
 interface ChaletDetailsProps {
   item: Hall & { vendor?: UserProfile };
@@ -37,7 +38,6 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
   
-  // New: Payment Method State for Chalets too
   const [paymentMethod, setPaymentMethod] = useState<'full' | 'hold'>('full');
 
   const { toast } = useToast();
@@ -93,7 +93,6 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
     if (!checkAvailability()) { toast({ title: 'نعتذر', description: 'بعض الأيام المختارة غير متاحة', variant: 'destructive' }); return; }
     if (!guestData.name || !guestData.phone || !guestData.email) { toast({ title: 'تنبيه', description: 'أكمل بيانات التواصل والبريد الإلكتروني', variant: 'destructive' }); return; }
     
-    // If holding, skip payment modal
     if (paymentMethod === 'hold') {
         handleBookingSubmission('hold');
     } else {
@@ -104,6 +103,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
   const handleBookingSubmission = async (method: 'full' | 'hold') => {
     setIsBooking(true);
     try {
+      const normalizedPhone = normalizeNumbers(guestData.phone);
       const status = method === 'hold' ? 'on_hold' : 'confirmed';
       const payStatus = method === 'hold' ? 'unpaid' : 'paid';
       
@@ -119,7 +119,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
         status: status,
         booking_method: method,
         guest_name: guestData.name,
-        guest_phone: guestData.phone,
+        guest_phone: normalizedPhone,
         guest_email: guestData.email,
         guests_adults: adults,
         guests_children: children,
@@ -130,12 +130,11 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
       const { data, error } = await supabase.from('bookings').insert([payload]).select().single();
       if (error) throw error;
       
-      // Register client in CRM
       if (!user) {
           await supabase.from('vendor_clients').insert([{
               vendor_id: item.vendor_id,
               full_name: guestData.name,
-              phone_number: guestData.phone,
+              phone_number: normalizedPhone,
               email: guestData.email
           }]);
       }
@@ -274,7 +273,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
 
                     <div className="space-y-3">
                         <Input placeholder="الاسم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-12 rounded-xl bg-gray-50" />
-                        <Input placeholder="الجوال (للدخول لاحقاً)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} className="h-12 rounded-xl bg-gray-50" />
+                        <Input placeholder="الجوال (للدخول لاحقاً)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: normalizeNumbers(e.target.value)})} className="h-12 rounded-xl bg-gray-50" />
                         <div className="relative">
                             <Input placeholder="البريد الإلكتروني (للفاتورة)" type="email" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} className="h-12 rounded-xl bg-gray-50 pr-10" />
                             <Mail className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
