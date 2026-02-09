@@ -191,9 +191,12 @@ const App: React.FC = () => {
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session?.user) {
-            // Only force redirect if it's a fresh sign-in
-            const isFreshSignIn = event === 'SIGNED_IN';
-            fetchProfile(session.user.id, isFreshSignIn);
+            // CRITICAL FIX: Only fetch profile and redirect if the user ID has actually changed 
+            // or if we haven't loaded a profile yet.
+            // This prevents page resets when switching browser tabs.
+            if (profileIdRef.current !== session.user.id) {
+                fetchProfile(session.user.id, true);
+            }
         }
       } else if (event === 'SIGNED_OUT') {
         if (!session) {
