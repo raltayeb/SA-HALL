@@ -9,7 +9,8 @@ import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Sparkles, 
   Share2, Heart, ArrowRight, Star,
-  ShieldCheck, Info, Check, Flame, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Package, Wifi, Car, Music, Users, Circle, CircleDot
+  ShieldCheck, Info, Check, Flame, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Package, Wifi, Car, Music, Users, Circle, CircleDot,
+  Briefcase
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -31,6 +32,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [hallAddons, setHallAddons] = useState<HallAddon[]>([]);
   const [hallPackages, setHallPackages] = useState<HallPackage[]>([]);
+  const [vendorServices, setVendorServices] = useState<Service[]>([]); // New: Vendor Services
   
   // Carousel State
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -40,6 +42,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
   
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
+  const [selectedVendorServices, setSelectedVendorServices] = useState<Service[]>([]); // New: Selected Services
   const [selectedPackage, setSelectedPackage] = useState<HallPackage | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit' | 'hold'>('deposit'); // Default to deposit
 
@@ -66,8 +69,9 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
   const subTotal = useMemo(() => {
     let sum = basePrice;
     sum += selectedAddons.reduce((s, a) => s + Number(a.price), 0);
+    sum += selectedVendorServices.reduce((s, vs) => s + Number(vs.price), 0);
     return isNaN(sum) ? 0 : sum;
-  }, [selectedAddons, basePrice]);
+  }, [selectedAddons, selectedVendorServices, basePrice]);
 
   const vat = subTotal * VAT_RATE;
   const grandTotal = subTotal + vat;
@@ -94,6 +98,10 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
       const h = item as Hall;
       if (h.addons) setHallAddons(h.addons || []);
       if (h.packages) setHallPackages(h.packages || []);
+
+      // Fetch Vendor Services (Cross-sell)
+      const { data: vServices } = await supabase.from('services').select('*').eq('vendor_id', item.vendor_id).eq('is_active', true);
+      if (vServices) setVendorServices(vServices);
     }
   }, [item.id, isHall, item]);
 
@@ -135,6 +143,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                 price: addon.price,
                 qty: 1,
                 type: 'addon'
+            })),
+            ...selectedVendorServices.map(svc => ({
+                id: svc.id,
+                name: svc.name,
+                price: svc.price,
+                qty: 1,
+                type: 'service'
             }))
         ],
       };
@@ -156,6 +171,14 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
           const exists = prev.find(a => a.name === addon.name);
           if (exists) return prev.filter(a => a.name !== addon.name);
           return [...prev, addon];
+      });
+  };
+
+  const toggleVendorService = (svc: Service) => {
+      setSelectedVendorServices(prev => {
+          const exists = prev.find(s => s.id === svc.id);
+          if (exists) return prev.filter(s => s.id !== svc.id);
+          return [...prev, svc];
       });
   };
 
@@ -257,7 +280,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                     </div>
                 </div>
 
-                {/* Section A: Packages (NEW) */}
+                {/* Section A: Packages */}
                 {isHall && hallPackages.length > 0 && (
                     <div className="border-b border-gray-100 pb-10 space-y-6">
                         <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
@@ -318,7 +341,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                     </div>
                 )}
 
-                {/* Section B: Amenities (مميزات القاعة) */}
+                {/* Section B: Amenities */}
                 {isHall && (
                     <div className="border-b border-gray-100 pb-10 space-y-6">
                         <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
@@ -337,11 +360,50 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                     </div>
                 )}
 
-                {/* Section C: Addons (خدمات إضافية) */}
+                {/* Section C: Vendor Services (Global Services) */}
+                {isHall && vendorServices.length > 0 && (
+                    <div className="border-b border-gray-100 pb-10 space-y-6">
+                        <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+                            <Briefcase className="w-6 h-6 text-primary" /> خدمات يقدمها البائع
+                        </h3>
+                        <p className="text-sm text-gray-500 font-bold mb-4">بإمكانك إضافة هذه الخدمات الخارجية لحجزك.</p>
+                        
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {vendorServices.map((svc, i) => {
+                                const isSelected = selectedVendorServices.find(s => s.id === svc.id);
+                                return (
+                                    <div 
+                                        key={i} 
+                                        onClick={() => toggleVendorService(svc)}
+                                        className={`
+                                            cursor-pointer p-5 rounded-[1.5rem] border-2 transition-all duration-300 flex items-center justify-between group
+                                            ${isSelected 
+                                                ? 'border-primary bg-primary/5 shadow-sm' 
+                                                : 'border-gray-100 bg-white hover:border-primary/30 hover:shadow-md'}
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-xl bg-white border flex items-center justify-center transition-colors ${isSelected ? 'border-primary text-primary' : 'border-gray-200 text-gray-300'}`}>
+                                                {isSelected ? <Check className="w-5 h-5" /> : <Package className="w-5 h-5" />}
+                                            </div>
+                                            <div>
+                                                <p className={`font-black text-sm ${isSelected ? 'text-primary' : 'text-gray-900'}`}>{svc.name}</p>
+                                                <span className="text-[10px] text-gray-400 font-bold">{svc.category}</span>
+                                            </div>
+                                        </div>
+                                        <PriceTag amount={svc.price} className={`text-lg ${isSelected ? 'text-primary' : 'text-gray-900'}`} />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Section D: Addons (Hall Specific) */}
                 {isHall && hallAddons.length > 0 && (
                     <div className="border-b border-gray-100 pb-10 space-y-6">
                         <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                            <Package className="w-6 h-6 text-primary" /> خدمات إضافية (حسب الطلب)
+                            <Package className="w-6 h-6 text-primary" /> خدمات إضافية (مرافق القاعة)
                         </h3>
                         <div className="grid md:grid-cols-2 gap-4">
                             {hallAddons.map((addon, i) => {
@@ -373,7 +435,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                     </div>
                 )}
 
-                {/* Section D: Calendar */}
+                {/* Section E: Calendar */}
                 <div className="py-4">
                     <h3 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <CalendarIcon className="w-6 h-6 text-primary" /> الأيام المتاحة للحجز
@@ -473,8 +535,14 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, type, user, onBa
                                 </div>
                                 {selectedAddons.length > 0 && (
                                     <div className="flex justify-between text-sm text-gray-600 font-medium">
-                                        <span>الخدمات ({selectedAddons.length})</span>
+                                        <span>إضافات القاعة ({selectedAddons.length})</span>
                                         <span>{selectedAddons.reduce((s,a) => s + Number(a.price), 0)} SAR</span>
+                                    </div>
+                                )}
+                                {selectedVendorServices.length > 0 && (
+                                    <div className="flex justify-between text-sm text-gray-600 font-medium">
+                                        <span>خدمات خارجية ({selectedVendorServices.length})</span>
+                                        <span>{selectedVendorServices.reduce((s,a) => s + Number(a.price), 0)} SAR</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between text-sm text-gray-600 font-medium">

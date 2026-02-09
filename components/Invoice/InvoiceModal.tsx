@@ -34,18 +34,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "طلب استشارة / عرض سعر" : "الفاتورة الضريبية الإلكترونية"} className="max-w-xl">
-      <div className="space-y-6 text-right" id="printable-invoice">
+    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "طلب استشارة / عرض سعر" : "الفاتورة الضريبية الإلكترونية"} className="max-w-3xl w-full">
+      <div className="space-y-6 text-right pb-4" id="printable-invoice">
         {/* Header */}
-        <div className="flex justify-between items-start border-b pb-6">
+        <div className="flex flex-col-reverse sm:flex-row justify-between items-start border-b pb-6 gap-6">
           <div>
             <h2 className="text-2xl font-black text-primary leading-none">{vendorName}</h2>
             <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-widest">{isConsultation ? 'عرض مبدئي' : 'المرفق السياحي المعتمد'}</p>
             <p className="text-xs text-gray-900 font-bold mt-1">الرقم الضريبي: <span className="font-mono">{taxId}</span></p>
           </div>
-          <div className="text-left flex flex-col items-center gap-2">
+          <div className="text-left flex flex-col items-center gap-2 w-full sm:w-auto">
             <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10">
-              <QrCode className="w-20 h-20 text-primary" />
+              <QrCode className="w-16 h-16 sm:w-20 sm:h-20 text-primary" />
             </div>
             <span className="text-[9px] font-black text-primary bg-primary/5 px-3 py-1 rounded-full uppercase">
                 {isConsultation ? 'Consultation' : 'ZATCA Verified'}
@@ -54,13 +54,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
         </div>
 
         {/* Info */}
-        <div className="grid grid-cols-2 gap-6 text-sm bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm bg-gray-50/50 p-6 rounded-3xl border border-gray-100">
           <div className="space-y-1">
             <p className="text-gray-400 text-[10px] font-black uppercase">العميل</p>
             <p className="font-black text-gray-900 text-lg">{booking.profiles?.full_name || booking.guest_name || 'عميل'}</p>
             <p className="text-xs font-bold text-gray-500">{booking.profiles?.phone_number || booking.guest_phone}</p>
           </div>
-          <div className="text-left space-y-1 border-r border-gray-200 pr-6">
+          <div className="text-right sm:text-left space-y-1 sm:border-r border-gray-200 sm:pr-6 border-t sm:border-t-0 pt-4 sm:pt-0">
             <p className="text-gray-400 text-[10px] font-black uppercase">المرجع</p>
             <p className="font-mono text-sm font-black text-primary">#ORD-{booking.id.slice(0, 8).toUpperCase()}</p>
             <p className="text-gray-400 text-[10px] font-black uppercase mt-4">التاريخ</p>
@@ -163,7 +163,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
         </div>
       </div>
 
-      <div className="flex gap-4 mt-8 no-print">
+      <div className="flex gap-4 mt-4 no-print pb-2">
         <Button variant="outline" className="flex-1 gap-2 rounded-2xl h-14 font-black text-gray-600 hover:bg-gray-50 border-2" onClick={() => window.print()}>
           <Printer className="w-5 h-5" /> طباعة
         </Button>
@@ -171,7 +171,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
           <Download className="w-5 h-5" /> تحميل PDF
         </Button>
       </div>
-      <style>{`@media print { body * { visibility: hidden; } #printable-invoice, #printable-invoice * { visibility: visible; } #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; padding: 40px; border: none; } .no-print { display: none !important; } }`}</style>
+      <style>{`@media print { body * { visibility: hidden; } #printable-invoice, #printable-invoice * { visibility: visible; } #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; border: none; } .no-print { display: none !important; } }`}</style>
     </Modal>
   );
 };
