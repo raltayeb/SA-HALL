@@ -145,11 +145,12 @@ export interface Hall {
   price_per_night: number;
   description: string;
   description_en?: string;
+  policies?: string; // New: Terms & Conditions
   image_url: string;
   images: string[];
   amenities: string[];
   addons?: HallAddon[]; 
-  packages?: HallPackage[]; // New Packages
+  packages?: HallPackage[]; 
   is_active: boolean;
   created_at?: string;
 }
@@ -162,6 +163,7 @@ export interface Service {
   price: number;
   description: string;
   image_url: string;
+  images?: string[]; // Added: Portfolio images
   is_active: boolean;
   created_at?: string;
 }
@@ -181,11 +183,12 @@ export interface Booking {
   user_id: string | null; 
   vendor_id: string;
   booking_date: string;
+  check_out_date?: string; // New: For Chalets
   start_time?: string;
   end_time?: string;
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   booking_type?: 'booking' | 'consultation'; 
-  booking_method?: 'full' | 'deposit' | 'hold'; // New: Booking Method
+  booking_method?: 'full' | 'deposit' | 'hold'; 
   package_name?: string; 
   items?: BookingItem[]; 
   total_amount: number;
@@ -196,6 +199,8 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold'; 
   guest_name?: string;
   guest_phone?: string;
+  guests_adults?: number; // New
+  guests_children?: number; // New
   notes?: string;
   created_at?: string;
   halls?: Hall;
@@ -281,7 +286,7 @@ export interface Coupon {
   end_date: string;
   is_active: boolean;
   created_at?: string;
-  target_ids_json?: any; // Helper
+  target_ids_json?: any; 
 }
 
 export interface StoreOrder {
@@ -295,6 +300,7 @@ export interface StoreOrder {
 
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك', 'حائل', 'القصيم', 'جازان', 'نجران', 'الجوف', 'عرعر'];
 export const HALL_AMENITIES = ['مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية', 'بوفيه مفتوح', 'غرفة كبار الزوار', 'مدخل مستقل'];
+export const CHALET_AMENITIES = ['مسبح خارجي', 'مسبح داخلي', 'ألعاب مائية', 'منطقة شواء', 'مجلس خارجي', 'مطبخ متكامل', 'غرفة نوم ماستر', 'ألعاب أطفال', 'ملعب كرة قدم', 'واي فاي', 'نطيطة'];
 export const SERVICE_CATEGORIES = ['ضيافة', 'تصوير', 'كوش', 'بوفيه', 'إضاءة وصوت', 'زينة وزهور', 'تنسيق حفلات', 'أخرى'];
 export const POS_CATEGORIES = ['مشروبات', 'مأكولات', 'خدمات إضافية', 'تأجير', 'عام'];
 export const EXPENSE_CATEGORIES = ['رواتب', 'إيجار', 'صيانة', 'فواتير', 'تسويق', 'أخرى'];

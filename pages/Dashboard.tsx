@@ -3,13 +3,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking } from '../types';
 import { Button } from '../components/ui/Button';
+import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  CalendarCheck, Building2, Loader2, TrendingUp, Star, Users, CheckCircle2, Inbox
+  CalendarCheck, Building2, Loader2, TrendingUp, Star, Users, CheckCircle2, Inbox, 
+  Wallet, ArrowUpRight, ArrowDownRight, PieChart, BarChart
 } from 'lucide-react';
 import { 
-  XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis
+  XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis, BarChart as ReBarChart, Bar
 } from 'recharts';
-import { format, subMonths, isSameMonth, getDaysInMonth } from 'date-fns';
+import { format, subMonths, isSameMonth, getDaysInMonth, startOfYear, eachMonthOfInterval } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 
 interface DashboardProps {
@@ -23,7 +25,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     pendingRequests: 0,
     avgRating: 5.0,
     activeHalls: 0,
-    monthBookings: 0
+    monthRevenue: 0,
+    totalRevenue: 0
   });
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
@@ -44,22 +47,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       const bookings = (bookingsRes.data as Booking[]) || [];
       const totalBookings = bookings.length;
       
-      // Calculate Occupancy for current month
+      // Revenue Calculations
+      const totalRevenue = bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
       const currentMonthBookings = bookings.filter(b => isSameMonth(new Date(b.booking_date), today));
+      const monthRevenue = currentMonthBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
+
+      // Calculate Occupancy for current month
       const daysInMonth = getDaysInMonth(today);
-      // Assuming 1 hall implies 1 possible booking per day. If multiple halls, capacity multiplies.
       const totalCapacityDays = (hallsRes.data?.length || 1) * daysInMonth;
       const occupancyRate = totalCapacityDays > 0 ? Math.round((currentMonthBookings.length / totalCapacityDays) * 100) : 0;
 
-      // Avg Rating (Mocked if no relation directly)
+      // Avg Rating
       const avgRating = 4.9; 
 
-      // Chart Data
-      const monthlyData = Array.from({ length: 6 }).map((_, i) => {
-        const d = subMonths(today, 5 - i);
-        const monthName = format(d, 'MMM', { locale: arSA });
-        const mBookings = bookings.filter(b => isSameMonth(new Date(b.booking_date), d));
-        return { name: monthName, bookings: mBookings.length };
+      // Chart Data (Last 6 Months)
+      const months = eachMonthOfInterval({
+          start: subMonths(today, 5),
+          end: today
+      });
+
+      const monthlyData = months.map(month => {
+        const monthName = format(month, 'MMM', { locale: arSA });
+        const mBookings = bookings.filter(b => isSameMonth(new Date(b.booking_date), month));
+        const mRevenue = mBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        return { name: monthName, bookings: mBookings.length, revenue: mRevenue };
       });
 
       setStats({
@@ -68,7 +79,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         pendingRequests: bookings.filter(b => b.status === 'pending').length,
         avgRating,
         activeHalls: hallsRes.data?.length || 0,
-        monthBookings: currentMonthBookings.length
+        monthRevenue,
+        totalRevenue
       });
 
       setChartData(monthlyData);
@@ -93,20 +105,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10 font-sans text-right">
       
       {/* 1. Welcome Header */}
-      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+      <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden shadow-sm">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-400 to-pink-300"></div>
         <div>
           <h2 className="text-3xl font-black text-gray-900">لوحة الأداء والتشغيل</h2>
-          <p className="text-gray-500 mt-2 font-bold text-sm">مؤشرات الأداء والكفاءة التشغيلية لقاعاتك.</p>
+          <p className="text-gray-500 mt-2 font-bold text-sm">مؤشرات الأداء المالي والتشغيلي لمنشأتك.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-6">
            <div className="text-center px-4 border-l border-gray-100">
-              <p className="text-[10px] font-black text-gray-400 uppercase">القاعات النشطة</p>
-              <p className="text-xl font-black text-gray-900">{stats.activeHalls}</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase">إيرادات الشهر</p>
+              <PriceTag amount={stats.monthRevenue} className="text-xl font-black text-emerald-600" />
            </div>
            <div className="text-center px-4">
-              <p className="text-[10px] font-black text-gray-400 uppercase">حجوزات الشهر</p>
-              <p className="text-xl font-black text-primary">{stats.monthBookings}</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase">إجمالي الإيرادات</p>
+              <PriceTag amount={stats.totalRevenue} className="text-xl font-black text-primary" />
            </div>
         </div>
       </div>
@@ -150,7 +162,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         </div>
 
         {/* Rating */}
-        <div className="bg-primary text-white p-6 rounded-[2rem] shadow-none space-y-4 relative overflow-hidden">
+        <div className="bg-primary text-white p-6 rounded-[2rem] shadow-xl shadow-primary/20 space-y-4 relative overflow-hidden">
            <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
            <div className="flex items-center justify-between relative z-10">
               <div className="p-3 bg-white/20 rounded-2xl text-white backdrop-blur-md"><Star className="w-6 h-6 fill-current" /></div>
@@ -167,13 +179,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       <div className="grid lg:grid-cols-3 gap-8">
          <div className="lg:col-span-2 bg-white border border-gray-100 rounded-[2.5rem] p-8">
             <div className="flex justify-between items-center mb-8">
-               <h3 className="font-black text-xl text-gray-900 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> نمو الحجوزات</h3>
+               <h3 className="font-black text-xl text-gray-900 flex items-center gap-2"><BarChart className="w-5 h-5 text-primary" /> التحليل المالي</h3>
             </div>
             <div className="h-[300px] w-full" dir="ltr">
                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData}>
                      <defs>
-                        <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                            <stop offset="5%" stopColor="#4B0082" stopOpacity={0.1}/>
                            <stop offset="95%" stopColor="#4B0082" stopOpacity={0}/>
                         </linearGradient>
@@ -184,7 +196,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                      <Tooltip 
                         contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)', fontWeight: 'bold'}}
                      />
-                     <Area type="monotone" dataKey="bookings" stroke="#4B0082" strokeWidth={3} fillOpacity={1} fill="url(#colorBookings)" />
+                     <Area type="monotone" dataKey="revenue" stroke="#4B0082" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
                   </AreaChart>
                </ResponsiveContainer>
             </div>
@@ -209,13 +221,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                               {b.profiles?.full_name || b.guest_name}
                            </p>
                            <p className="text-[9px] font-bold text-gray-400 truncate max-w-[120px]">
-                              {b.halls?.name} - {format(new Date(b.booking_date), 'dd/MM')}
+                              {b.halls?.name || b.services?.name}
                            </p>
                         </div>
                      </div>
-                     <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${b.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
-                        {b.status === 'confirmed' ? 'مؤكد' : 'انتظار'}
-                     </span>
+                     <div className="text-left">
+                        <p className="text-[10px] font-bold text-gray-500">{format(new Date(b.booking_date), 'dd MMM')}</p>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg ${b.status === 'confirmed' ? 'text-green-600 bg-green-50' : 'text-orange-600 bg-orange-50'}`}>
+                            {b.status === 'confirmed' ? 'مؤكد' : 'انتظار'}
+                        </span>
+                     </div>
                   </div>
                ))}
             </div>

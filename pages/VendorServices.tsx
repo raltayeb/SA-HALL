@@ -5,8 +5,7 @@ import { UserProfile, Service, ServiceCategory } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
-import { formatCurrency } from '../utils/currency';
-import { Plus, Sparkles, Tag, Edit3, Trash2, Package, Upload, Loader2, X, Lock, Send, MoreVertical, Eye, EyeOff } from 'lucide-react';
+import { Plus, Sparkles, Tag, Edit3, Trash2, Package, Upload, Loader2, X, Lock } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 
@@ -23,26 +22,18 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
   const [currentService, setCurrentService] = useState<Partial<Service>>({});
   const [saving, setSaving] = useState(false);
   
-  // Upgrade Logic
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [servicesRes, categoriesRes, requestRes] = await Promise.all([
+      const [servicesRes, categoriesRes] = await Promise.all([
         supabase.from('services').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
         supabase.from('service_categories').select('*').order('name'),
-        supabase.from('upgrade_requests').select('*').eq('vendor_id', user.id).eq('request_type', 'service').eq('status', 'pending')
       ]);
-      
       setServices(servicesRes.data || []);
       setCategories(categoriesRes.data || []);
-      if(requestRes.data && requestRes.data.length > 0) setHasPendingRequest(true);
-
     } catch (err: any) {
       toast({ title: 'خطأ', description: 'فشل في تحميل الخدمات', variant: 'destructive' });
     } finally {
@@ -63,8 +54,15 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
       const { error: uploadError } = await supabase.storage.from('service-images').upload(fileName, file);
       if (uploadError) throw uploadError;
       const { data: { publicUrl } } = supabase.storage.from('service-images').getPublicUrl(fileName);
-      setCurrentService(prev => ({ ...prev, image_url: publicUrl }));
-      toast({ title: 'نجاح', description: 'تم رفع صورة الخدمة بنجاح.', variant: 'success' });
+      
+      // Update images array (Portfolio)
+      const newImages = [...(currentService.images || []), publicUrl];
+      setCurrentService(prev => ({ 
+          ...prev, 
+          images: newImages,
+          image_url: newImages[0] // Main image is first one
+      }));
+      toast({ title: 'نجاح', description: 'تم رفع الصورة بنجاح.', variant: 'success' });
     } catch (error: any) {
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     } finally {
@@ -105,67 +103,28 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (services.length >= user.service_limit) {
-       setIsUpgradeModalOpen(true);
+       toast({ title: 'الحد الأقصى', description: 'وصلت للحد المسموح من الخدمات.', variant: 'warning' });
        return;
     }
-    setCurrentService({ is_active: true, category: categories[0]?.name || '' }); 
+    setCurrentService({ is_active: true, category: categories[0]?.name || '', images: [] }); 
     setIsEditing(true);
-  };
-
-  const handleRequestUpgrade = async () => {
-    if(hasPendingRequest) {
-        toast({ title: 'طلب معلق', description: 'لديك طلب زيادة خدمات قيد المراجعة.', variant: 'warning' });
-        return;
-    }
-    try {
-        const { error } = await supabase.from('upgrade_requests').insert([{
-            vendor_id: user.id,
-            request_type: 'service',
-            status: 'pending'
-        }]);
-        if(error) throw error;
-        toast({ title: 'تم الإرسال', description: 'تم إرسال طلب إضافة خدمة للإدارة.', variant: 'success' });
-        setHasPendingRequest(true);
-        setIsUpgradeModalOpen(false);
-    } catch (err: any) {
-        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
-    }
   };
 
   return (
     <div className="space-y-8 pb-10 font-sans text-right">
-      
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
         <div>
           <h2 className="text-3xl font-black text-primary">إدارة الخدمات</h2>
           <p className="text-sm text-muted-foreground mt-1 font-bold">باقات إضافية، ضيافة، وتجهيزات.</p>
         </div>
-        
-        <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-gray-400 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100">
-                {services.length} / {user.service_limit} خدمة
-            </span>
-            <Button onClick={handleAddNew} className={`rounded-2xl h-12 px-6 font-black gap-2 transition-all ${services.length >= user.service_limit ? 'bg-gray-100 text-gray-400 hover:bg-gray-200 shadow-none' : 'shadow-xl shadow-primary/20'}`}>
-                {services.length >= user.service_limit ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                {services.length >= user.service_limit ? 'طلب زيادة' : 'خدمة جديدة'}
-            </Button>
-        </div>
+        <Button onClick={handleAddNew} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
+            <Plus className="w-4 h-4" /> خدمة جديدة
+        </Button>
       </div>
 
-      {/* Services Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {loading ? (
-          Array.from({length: 4}).map((_, i) => <div key={i} className="h-[300px] bg-gray-100 animate-pulse rounded-[2.5rem]"></div>)
-        ) : services.length === 0 ? (
-            <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[2.5rem] opacity-50 bg-white">
-                <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="font-bold text-gray-400">لا توجد خدمات مضافة حالياً.</p>
-            </div>
-        ) : (
-          services.map(s => (
-            <div key={s.id} className="group bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all duration-300 flex flex-col relative">
-              {/* Image Area */}
+        {loading ? [1,2,3].map(i => <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>) : services.map(s => (
+            <div key={s.id} className="group bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col relative">
               <div className="aspect-[4/3] bg-gray-50 relative overflow-hidden">
                 {s.image_url ? (
                     <img src={s.image_url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -173,59 +132,17 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
                     <div className="flex h-full items-center justify-center opacity-10"><Package className="w-16 h-16" /></div>
                 )}
                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-xl text-[10px] font-black shadow-sm text-primary">{s.category}</div>
-                {!s.is_active && <div className="absolute inset-0 bg-black/60 flex items-center justify-center font-black text-white backdrop-blur-sm">غير نشط</div>}
               </div>
-
-              {/* Content */}
               <div className="p-6 flex-1 flex flex-col gap-3">
-                <div className="flex justify-between items-start">
-                    <h3 className="font-black text-lg text-gray-900 group-hover:text-primary transition-colors line-clamp-1">{s.name}</h3>
-                </div>
+                <h3 className="font-black text-lg text-gray-900 truncate">{s.name}</h3>
                 <PriceTag amount={s.price} className="text-xl text-primary" />
-                
-                <div className="mt-auto pt-4 border-t border-gray-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <button 
-                        onClick={() => { setCurrentService(s); setIsEditing(true); }}
-                        className="flex-1 h-10 rounded-xl bg-gray-50 hover:bg-primary hover:text-white text-gray-500 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
-                    >
-                        <Edit3 className="w-3.5 h-3.5" /> تعديل
-                    </button>
-                    <button 
-                        onClick={async () => { if(confirm('حذف؟')) { await supabase.from('services').delete().eq('id', s.id); fetchData(); } }}
-                        className="w-10 h-10 rounded-xl bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center transition-colors"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                </div>
+                <Button variant="outline" className="mt-auto w-full rounded-xl text-xs font-bold" onClick={() => { setCurrentService(s); setIsEditing(true); }}>تعديل</Button>
               </div>
             </div>
-          ))
-        )}
+        ))}
       </div>
 
-      <Modal isOpen={isUpgradeModalOpen} onClose={() => setIsUpgradeModalOpen(false)} title="طلب زيادة خدمات">
-         <div className="space-y-6 text-center py-4">
-            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary">
-                <Sparkles className="w-10 h-10" />
-            </div>
-            <div className="space-y-2">
-                <h3 className="text-xl font-black">اكتمل عدد الخدمات</h3>
-                <p className="text-sm text-gray-500 font-bold leading-relaxed">يمكنك إضافة حتى {user.service_limit} خدمات فقط. قم بطلب زيادة الحد من الإدارة.</p>
-            </div>
-            
-            {hasPendingRequest ? (
-                <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-100 text-yellow-800 font-bold text-sm">
-                    الطلب قيد المراجعة.
-                </div>
-            ) : (
-                <Button onClick={handleRequestUpgrade} className="w-full h-12 rounded-xl font-bold shadow-xl shadow-primary/20 gap-2">
-                    <Send className="w-4 h-4" /> إرسال طلب
-                </Button>
-            )}
-         </div>
-      </Modal>
-
-      <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} title={currentService.id ? 'تعديل الخدمة' : 'خدمة جديدة'}>
+      <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} title={currentService.id ? 'تعديل الخدمة' : 'خدمة جديدة'} className="max-w-2xl">
         <div className="space-y-6 text-right">
           <Input label="اسم الخدمة" value={currentService.name || ''} onChange={e => setCurrentService({...currentService, name: e.target.value})} className="h-12 rounded-xl text-right font-bold" />
           <div className="space-y-2">
@@ -234,30 +151,25 @@ export const VendorServices: React.FC<VendorServicesProps> = ({ user }) => {
               {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
             </select>
           </div>
-          <Input label="سعر الخدمة (ر.س)" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
-          
+          <Input label="سعر الخدمة (ر.س) / يبدأ من" type="number" value={currentService.price || ''} onChange={e => setCurrentService({...currentService, price: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2 text-right">صورة الخدمة <Tag className="w-4 h-4 text-primary" /></label>
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="aspect-[16/9] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all overflow-hidden relative group"
-            >
-              {uploading ? (
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              ) : currentService.image_url ? (
-                <>
-                  <img src={currentService.image_url} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                     <Upload className="w-8 h-8 text-white" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-8 h-8 text-gray-300 group-hover:text-primary transition-colors" />
-                  <span className="text-[10px] font-bold text-gray-400 mt-2 group-hover:text-primary">رفع صورة</span>
-                </>
-              )}
-              <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
+             <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">الوصف التفصيلي</label>
+             <textarea className="w-full h-32 border rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentService.description || ''} onChange={e => setCurrentService({...currentService, description: e.target.value})} />
+          </div>
+          
+          <div className="space-y-4 pt-4 border-t border-gray-100">
+            <label className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center justify-end gap-2 text-right">معرض الأعمال <Tag className="w-4 h-4 text-primary" /></label>
+            <div className="flex flex-wrap gap-4 justify-end">
+                <div onClick={() => fileInputRef.current?.click()} className="w-24 h-24 rounded-xl bg-purple-50 border-2 border-dashed border-purple-200 flex items-center justify-center cursor-pointer hover:bg-purple-100 transition-all">
+                    {uploading ? <Loader2 className="w-6 h-6 animate-spin text-primary" /> : <Plus className="w-6 h-6 text-primary" />}
+                </div>
+                <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
+                {currentService.images?.map((img, i) => (
+                    <div key={i} className="w-24 h-24 rounded-xl overflow-hidden relative group border border-gray-200">
+                        <img src={img} className="w-full h-full object-cover" />
+                        <button onClick={() => setCurrentService({...currentService, images: currentService.images?.filter((_, idx) => idx !== i)})} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-all"><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                ))}
             </div>
           </div>
 

@@ -29,6 +29,8 @@ import { Favorites } from './pages/Favorites';
 import { AdminRequests } from './pages/AdminRequests';
 import { VendorAccounting } from './pages/VendorAccounting';
 import { HallDetails } from './pages/HallDetails';
+import { ChaletDetails } from './pages/ChaletDetails';
+import { ServiceDetails } from './pages/ServiceDetails';
 import { VendorClients } from './pages/VendorClients';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
@@ -85,7 +87,6 @@ const App: React.FC = () => {
     holder: ''
   });
 
-  const [systemFees, setSystemFees] = useState({ hallFee: 500, serviceFee: 200 });
   const { toast } = useToast();
 
   const passValidations = {
@@ -138,7 +139,7 @@ const App: React.FC = () => {
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
             if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(currentTab)) {
-               
+               // Stay
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
                 else if (profile.role === 'user') setActiveTab('browse');
@@ -519,20 +520,24 @@ const App: React.FC = () => {
     if (activeTab === 'services_page') return <PublicListing type="service" title="خدمات المناسبات" subtitle="كل ما تحتاجه لإكمال فرحتك من ضيافة وتصوير وتجهيزات" onNavigate={navigateToDetails} />;
     if (activeTab === 'store_page') return <PublicStore />;
 
-    if (activeTab === 'hall_details' && selectedEntity) return (
-        <HallDetails
-            item={selectedEntity.item}
-            type={selectedEntity.type}
-            user={userProfile}
-            onBack={() => {
-                const hallItem = selectedEntity.item as Hall;
-                if (selectedEntity.type === 'service') setActiveTab('services_page');
-                else if (hallItem.type === 'chalet' || hallItem.type === 'resort') setActiveTab('chalets_page');
-                else setActiveTab('halls_page');
-                window.scrollTo(0, 0);
-            }}
-        />
-    );
+    // Conditional Rendering based on Entity Type
+    if (activeTab === 'hall_details' && selectedEntity) {
+        const handleBack = () => {
+            const hallItem = selectedEntity.item as Hall;
+            if (selectedEntity.type === 'service') setActiveTab('services_page');
+            else if (selectedEntity.type === 'chalet' || hallItem.type === 'chalet' || hallItem.type === 'resort') setActiveTab('chalets_page');
+            else setActiveTab('halls_page');
+            window.scrollTo(0, 0);
+        };
+
+        if (selectedEntity.type === 'chalet' || (selectedEntity.item.type && ['chalet', 'resort'].includes(selectedEntity.item.type))) {
+            return <ChaletDetails item={selectedEntity.item} user={userProfile} onBack={handleBack} />;
+        }
+        if (selectedEntity.type === 'service') {
+            return <ServiceDetails item={selectedEntity.item} user={userProfile} onBack={handleBack} />;
+        }
+        return <HallDetails item={selectedEntity.item} user={userProfile} type={selectedEntity.type} onBack={handleBack} />;
+    }
 
     if (!isLocked && userProfile) {
         return (
