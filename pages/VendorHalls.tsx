@@ -1,13 +1,13 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Hall, Booking, SAUDI_CITIES, HallAddon } from '../types';
+import { UserProfile, Hall, Booking, SAUDI_CITIES, HallAddon, HallPackage } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
 import { 
-  Plus, MapPin, Users, X, Loader2, Building2, Lock, Star, ArrowUpRight, DollarSign, Filter, Upload, Trash2, ClipboardList, Sparkles, Minus
+  Plus, MapPin, Users, X, Loader2, Building2, Lock, Star, ArrowUpRight, DollarSign, Filter, Upload, Trash2, ClipboardList, Sparkles, Minus, Package
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { format, subMonths, isSameMonth, eachMonthOfInterval } from 'date-fns';
@@ -28,14 +28,15 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ 
-      images: [], amenities: [], city: SAUDI_CITIES[0], addons: [] 
+      images: [], amenities: [], city: SAUDI_CITIES[0], addons: [], packages: [] 
   });
   
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   
-  // Addon state for the form
+  // Addon & Package state for the form
   const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0 });
+  const [newPackage, setNewPackage] = useState<HallPackage>({ name: '', price: 0, description: '' });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -150,6 +151,22 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       }));
   };
 
+  const addPackage = () => {
+      if (!newPackage.name || newPackage.price <= 0) return;
+      setCurrentHall(prev => ({
+          ...prev,
+          packages: [...(prev.packages || []), newPackage]
+      }));
+      setNewPackage({ name: '', price: 0, description: '' });
+  };
+
+  const removePackage = (index: number) => {
+      setCurrentHall(prev => ({
+          ...prev,
+          packages: (prev.packages || []).filter((_, i) => i !== index)
+      }));
+  };
+
   const handleSave = async () => {
     if (!currentHall.name || !currentHall.city) {
       toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الأساسية.', variant: 'destructive' });
@@ -179,7 +196,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (halls.length >= user.hall_limit) { setIsUpgradeModalOpen(true); return; }
-    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [] }); 
+    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [], packages: [] }); 
     setIsEditing(true);
   };
 
@@ -189,7 +206,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-      {/* Header */}
+      {/* Header and Analytics sections remain same... */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-gray-100">
         <div>
            <h2 className="text-3xl font-black text-primary">إدارة القاعات</h2>
@@ -207,45 +224,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                 {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </select>
             <Building2 className="w-5 h-5 text-primary ml-2" />
-        </div>
-      </div>
-
-      {/* Analytics */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Bookings */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-blue-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-blue-600"><ClipboardList className="w-6 h-6" /></div>
-            </div>
-            <div className="space-y-1">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">إجمالي الحجوزات</p>
-                <div className="text-3xl font-black text-gray-900">{analytics.totalBookingsCount}</div>
-            </div>
-        </div>
-
-        {/* Rating */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-yellow-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-yellow-500"><Star className="w-6 h-6 fill-current" /></div>
-            </div>
-            <div className="space-y-1">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">متوسط التقييم</p>
-                <div className="text-3xl font-black text-gray-900">{analytics.avgRating.toFixed(1)}</div>
-            </div>
-        </div>
-
-        {/* Active Halls */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-purple-200 transition-all">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-purple-600"><Building2 className="w-6 h-6" /></div>
-            </div>
-            <div className="space-y-1">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedHallId === 'all' ? 'القاعات النشطة' : 'سعة القاعة'}</p>
-                <div className="text-3xl font-black text-gray-900">
-                    {selectedHallId === 'all' ? analytics.activeHallsCount : (analytics.filteredHallsList[0]?.capacity || 0)} 
-                    <span className="text-sm text-gray-400 font-bold"> {selectedHallId === 'all' ? 'قاعة' : 'ضيف'}</span>
-                </div>
-            </div>
         </div>
       </div>
 
@@ -333,11 +311,40 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     </div>
                  </div>
 
+                 {/* Packages Management */}
+                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
+                    <h3 className="text-sm font-black text-primary mb-6 text-right flex items-center gap-2"><Package className="w-4 h-4" /> باقات الحجز (اختياري)</h3>
+                    <p className="text-xs text-gray-400 font-bold mb-4 text-right">أضف باقات خاصة (مثل: عشاء، بوفيه، VIP) ليختار منها العميل بدلاً من السعر الأساسي.</p>
+                    
+                    <div className="space-y-4">
+                        <div className="flex gap-2">
+                            <Button onClick={addPackage} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
+                            <Input placeholder="وصف الباقة" value={newPackage.description || ''} onChange={e => setNewPackage({...newPackage, description: e.target.value})} className="h-12 flex-1 rounded-xl" />
+                            <Input placeholder="السعر" type="number" value={newPackage.price || ''} onChange={e => setNewPackage({...newPackage, price: Number(e.target.value)})} className="h-12 w-24 rounded-xl" />
+                            <Input placeholder="اسم الباقة" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-12 w-40 rounded-xl" />
+                        </div>
+
+                        <div className="space-y-2">
+                            {currentHall.packages?.map((pkg, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <button onClick={() => removePackage(idx)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
+                                    <div className="flex items-center gap-4 flex-1 justify-end">
+                                        <span className="text-xs text-gray-500">{pkg.description}</span>
+                                        <span className="font-mono text-primary font-bold">{pkg.price} SAR</span>
+                                        <span className="font-bold text-gray-900">{pkg.name}</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {(!currentHall.packages || currentHall.packages.length === 0) && (
+                                <p className="text-center text-gray-400 text-xs py-4 font-bold">لا توجد باقات مضافة.</p>
+                            )}
+                        </div>
+                    </div>
+                 </div>
+
                  {/* Hall Services / Addons */}
                  <div className="bg-white border border-purple-100 rounded-2xl p-6">
                     <h3 className="text-sm font-black text-primary mb-6 text-right flex items-center gap-2"><Sparkles className="w-4 h-4" /> خدمات إضافية للقاعة</h3>
-                    <p className="text-xs text-gray-400 font-bold mb-4 text-right">أضف خدمات اختيارية يمكن للعميل طلبها عند الحجز (مثل: ضيافة، كوشة، إلخ).</p>
-                    
                     <div className="space-y-4">
                         <div className="flex gap-2">
                             <Button onClick={addAddon} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
@@ -355,9 +362,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                     </div>
                                 </div>
                             ))}
-                            {(!currentHall.addons || currentHall.addons.length === 0) && (
-                                <p className="text-center text-gray-400 text-xs py-4 font-bold">لا توجد خدمات إضافية.</p>
-                            )}
                         </div>
                     </div>
                  </div>

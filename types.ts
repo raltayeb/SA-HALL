@@ -123,6 +123,12 @@ export interface HallAddon {
   description?: string;
 }
 
+export interface HallPackage {
+  name: string;
+  price: number;
+  description?: string;
+}
+
 export interface Hall {
   id: string;
   vendor_id: string;
@@ -142,7 +148,8 @@ export interface Hall {
   image_url: string;
   images: string[];
   amenities: string[];
-  addons?: HallAddon[]; // New field for Hall Services
+  addons?: HallAddon[]; 
+  packages?: HallPackage[]; // New Packages
   is_active: boolean;
   created_at?: string;
 }
@@ -164,7 +171,7 @@ export interface BookingItem {
   name: string;
   price: number;
   qty: number;
-  type: 'product' | 'service' | 'addon';
+  type: 'product' | 'service' | 'addon' | 'package';
 }
 
 export interface Booking {
@@ -174,9 +181,11 @@ export interface Booking {
   user_id: string | null; 
   vendor_id: string;
   booking_date: string;
-  // Removed start_time and end_time
+  start_time?: string;
+  end_time?: string;
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   booking_type?: 'booking' | 'consultation'; 
+  booking_method?: 'full' | 'deposit' | 'hold'; // New: Booking Method
   package_name?: string; 
   items?: BookingItem[]; 
   total_amount: number;
@@ -184,7 +193,7 @@ export interface Booking {
   vat_amount: number;
   discount_amount?: number;
   applied_coupon?: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed'; 
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold'; 
   guest_name?: string;
   guest_phone?: string;
   notes?: string;
@@ -272,6 +281,7 @@ export interface Coupon {
   end_date: string;
   is_active: boolean;
   created_at?: string;
+  target_ids_json?: any; // Helper
 }
 
 export interface StoreOrder {
