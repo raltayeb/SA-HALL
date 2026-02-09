@@ -1,21 +1,16 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Hall, Booking, SAUDI_CITIES, HALL_AMENITIES } from '../types';
+import { UserProfile, Hall, Booking, SAUDI_CITIES, HallAddon } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
 import { 
-  Plus, MapPin, Users, X, CheckSquare, Square, 
-  Loader2, Building2, Lock, Send, BarChart3, TrendingUp, 
-  CalendarCheck, Star, ArrowUpRight, DollarSign, PieChart, Filter, Upload, Trash2, ClipboardList
+  Plus, MapPin, Users, X, Loader2, Building2, Lock, Star, ArrowUpRight, DollarSign, Filter, Upload, Trash2, ClipboardList, Sparkles, Minus
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Cell 
-} from 'recharts';
-import { format, subMonths, isSameMonth, parseISO, startOfYear, eachMonthOfInterval, endOfYear } from 'date-fns';
+import { format, subMonths, isSameMonth, eachMonthOfInterval } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 
 interface VendorHallsProps {
@@ -23,30 +18,32 @@ interface VendorHallsProps {
 }
 
 export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
-  // Data State
   const [halls, setHalls] = useState<Hall[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [reviewsSummary, setReviewsSummary] = useState<{hallId: string, rating: number}[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // UI State
   const [selectedHallId, setSelectedHallId] = useState<string>('all');
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ images: [], amenities: [], city: SAUDI_CITIES[0] });
+  const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ 
+      images: [], amenities: [], city: SAUDI_CITIES[0], addons: [] 
+  });
   
-  // Upgrade Request State
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   
+  // Addon state for the form
+  const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0 });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: hallsData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
+      const { data: hallsData } = await supabase.from('halls').select('*').eq('vendor_id', user.id).eq('type', 'hall');
       setHalls(hallsData || []);
 
       const { data: bookingsData } = await supabase
@@ -74,7 +71,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Analytics Calculation
   const analytics = useMemo(() => {
     const filteredHalls = selectedHallId === 'all' ? halls : halls.filter(h => h.id === selectedHallId);
     const filteredBookings = selectedHallId === 'all' ? allBookings : allBookings.filter(b => b.hall_id === selectedHallId);
@@ -138,6 +134,22 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     }
   };
 
+  const addAddon = () => {
+      if (!newAddon.name || newAddon.price < 0) return;
+      setCurrentHall(prev => ({
+          ...prev,
+          addons: [...(prev.addons || []), newAddon]
+      }));
+      setNewAddon({ name: '', price: 0 });
+  };
+
+  const removeAddon = (index: number) => {
+      setCurrentHall(prev => ({
+          ...prev,
+          addons: (prev.addons || []).filter((_, i) => i !== index)
+      }));
+  };
+
   const handleSave = async () => {
     if (!currentHall.name || !currentHall.city) {
       toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الأساسية.', variant: 'destructive' });
@@ -145,14 +157,14 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
     }
     setSaving(true);
     try {
-      // Calculate total capacity
       const totalCapacity = (Number(currentHall.capacity_men) || 0) + (Number(currentHall.capacity_women) || 0);
       
       const payload = { 
           ...currentHall, 
           vendor_id: user.id, 
           image_url: currentHall.images?.[0] || '',
-          capacity: totalCapacity > 0 ? totalCapacity : Number(currentHall.capacity) || 0
+          capacity: totalCapacity > 0 ? totalCapacity : Number(currentHall.capacity) || 0,
+          type: 'hall' // Force type
       };
       
       const { error } = currentHall.id ? await supabase.from('halls').update(payload).eq('id', currentHall.id) : await supabase.from('halls').insert([payload]);
@@ -167,14 +179,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const handleAddNew = () => {
     if (halls.length >= user.hall_limit) { setIsUpgradeModalOpen(true); return; }
-    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0 }); 
+    setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [] }); 
     setIsEditing(true);
-  };
-
-  const toggleAmenity = (amenity: string) => {
-    const current = currentHall.amenities || [];
-    const updated = current.includes(amenity) ? current.filter(a => a !== amenity) : [...current, amenity];
-    setCurrentHall({ ...currentHall, amenities: updated });
   };
 
   const goToHallBookings = (hallId: string) => {
@@ -183,7 +189,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-      {/* Header - Flat */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-gray-100">
         <div>
            <h2 className="text-3xl font-black text-primary">إدارة القاعات</h2>
@@ -204,28 +210,16 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Analytics Cards */}
+      {/* Analytics */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {/* Revenue */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-primary/20 transition-all">
-            <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-primary"><DollarSign className="w-6 h-6" /></div>
-                <span className="text-[10px] font-black bg-green-50 text-green-600 px-2 py-1 rounded-lg flex items-center gap-1"><TrendingUp className="w-3 h-3" /> ممتاز</span>
-            </div>
-            <div className="space-y-1">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">إجمالي الإيرادات</p>
-                <PriceTag amount={analytics.totalRevenue} className="text-3xl font-black text-gray-900" />
-            </div>
-        </div>
-
         {/* Bookings */}
         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 hover:border-blue-200 transition-all">
             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-blue-600"><CalendarCheck className="w-6 h-6" /></div>
+                <div className="p-3 bg-gray-50 rounded-xl text-blue-600"><ClipboardList className="w-6 h-6" /></div>
             </div>
             <div className="space-y-1">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">الحجوزات المؤكدة</p>
-                <div className="text-3xl font-black text-gray-900">{analytics.confirmedBookings} <span className="text-sm text-gray-400 font-bold">/ {analytics.totalBookingsCount}</span></div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">إجمالي الحجوزات</p>
+                <div className="text-3xl font-black text-gray-900">{analytics.totalBookingsCount}</div>
             </div>
         </div>
 
@@ -236,7 +230,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
             </div>
             <div className="space-y-1">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">متوسط التقييم</p>
-                <div className="text-3xl font-black text-gray-900">{analytics.avgRating.toFixed(1)} <span className="text-sm text-gray-400 font-bold">/ 5.0</span></div>
+                <div className="text-3xl font-black text-gray-900">{analytics.avgRating.toFixed(1)}</div>
             </div>
         </div>
 
@@ -258,13 +252,13 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       {/* Hall Cards Grid */}
       <div className="flex justify-between items-center text-right flex-row-reverse border-t border-gray-200 pt-8 mt-4">
         <div>
-           <h2 className="text-2xl font-black">إدارة وتعديل القاعات</h2>
+           <h2 className="text-2xl font-black">قائمة القاعات</h2>
            <p className="text-sm text-gray-400 mt-1">لديك {halls.length} من أصل {user.hall_limit} قاعات مسموحة.</p>
         </div>
         {!isEditing && (
           <Button onClick={handleAddNew} className={`rounded-xl h-12 px-8 font-black gap-2 transition-all ${halls.length >= user.hall_limit ? 'bg-gray-100 text-gray-400' : 'bg-primary text-white shadow-none'}`}>
             {halls.length >= user.hall_limit ? <Lock className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {halls.length >= user.hall_limit ? 'طلب إضافة قاعة' : 'إضافة قاعة جديدة'}
+            {halls.length >= user.hall_limit ? 'طلب زيادة' : 'إضافة قاعة'}
           </Button>
         )}
       </div>
@@ -298,11 +292,10 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
         )}
       </div>
 
-      {/* Edit Hall Modal - DESIGN UPDATE */}
+      {/* Edit Hall Modal */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="w-full md:max-w-4xl h-full bg-white border-l border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
-              {/* Modal Header */}
               <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10">
                 <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-50 hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors"><X className="w-5 h-5" /></button>
                 <div className="text-right">
@@ -311,20 +304,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar">
-                 
-                 {/* Section 1: Owner Info (Read-Only) */}
-                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
-                    <h3 className="text-sm font-black text-primary mb-6 text-right">معلومات المالك</h3>
-                    <div className="space-y-4 text-right">
-                       <Input label="الاسم" value={user.full_name} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold" />
-                       <div className="grid grid-cols-2 gap-4">
-                          <Input label="رقم الهاتف" value={user.phone_number || ''} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold text-left" />
-                          <Input label="البريد الالكتروني" value={user.email} readOnly className="h-12 rounded-xl bg-gray-50 border-gray-200 text-gray-500 font-bold text-left" />
-                       </div>
-                    </div>
-                 </div>
-
-                 {/* Section 2: Basic Hall Info */}
                  <div className="bg-white border border-purple-100 rounded-2xl p-6">
                     <h3 className="text-sm font-black text-primary mb-6 text-right">معلومات القاعة الأساسية</h3>
                     <div className="space-y-4 text-right">
@@ -345,35 +324,54 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                             <Input label="عدد الرجال" type="number" value={currentHall.capacity_men || ''} onChange={e => setCurrentHall({...currentHall, capacity_men: Number(e.target.value)})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500">الوصف | بالعربي</label>
-                                <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-right resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500">الوصف | بالانجليزي (اختياري)</label>
-                                <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-left resize-none font-bold text-sm" dir="ltr" value={currentHall.description_en || ''} onChange={e => setCurrentHall({...currentHall, description_en: e.target.value})} />
-                            </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500">الوصف</label>
+                            <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none text-right resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
                         </div>
                         
                         <Input label="سعر الليلة (ر.س)" type="number" value={currentHall.price_per_night || ''} onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} className="h-12 rounded-xl border-gray-200 bg-white font-bold" />
                     </div>
                  </div>
 
-                 {/* Section 3: Attachments */}
+                 {/* Hall Services / Addons */}
+                 <div className="bg-white border border-purple-100 rounded-2xl p-6">
+                    <h3 className="text-sm font-black text-primary mb-6 text-right flex items-center gap-2"><Sparkles className="w-4 h-4" /> خدمات إضافية للقاعة</h3>
+                    <p className="text-xs text-gray-400 font-bold mb-4 text-right">أضف خدمات اختيارية يمكن للعميل طلبها عند الحجز (مثل: ضيافة، كوشة، إلخ).</p>
+                    
+                    <div className="space-y-4">
+                        <div className="flex gap-2">
+                            <Button onClick={addAddon} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
+                            <Input placeholder="السعر" type="number" value={newAddon.price || ''} onChange={e => setNewAddon({...newAddon, price: Number(e.target.value)})} className="h-12 w-32 rounded-xl" />
+                            <Input placeholder="اسم الخدمة (مثال: بوفيه إضافي)" value={newAddon.name} onChange={e => setNewAddon({...newAddon, name: e.target.value})} className="h-12 flex-1 rounded-xl" />
+                        </div>
+
+                        <div className="space-y-2">
+                            {currentHall.addons?.map((addon, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <button onClick={() => removeAddon(idx)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-bold text-gray-900">{addon.name}</span>
+                                        <span className="font-mono text-primary font-bold">{addon.price} SAR</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {(!currentHall.addons || currentHall.addons.length === 0) && (
+                                <p className="text-center text-gray-400 text-xs py-4 font-bold">لا توجد خدمات إضافية.</p>
+                            )}
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Images */}
                  <div className="bg-white border border-purple-100 rounded-2xl p-6">
                     <h3 className="text-sm font-black text-primary mb-6 text-right">المرفقات</h3>
-                    
                     <div className="flex flex-wrap gap-4 justify-end">
-                        {/* Add Button */}
                         <div onClick={() => fileInputRef.current?.click()} className="w-40 h-40 rounded-xl bg-purple-100 border-2 border-dashed border-purple-300 flex items-center justify-center cursor-pointer hover:bg-purple-200 transition-all group">
                             <div className="bg-primary text-white rounded-lg p-2 group-hover:scale-110 transition-transform">
                                 {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Plus className="w-6 h-6" />}
                             </div>
                         </div>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
-
-                        {/* Existing Images */}
                         {currentHall.images?.map((img, i) => (
                             <div key={i} className="w-40 h-40 rounded-xl overflow-hidden relative group border border-gray-200">
                                 <img src={img} className="w-full h-full object-cover" />
@@ -382,9 +380,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                         ))}
                     </div>
                  </div>
-
-                 {/* Amenities (Hidden in new design but kept for logic if needed, or add a section) */}
-                 {/* Can add another section here if needed */}
               </div>
 
               <div className="p-6 border-t border-gray-100 bg-white z-10 flex gap-4">

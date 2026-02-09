@@ -5,7 +5,7 @@ import { Hall, Booking, VendorClient } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { Loader2, AlertCircle, UserCheck, Plus } from 'lucide-react';
+import { Loader2, AlertCircle, UserCheck } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
 interface AddBookingModalProps {
@@ -18,13 +18,11 @@ interface AddBookingModalProps {
 export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClose, vendorId, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [halls, setHalls] = useState<Hall[]>([]);
-  const [clients, setClients] = useState<VendorClient[]>([]); // Clients list
+  const [clients, setClients] = useState<VendorClient[]>([]); 
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<Partial<Booking>>({
     booking_date: new Date().toISOString().split('T')[0],
-    start_time: '16:00',
-    end_time: '23:00',
     payment_status: 'unpaid',
     status: 'confirmed',
     total_amount: 0,
@@ -36,11 +34,9 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
 
-  // Fetch Data on Open
   useEffect(() => {
     if (isOpen) {
       const fetchData = async () => {
-        // 1. Fetch Halls
         const { data: hallsData } = await supabase.from('halls').select('*').eq('vendor_id', vendorId);
         setHalls(hallsData || []);
         if (hallsData && hallsData.length > 0) {
@@ -52,7 +48,6 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             }));
         }
 
-        // 2. Fetch Clients
         const { data: clientsData } = await supabase.from('vendor_clients').select('*').eq('vendor_id', vendorId).order('full_name');
         setClients(clientsData || []);
       };
@@ -60,7 +55,6 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
     }
   }, [isOpen, vendorId]);
 
-  // Handle Client Selection
   const handleClientSelect = (clientId: string) => {
       setSelectedClientId(clientId);
       const client = clients.find(c => c.id === clientId);
@@ -79,18 +73,15 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
         return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDate = new Date(formData.booking_date!);
-    selectedDate.setHours(0, 0, 0, 0);
-
-    if (selectedDate < today) {
-        toast({ title: 'تاريخ غير صالح', description: 'لا يمكن اختيار تاريخ في الماضي.', variant: 'destructive' });
-        return;
-    }
-
-    if (formData.start_time && formData.end_time && formData.start_time >= formData.end_time) {
-        toast({ title: 'توقيت غير منطقي', description: 'يجب أن يكون وقت الدخول قبل وقت الخروج.', variant: 'destructive' });
+    // Check for existing booking on this day
+    const { data: existing } = await supabase.from('bookings')
+        .select('id')
+        .eq('hall_id', formData.hall_id)
+        .eq('booking_date', formData.booking_date)
+        .neq('status', 'cancelled');
+    
+    if (existing && existing.length > 0) {
+        toast({ title: 'التاريخ محجوز', description: 'يوجد حجز مؤكد مسبقاً في هذا التاريخ.', variant: 'destructive' });
         return;
     }
 
@@ -105,14 +96,11 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             if (finalPaidAmount >= (formData.total_amount || 0)) formData.payment_status = 'paid'; 
         }
 
-        // Check if we need to create a new client implicitly (if not selected from list)
-        // This is handled by the DB trigger `sync_booking_to_crm` usually, but we send the raw name/phone here.
-
         const payload = {
             ...formData,
             paid_amount: finalPaidAmount,
             vendor_id: vendorId,
-            user_id: null, // Allow guest booking
+            user_id: null, 
             vat_amount: (formData.total_amount || 0) * 0.15,
             guest_name: guestName,
             guest_phone: guestPhone,
@@ -156,7 +144,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
                 </select>
             </div>
 
-            {/* Client Selection (Connected) */}
+            {/* Client Selection */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3">
                 <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><UserCheck className="w-4 h-4" /> بيانات العميل</label>
@@ -182,11 +170,6 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             <div className="grid grid-cols-2 gap-3">
                 <Input type="date" label="تاريخ الحجز" value={formData.booking_date} onChange={e => setFormData({...formData, booking_date: e.target.value})} className="h-12" />
                 <Input type="number" label="المبلغ الإجمالي" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: Number(e.target.value)})} className="h-12" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <Input type="time" label="وقت الدخول" value={formData.start_time} onChange={e => setFormData({...formData, start_time: e.target.value})} className="h-12" />
-                <Input type="time" label="وقت الخروج" value={formData.end_time} onChange={e => setFormData({...formData, end_time: e.target.value})} className="h-12" />
             </div>
 
             {/* Payment Status */}

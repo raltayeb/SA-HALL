@@ -89,13 +89,12 @@ export interface SystemSettings {
   platform_logo_url?: string;
   hall_listing_fee: number;
   service_listing_fee: number;
-  footer_config?: FooterConfig; // New Field
+  footer_config?: FooterConfig;
   payment_gateways: {
     visa_enabled: boolean;
     cash_enabled: boolean;
     visa_merchant_id?: string;
     visa_secret_key?: string;
-    // HyperPay Specifics
     hyperpay_enabled: boolean;
     hyperpay_entity_id?: string;
     hyperpay_access_token?: string;
@@ -118,25 +117,32 @@ export interface ContentPage {
   updated_at?: string;
 }
 
+export interface HallAddon {
+  name: string;
+  price: number;
+  description?: string;
+}
+
 export interface Hall {
   id: string;
   vendor_id: string;
   name: string;
-  name_en?: string; // New
+  name_en?: string;
   city: string;
   type?: 'hall' | 'chalet' | 'resort' | 'lounge'; 
   address?: string; 
   latitude?: number;
   longitude?: number;
   capacity: number;
-  capacity_men?: number; // New
-  capacity_women?: number; // New
+  capacity_men?: number;
+  capacity_women?: number;
   price_per_night: number;
   description: string;
-  description_en?: string; // New
+  description_en?: string;
   image_url: string;
   images: string[];
   amenities: string[];
+  addons?: HallAddon[]; // New field for Hall Services
   is_active: boolean;
   created_at?: string;
 }
@@ -154,11 +160,11 @@ export interface Service {
 }
 
 export interface BookingItem {
-  id: string;
+  id?: string;
   name: string;
   price: number;
   qty: number;
-  type: 'product' | 'service';
+  type: 'product' | 'service' | 'addon';
 }
 
 export interface Booking {
@@ -168,8 +174,7 @@ export interface Booking {
   user_id: string | null; 
   vendor_id: string;
   booking_date: string;
-  start_time?: string; 
-  end_time?: string;   
+  // Removed start_time and end_time
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   booking_type?: 'booking' | 'consultation'; 
   package_name?: string; 

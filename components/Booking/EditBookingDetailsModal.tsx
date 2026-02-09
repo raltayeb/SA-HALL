@@ -23,8 +23,6 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
     payment_status: booking.payment_status || 'unpaid',
     total_amount: booking.total_amount,
     paid_amount: booking.paid_amount || 0,
-    start_time: booking.start_time || '',
-    end_time: booking.end_time || '',
     notes: booking.notes || '',
     guest_name: booking.guest_name || '',
     guest_phone: booking.guest_phone || ''
@@ -39,8 +37,6 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
             payment_status: booking.payment_status || 'unpaid',
             total_amount: booking.total_amount,
             paid_amount: booking.paid_amount || 0,
-            start_time: booking.start_time || '',
-            end_time: booking.end_time || '',
             notes: booking.notes || '',
             guest_name: booking.guest_name || '',
             guest_phone: booking.guest_phone || ''
@@ -70,12 +66,9 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
             .from('bookings')
             .update({
                 status: formData.status,
-                start_time: formData.start_time,
-                end_time: formData.end_time,
                 notes: formData.notes,
                 guest_name: formData.guest_name,
                 guest_phone: formData.guest_phone
-                // Note: Payment fields removed from update to enforce Accounting section usage
             })
             .eq('id', booking.id);
 
@@ -100,7 +93,7 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                     {/* Status Section */}
                     <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 space-y-4">
                         <div className="flex items-center gap-2 text-gray-800 font-bold text-xs border-b border-gray-200 pb-2 mb-2">
-                            <CalendarCheck className="w-4 h-4 text-primary" /> حالة وموعد الحجز
+                            <CalendarCheck className="w-4 h-4 text-primary" /> حالة الحجز
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-gray-400 uppercase">حالة الحجز</label>
@@ -114,10 +107,6 @@ export const EditBookingDetailsModal: React.FC<EditBookingDetailsModalProps> = (
                                 <option value="cancelled">ملغي</option>
                                 <option value="completed">مكتمل</option>
                             </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <Input label="وقت الدخول" type="time" value={formData.start_time} onChange={e => setFormData({...formData, start_time: e.target.value})} className="bg-white" />
-                            <Input label="وقت الخروج" type="time" value={formData.end_time} onChange={e => setFormData({...formData, end_time: e.target.value})} className="bg-white" />
                         </div>
                     </div>
 

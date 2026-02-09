@@ -7,6 +7,7 @@ import { PublicNavbar } from './components/Layout/PublicNavbar';
 import { Footer } from './components/Layout/Footer';
 import { Dashboard } from './pages/Dashboard';
 import { VendorHalls } from './pages/VendorHalls';
+import { VendorChalets } from './pages/VendorChalets';
 import { Bookings } from './pages/Bookings';
 import { Home } from './pages/Home';
 import { VendorSubscriptions } from './pages/VendorSubscriptions';
@@ -38,8 +39,6 @@ import {
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
 
-// Registration Steps: 
-// 0: Info -> 1: OTP -> 2: Password -> 3: Welcome Selection -> 4: Setup & Pay
 type RegStep = 0 | 1 | 2 | 3 | 4;
 
 const App: React.FC = () => {
@@ -55,7 +54,6 @@ const App: React.FC = () => {
   const regStepRef = useRef<RegStep>(0); 
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Registration State
   const [regStep, setRegStep] = useState<RegStep>(0);
   const [regData, setRegData] = useState({
     email: '',
@@ -67,7 +65,6 @@ const App: React.FC = () => {
   const [otpCode, setOtpCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
-  // Selection & Asset Setup State
   const [selectedType, setSelectedType] = useState<'hall' | 'chalet' | 'service' | null>(null);
   const [assetData, setAssetData] = useState({
     name: '',
@@ -141,7 +138,7 @@ const App: React.FC = () => {
           if (isInitialLoad) {
             const currentTab = activeTabRef.current;
             if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register'].includes(currentTab)) {
-               // Stay on public pages
+               
             } else {
                 if (profile.role === 'super_admin') setActiveTab('admin_dashboard');
                 else if (profile.role === 'user') setActiveTab('browse');
@@ -488,13 +485,11 @@ const App: React.FC = () => {
                 </div>
             ) : (
                 <div className="w-full flex items-center justify-center p-4 bg-gray-50/50">
-                    {/* Simplified Asset Setup Form */}
                     <div className="max-w-4xl w-full flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-500 pb-20">
                         <div className="flex justify-between items-center px-2">
                             <h2 className="text-3xl font-black text-primary">إضافة {selectedType === 'service' ? 'الخدمة' : 'المكان'}</h2>
                             <Button variant="outline" onClick={() => setRegStep(3)} className="gap-2 h-12 rounded-xl"><ArrowRight className="w-4 h-4" /> تغيير النشاط</Button>
                         </div>
-                        {/* Render setup components... (truncated for brevity but logic remains same) */}
                         <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
                             <h3 className="text-lg font-black text-primary mb-6 text-right">معلومات أساسية</h3>
                             <Input label="الاسم" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold" />
@@ -539,12 +534,12 @@ const App: React.FC = () => {
         />
     );
 
-    // Dashboard Content
     if (!isLocked && userProfile) {
         return (
             <div className="mx-auto w-full max-w-[1600px] lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8">
                 {activeTab === 'dashboard' && <Dashboard user={userProfile} />}
                 {activeTab === 'my_halls' && <VendorHalls user={userProfile} />}
+                {activeTab === 'my_chalets' && <VendorChalets user={userProfile} />}
                 {activeTab === 'my_services' && <VendorServices user={userProfile} />}
                 {activeTab === 'calendar' && <CalendarBoard user={userProfile} />}
                 {activeTab === 'hall_bookings' && <Bookings user={userProfile} />}
@@ -555,7 +550,6 @@ const App: React.FC = () => {
                 {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
                 {activeTab === 'my_bookings' && <Bookings user={userProfile} />}
                 {activeTab === 'my_clients' && <VendorClients user={userProfile} />}
-                {/* Admin Pages */}
                 {activeTab === 'admin_dashboard' && userProfile.role === 'super_admin' && <AdminDashboard />}
                 {activeTab === 'admin_users' && userProfile.role === 'super_admin' && <UsersManagement />}
                 {activeTab === 'admin_requests' && userProfile.role === 'super_admin' && <AdminRequests />}
