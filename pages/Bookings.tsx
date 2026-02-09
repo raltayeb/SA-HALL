@@ -7,8 +7,9 @@ import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
 import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetailsModal';
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
+import { GuestBookingDetailsModal } from '../components/Booking/GuestBookingDetailsModal'; // Import New Component
 import { 
-  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2
+  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2, Eye
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
@@ -33,6 +34,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isGuestDetailsOpen, setIsGuestDetailsOpen] = useState(false); // New State
   
   // Column Filters
   const [columnFilters, setColumnFilters] = useState({
@@ -61,13 +63,15 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
           *,
           halls:hall_id (name, city),
           client:user_id (full_name, email, phone_number),
-          vendor:vendor_id (*),
+          vendor:vendor_id (business_name, phone_number, email),
           services:service_id (name)
         `);
 
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
       } else if (user.role === 'user') {
+        // For guest/user, we fetch bookings where they are the user_id (registered) OR matched by guest logic handled in backend/insertion
+        // Since RLS policies handle visibility, we just query for user_id match or if we are a guest session (handled by supbase auth usually)
         query = query.eq('user_id', user.id);
       }
 
@@ -102,7 +106,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     };
   }, [fetchBookings, user.id, user.role]);
 
-  // Handle Mark as Read
+  // Handle Mark as Read / View Details
   const handleBookingClick = async (booking: Booking) => {
       setSelectedBooking(booking);
       if (user.role === 'vendor') {
@@ -115,7 +119,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
               }
           }
       } else {
-          setIsInvoiceOpen(true);
+          // For guests/users, open the new detailed modal
+          setIsGuestDetailsOpen(true);
       }
   };
 
@@ -154,14 +159,16 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
          <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-primary/5 rounded-2xl flex items-center justify-center text-primary relative">
                 <Inbox className="w-7 h-7" />
-                {bookings.filter(b => !(b as any).is_read).length > 0 && (
+                {user.role === 'vendor' && bookings.filter(b => !(b as any).is_read).length > 0 && (
                     <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                 )}
             </div>
             <div>
                 <h2 className="text-3xl font-bold text-primary">سجل الحجوزات</h2>
                 <p className="text-sm font-bold text-gray-400 mt-1">
-                    لديك <span className="text-primary">{bookings.filter(b => !(b as any).is_read).length}</span> رسائل جديدة بانتظار القراءة.
+                    {user.role === 'vendor' 
+                        ? `لديك ${bookings.filter(b => !(b as any).is_read).length} رسائل جديدة بانتظار القراءة.` 
+                        : 'يمكنك متابعة حالة حجوزاتك والدفعات من هنا.'}
                 </p>
             </div>
          </div>
@@ -181,7 +188,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
             <div className="md:col-span-2 relative">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input 
-                    placeholder="بحث برقم الحجز أو اسم العميل..." 
+                    placeholder={user.role === 'vendor' ? "بحث برقم الحجز أو اسم العميل..." : "بحث برقم الحجز..."}
                     className="w-full h-10 bg-white border border-gray-200 rounded-xl pr-10 pl-4 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
                     value={columnFilters.client}
                     onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
@@ -222,7 +229,7 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
             <table className="w-full text-right border-collapse">
                 <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
                     <tr>
-                        <th className="p-4 w-[25%]">تفاصيل العميل</th>
+                        <th className="p-4 w-[25%]">{user.role === 'vendor' ? 'تفاصيل العميل' : 'رقم الحجز'}</th>
                         <th className="p-4 w-[20%]">الموعد والمكان</th>
                         <th className="p-4 w-[15%]">الحالة</th>
                         <th className="p-4 w-[20%]">المالية</th>
@@ -249,17 +256,25 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 `}
                             >
                                 <td className="p-4">
-                                    <div className={`text-sm ${!isRead ? 'text-gray-900' : 'text-gray-600'}`}>
-                                        {b.client?.full_name || b.guest_name || 'عميل خارجي'}
-                                    </div>
-                                    <div className="flex gap-2 items-center mt-1">
-                                        <span className="text-[9px] font-mono bg-gray-100 px-1 rounded text-gray-500">#{b.id.slice(0,8)}</span>
-                                        <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{b.client?.phone_number || b.guest_phone}</span>
-                                    </div>
+                                    {user.role === 'vendor' ? (
+                                        <>
+                                            <div className={`text-sm ${!isRead ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                {b.client?.full_name || b.guest_name || 'عميل خارجي'}
+                                            </div>
+                                            <div className="flex gap-2 items-center mt-1">
+                                                <span className="text-[9px] font-mono bg-gray-100 px-1 rounded text-gray-500">#{b.id.slice(0,8)}</span>
+                                                <span className="text-[10px] text-gray-400 truncate max-w-[100px]">{b.client?.phone_number || b.guest_phone}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-black font-mono text-gray-900">#{b.id.slice(0,8).toUpperCase()}</span>
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="p-4">
                                     <div className="flex items-center gap-2">
-                                        <div className={`p-1.5 rounded-lg ${!isRead ? 'bg-primary/10 text-primary' : 'bg-gray-200 text-gray-500'}`}>
+                                        <div className={`p-1.5 rounded-lg ${!isRead && user.role === 'vendor' ? 'bg-primary/10 text-primary' : 'bg-gray-200 text-gray-500'}`}>
                                             <Calendar className="w-3.5 h-3.5" />
                                         </div>
                                         <div>
@@ -287,8 +302,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                     </span>
                                 </td>
                                 <td className="p-4 text-center">
-                                    <button onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); setIsPaymentModalOpen(true); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-green-600 transition-colors">
-                                        <CreditCard className="w-4 h-4" />
+                                    <button onClick={(e) => { e.stopPropagation(); handleBookingClick(b); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-primary transition-colors">
+                                        {user.role === 'vendor' ? <CreditCard className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </td>
                             </tr>
@@ -311,6 +326,15 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       {selectedBooking && (
         <>
             <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} booking={{...selectedBooking, profiles: user.role === 'vendor' ? (selectedBooking.client || selectedBooking.profiles) : (selectedBooking.vendor || selectedBooking.profiles)}} />
+            
+            {/* Guest Details Modal */}
+            <GuestBookingDetailsModal 
+                isOpen={isGuestDetailsOpen} 
+                onClose={() => setIsGuestDetailsOpen(false)} 
+                booking={selectedBooking} 
+                onOpenInvoice={() => setIsInvoiceOpen(true)}
+            />
+
             {user.role === 'vendor' && (
                 <>
                     <EditBookingDetailsModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} booking={selectedBooking} onSuccess={fetchBookings} />
