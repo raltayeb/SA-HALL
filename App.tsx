@@ -133,19 +133,23 @@ const App: React.FC = () => {
              }
           }
 
-          // Role-based redirection logic (Only on explicit force redirect or initial load)
+          // Role-based redirection logic
           if (forceRedirect) {
             const currentTab = activeTabRef.current;
-            // Only redirect if we are NOT on a specific internal page
-            if (['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab)) {
-               if(currentTab === 'guest_login') setActiveTab('my_bookings');
-            } else {
-                if (profile.role === 'super_admin' && currentTab === 'home') setActiveTab('admin_dashboard');
-                else if (profile.role === 'user' && currentTab === 'home') setActiveTab('browse');
+            const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab);
+            
+            if (profile.role === 'super_admin' && (isPublicPage || currentTab === 'home')) {
+                setActiveTab('admin_dashboard');
+            } else if (profile.role === 'user') {
+                // FORCE USER/GUEST TO BOOKINGS ONLY
+                setActiveTab('my_bookings');
+            } else if (profile.role === 'vendor' && currentTab === 'guest_login') {
+                setActiveTab('dashboard');
             }
           }
         } else {
-             // Guest User Logic
+             // Guest User Logic (Just created via GuestLogin trigger, typically)
+             // But if we are here, we usually have a profile. If not, handle graceful fallback.
              const user = (await supabase.auth.getUser()).data.user;
              if(user) {
                  const newProfile = {
@@ -159,10 +163,8 @@ const App: React.FC = () => {
                      service_limit: 0
                  };
                  setUserProfile(newProfile);
-                 // Only redirect if strictly needed
-                 if (activeTabRef.current === 'guest_login' || activeTabRef.current === 'login') {
-                    setActiveTab('my_bookings');
-                 }
+                 // Redirect guest to bookings immediately
+                 setActiveTab('my_bookings');
              }
         }
     } catch (error) {
@@ -189,12 +191,11 @@ const App: React.FC = () => {
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         if (session?.user) {
-            // Only force redirect if it's a fresh sign-in, not just a session recovery
+            // Only force redirect if it's a fresh sign-in
             const isFreshSignIn = event === 'SIGNED_IN';
             fetchProfile(session.user.id, isFreshSignIn);
         }
       } else if (event === 'SIGNED_OUT') {
-        // Ensure session is actually gone before clearing state to prevent blips
         if (!session) {
             setUserProfile(null);
             profileIdRef.current = null;

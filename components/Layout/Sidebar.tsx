@@ -99,13 +99,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       }
     ];
   } else {
+    // GUEST / USER VIEW - RESTRICTED TO ONLY BOOKINGS
     menuGroups = [
       {
         title: "حسابي",
         items: [
-          { id: 'browse', label: 'تصفح القاعات', icon: <Search className="w-5 h-5" /> },
-          { id: 'my_favorites', label: 'المفضلة', icon: <Heart className="w-5 h-5" /> },
-          { id: 'my_bookings', label: 'حجوزاتي', icon: <Ticket className="w-5 h-5" /> },
+          { id: 'my_bookings', label: 'سجل الحجوزات', icon: <Ticket className="w-5 h-5" /> },
         ]
       }
     ];
@@ -128,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
             <div className="flex flex-col">
               <h1 className="text-2xl font-ruqaa text-primary leading-none mt-1">القاعة</h1>
               <span className="text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-0.5 rounded-lg w-fit mt-1 border border-gray-100">
-                {user.role === 'super_admin' ? 'الإدارة العليا' : user.role === 'vendor' ? 'شريك أعمال' : 'حساب شخصي'}
+                {user.role === 'super_admin' ? 'الإدارة العليا' : user.role === 'vendor' ? 'شريك أعمال' : 'منصة الزوار'}
               </span>
             </div>
             <Button variant="ghost" size="icon" className="mr-auto lg:hidden text-gray-400" onClick={() => setIsOpen(false)}><X className="w-5 h-5" /></Button>
@@ -146,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
                   <p className="text-[9px] font-bold text-gray-400 truncate">{user.email}</p>
               </div>
               <button 
-                onClick={() => { setActiveTab('hall_bookings'); markAllAsRead(); }} 
+                onClick={() => { setActiveTab(user.role === 'vendor' ? 'hall_bookings' : 'my_bookings'); markAllAsRead(); }} 
                 className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-white border hover:border-primary/20 transition-colors text-gray-400 hover:text-primary"
               >
                 <Bell className="w-4 h-4" />
