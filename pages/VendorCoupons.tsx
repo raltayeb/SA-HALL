@@ -1,20 +1,21 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Coupon, Hall, Service, POSItem } from '../types';
+import { UserProfile, Coupon, Hall, Service, Chalet } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Badge } from '../components/ui/Badge';
-import { Ticket, Plus, Tag, Calendar, Trash2, CheckCircle2, Building2, Sparkles, Package, Info } from 'lucide-react';
+import { Ticket, Plus, Tag, Calendar, Trash2, CheckCircle2, Building2, Sparkles, Palmtree, Info, X } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [halls, setHalls] = useState<Hall[]>([]);
+  const [chalets, setChalets] = useState<Chalet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
   const [currentCoupon, setCurrentCoupon] = useState<Partial<Coupon>>({ 
     discount_type: 'percentage', 
     applicable_to: 'both',
@@ -26,23 +27,19 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
-    if (!user?.id) return;
     setLoading(true);
-    try {
-      const [couponsRes, hallsRes, servicesRes] = await Promise.all([
-        supabase.from('coupons').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('halls').select('id, name').eq('vendor_id', user.id),
-        supabase.from('services').select('id, name').eq('vendor_id', user.id),
-      ]);
-      
-      if (couponsRes.data) setCoupons(couponsRes.data as Coupon[]);
-      if (hallsRes.data) setHalls(hallsRes.data as Hall[]);
-      if (servicesRes.data) setServices(servicesRes.data as Service[]);
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    const [cRes, hRes, chRes, sRes] = await Promise.all([
+      supabase.from('coupons').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('halls').select('id, name').eq('vendor_id', user.id),
+      supabase.from('chalets').select('id, name').eq('vendor_id', user.id),
+      supabase.from('services').select('id, name').eq('vendor_id', user.id),
+    ]);
+    
+    setCoupons(cRes.data as Coupon[] || []);
+    setHalls(hRes.data as Hall[] || []);
+    setChalets(chRes.data as Chalet[] || []);
+    setServices(sRes.data as Service[] || []);
+    setLoading(false);
   }, [user.id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -57,7 +54,7 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleSave = async () => {
     if (!currentCoupon.code || !currentCoupon.discount_value || !currentCoupon.end_date) {
-      toast({ title: 'خطأ', description: 'يرجى إكمال بيانات الكوبون الأساسية.', variant: 'destructive' });
+      toast({ title: 'خطأ', description: 'البيانات ناقصة.', variant: 'destructive' });
       return;
     }
     const payload = { ...currentCoupon, vendor_id: user.id };
@@ -66,75 +63,77 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
       : await supabase.from('coupons').insert([payload]);
 
     if (!error) {
-      toast({ title: 'تم الحفظ بنجاح', variant: 'success' });
+      toast({ title: 'تم الحفظ', variant: 'success' });
       setIsModalOpen(false);
       setCurrentCoupon({ discount_type: 'percentage', applicable_to: 'both', target_ids: [], is_active: true, start_date: new Date().toISOString().split('T')[0] });
       fetchData();
     } else {
-      toast({ title: 'خطأ في الحفظ', description: error.message, variant: 'destructive' });
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     }
   };
 
+  const handleDelete = async (id: string) => {
+      if(!confirm('حذف الكوبون نهائياً؟')) return;
+      await supabase.from('coupons').delete().eq('id', id);
+      fetchData();
+  };
+
   return (
-    <div className="space-y-8 text-right pb-10">
-      <div className="flex justify-between items-center flex-row-reverse bg-white p-6 rounded-[2rem] border border-gray-200">
+    <div className="space-y-8 pb-20 font-tajawal text-right">
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
         <div>
-          <h2 className="text-3xl font-black text-primary flex items-center gap-3 justify-end">
-             إدارة الخصومات <Ticket className="w-8 h-8" />
+          <h2 className="text-2xl font-black text-primary flex items-center gap-2">
+             الخصومات والعروض <Ticket className="w-6 h-6" />
           </h2>
-          <p className="text-sm text-gray-400 mt-1 font-bold">حدد العناصر التي ترغب في تطبيق الخصم عليها لزيادة مبيعاتك.</p>
+          <p className="text-xs font-bold text-gray-400 mt-1">إنشاء أكواد خصم للقاعات والخدمات.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="h-12 px-8 rounded-2xl font-black gap-2 shadow">
-           إضافة كوبون جديد <Plus className="w-5 h-5" />
+        <Button onClick={() => setIsModalOpen(true)} className="h-12 px-6 rounded-2xl font-black gap-2 bg-gray-900 text-white shadow-lg shadow-primary/20">
+           كوبون جديد <Plus className="w-4 h-4" />
         </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          Array.from({length: 3}).map((_, i) => <div key={i} className="h-48 bg-gray-100 animate-pulse rounded-[2.5rem]"></div>)
-        ) : coupons.length === 0 ? (
-          <div className="col-span-full py-20 text-center border-2 border-dashed border-gray-200 rounded-[2.5rem] opacity-40 font-bold bg-white">
-            <Tag className="w-12 h-12 mx-auto mb-4" />
-            لا توجد عروض ترويجية نشطة حالياً.
+        {loading ? [1,2,3].map(i => <div key={i} className="h-40 bg-gray-100 animate-pulse rounded-[2rem]"></div>) : coupons.length === 0 ? (
+          <div className="col-span-full py-20 text-center border-2 border-dashed border-gray-200 rounded-[2.5rem] opacity-50">
+            <Tag className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="font-bold text-gray-400">لا توجد كوبونات نشطة.</p>
           </div>
         ) : coupons.map(c => (
-          <div key={c.id} className="bg-white border border-gray-200 rounded-[2.5rem] p-8 relative overflow-hidden group hover:border-primary/30 transition-all">
-             <div className="flex justify-between items-start mb-6 flex-row-reverse">
-                <div className="bg-primary/5 p-3 rounded-2xl text-primary border border-primary/10"><Tag className="w-6 h-6" /></div>
-                <Badge variant={c.is_active ? 'success' : 'destructive'} className="rounded-xl px-4">{c.is_active ? 'نشط' : 'متوقف'}</Badge>
-             </div>
-             <div className="space-y-2">
-                <h4 className="text-3xl font-black text-gray-900 tracking-wider font-mono">{c.code}</h4>
-                <p className="text-sm font-black text-primary">
-                  {c.discount_type === 'percentage' ? `خصم ${c.discount_value}%` : `خصم ثابت ${c.discount_value} ر.س`}
-                </p>
-                <div className="flex flex-wrap gap-1 mt-2">
-                    <span className="text-[10px] font-bold text-gray-400">ينطبق على: </span>
-                    <span className="text-[10px] font-black text-gray-600 bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-200">
-                        {c.target_ids?.length ? `${c.target_ids.length} عناصر محددة` : 'كافة الأصول'}
-                    </span>
+          <div key={c.id} className="bg-white border border-gray-100 rounded-[2.5rem] p-6 relative overflow-hidden group hover:border-primary/30 transition-all">
+             <div className="flex justify-between items-start mb-4">
+                <div className="bg-primary/5 p-3 rounded-2xl text-primary"><Tag className="w-5 h-5" /></div>
+                <div className={`px-3 py-1 rounded-xl text-[10px] font-black ${c.is_active ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'}`}>
+                    {c.is_active ? 'نشط' : 'معطل'}
                 </div>
              </div>
-             <div className="mt-6 flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-widest border-t border-gray-100 pt-4">
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> ينتهي: {c.end_date}</span>
-                <button className="text-red-400 hover:text-red-600 transition-colors" onClick={async () => {
-                  if(confirm('حذف الكوبون؟')) {
-                    await supabase.from('coupons').delete().eq('id', c.id);
-                    fetchData();
-                  }
-                }}><Trash2 className="w-4 h-4" /></button>
+             <div className="space-y-1">
+                <h4 className="text-2xl font-black text-gray-900 font-mono tracking-wider">{c.code}</h4>
+                <p className="text-sm font-black text-primary">
+                  {c.discount_type === 'percentage' ? `خصم ${c.discount_value}%` : `خصم ${c.discount_value} ر.س`}
+                </p>
+                <div className="text-[10px] font-bold text-gray-400 mt-2">
+                    ينطبق على: {c.target_ids?.length ? `${c.target_ids.length} عناصر` : 'الكل'}
+                </div>
+             </div>
+             <div className="mt-6 pt-4 border-t border-gray-50 flex justify-between items-center">
+                <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> ينتهي: {c.end_date}
+                </span>
+                <button onClick={() => handleDelete(c.id)} className="p-2 rounded-xl text-red-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                    <Trash2 className="w-4 h-4" />
+                </button>
              </div>
           </div>
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إعداد كوبون خصم مخصص" className="max-w-2xl">
-         <div className="space-y-6 text-right">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="إعداد كوبون خصم" className="max-w-xl">
+         <div className="space-y-5 text-right">
             <div className="grid grid-cols-2 gap-4">
-               <Input label="رمز الكوبون (مثال: OFFER20)" placeholder="OFFER20" value={currentCoupon.code || ''} onChange={e => setCurrentCoupon({...currentCoupon, code: e.target.value.toUpperCase()})} className="h-12 rounded-xl text-right font-black" />
+               <Input label="الكود (EN)" placeholder="SALE20" value={currentCoupon.code || ''} onChange={e => setCurrentCoupon({...currentCoupon, code: e.target.value.toUpperCase()})} className="h-12 rounded-xl text-center font-black uppercase" />
                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-500">نوع الخصم</label>
-                  <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none" value={currentCoupon.discount_type} onChange={e => setCurrentCoupon({...currentCoupon, discount_type: e.target.value as any})}>
+                  <label className="text-xs font-bold text-gray-500">النوع</label>
+                  <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-xs font-bold bg-white outline-none" value={currentCoupon.discount_type} onChange={e => setCurrentCoupon({...currentCoupon, discount_type: e.target.value as any})}>
                      <option value="percentage">نسبة مئوية (%)</option>
                      <option value="fixed">مبلغ ثابت (SAR)</option>
                   </select>
@@ -142,62 +141,36 @@ export const VendorCoupons: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-               <Input label="قيمة الخصم" type="number" value={currentCoupon.discount_value || ''} onChange={e => setCurrentCoupon({...currentCoupon, discount_value: Number(e.target.value)})} className="h-12 rounded-xl text-right font-bold" />
+               <Input label="القيمة" type="number" value={currentCoupon.discount_value || ''} onChange={e => setCurrentCoupon({...currentCoupon, discount_value: Number(e.target.value)})} className="h-12 rounded-xl font-bold" />
                <Input label="تاريخ الانتهاء" type="date" value={currentCoupon.end_date || ''} onChange={e => setCurrentCoupon({...currentCoupon, end_date: e.target.value})} className="h-12 rounded-xl font-bold" />
             </div>
 
-            {/* Targeted Asset Selection */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
-                    <Info className="w-4 h-4" /> اختر العناصر المشمولة بالخصم (اترك فارغاً للجميع)
-                </div>
+            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
+                <p className="text-[10px] font-black text-gray-400 uppercase">تخصيص الخصم (اختياري)</p>
                 
-                <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-6">
-                    {/* Halls */}
-                    {halls.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-primary flex items-center gap-1"><Building2 className="w-3 h-3" /> القاعات</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {halls.map(h => (
-                                    <button 
-                                        key={h.id} 
-                                        onClick={() => toggleTarget(h.id)}
-                                        className={`flex items-center gap-2 p-3 rounded-xl border text-[10px] font-bold transition-all text-right ${currentCoupon.target_ids?.includes(h.id) ? 'bg-primary text-white border-primary' : 'bg-white border-gray-200 text-gray-500 hover:border-primary/20'}`}
-                                    >
-                                        <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${currentCoupon.target_ids?.includes(h.id) ? 'bg-white text-primary border-white' : 'bg-gray-100 border-gray-200'}`}>
-                                            {currentCoupon.target_ids?.includes(h.id) && <CheckCircle2 className="w-3 h-3" />}
-                                        </div>
-                                        <span className="truncate">{h.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Services */}
-                    {services.length > 0 && (
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-black text-purple-600 flex items-center gap-1"><Sparkles className="w-3 h-3" /> الخدمات</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {services.map(s => (
-                                    <button 
-                                        key={s.id} 
-                                        onClick={() => toggleTarget(s.id)}
-                                        className={`flex items-center gap-2 p-3 rounded-xl border text-[10px] font-bold transition-all text-right ${currentCoupon.target_ids?.includes(s.id) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white border-gray-200 text-gray-500 hover:border-purple-200'}`}
-                                    >
-                                        <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center ${currentCoupon.target_ids?.includes(s.id) ? 'bg-white text-purple-600' : 'bg-gray-100'}`}>
-                                            {currentCoupon.target_ids?.includes(s.id) && <CheckCircle2 className="w-3 h-3" />}
-                                        </div>
-                                        <span className="truncate">{s.name}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                {halls.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-purple-600 flex gap-1"><Building2 className="w-3 h-3" /> القاعات</p>
+                        {halls.map(h => (
+                            <button key={h.id} onClick={() => toggleTarget(h.id)} className={`w-full text-right px-3 py-2 rounded-xl text-[10px] font-bold border transition-all flex justify-between ${currentCoupon.target_ids?.includes(h.id) ? 'bg-white border-primary text-primary shadow-sm' : 'border-transparent hover:bg-white'}`}>
+                                {h.name} {currentCoupon.target_ids?.includes(h.id) && <CheckCircle2 className="w-3 h-3" />}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {chalets.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-blue-600 flex gap-1"><Palmtree className="w-3 h-3" /> الشاليهات</p>
+                        {chalets.map(c => (
+                            <button key={c.id} onClick={() => toggleTarget(c.id)} className={`w-full text-right px-3 py-2 rounded-xl text-[10px] font-bold border transition-all flex justify-between ${currentCoupon.target_ids?.includes(c.id) ? 'bg-white border-primary text-primary shadow-sm' : 'border-transparent hover:bg-white'}`}>
+                                {c.name} {currentCoupon.target_ids?.includes(c.id) && <CheckCircle2 className="w-3 h-3" />}
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            <Button onClick={handleSave} className="w-full h-14 rounded-2xl font-black text-lg shadow">تفعيل نظام الخصم</Button>
+            <Button onClick={handleSave} className="w-full h-12 rounded-xl font-black text-lg shadow-lg shadow-primary/20">حفظ وتفعيل</Button>
          </div>
       </Modal>
     </div>

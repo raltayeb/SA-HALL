@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Booking, UserProfile, Hall } from '../types';
+import { Booking, UserProfile, Hall, Chalet } from '../types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { AddBookingModal } from '../components/Booking/AddBookingModal';
@@ -9,7 +9,7 @@ import { EditBookingDetailsModal } from '../components/Booking/EditBookingDetail
 import { PaymentHistoryModal } from '../components/Booking/PaymentHistoryModal';
 import { GuestBookingDetailsModal } from '../components/Booking/GuestBookingDetailsModal';
 import { 
-  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2, Eye, UserCheck
+  Search, Plus, Inbox, CheckCircle2, Clock, PieChart, CreditCard, ChevronLeft, ChevronRight, Calendar, Building2, Eye, UserCheck, Palmtree, Sparkles, Filter
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
@@ -24,6 +24,7 @@ interface BookingsProps {
 export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [halls, setHalls] = useState<Hall[]>([]);
+  const [chalets, setChalets] = useState<Chalet[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,10 +37,10 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isGuestDetailsOpen, setIsGuestDetailsOpen] = useState(false); 
   
-  const [columnFilters, setColumnFilters] = useState({
-    client: '',
+  const [filters, setFilters] = useState({
+    search: '',
     date: '',
-    hall: 'all',
+    assetType: 'all', // hall, chalet, service
     paymentStatus: 'all',
     status: 'all'
   });
@@ -49,16 +50,23 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
+      // 1. Fetch Assets for filtering (if vendor)
       if (user.role === 'vendor') {
-          const { data: hData } = await supabase.from('halls').select('*').eq('vendor_id', user.id);
-          setHalls(hData as Hall[] || []);
+          const [hRes, cRes] = await Promise.all([
+              supabase.from('halls').select('*').eq('vendor_id', user.id),
+              supabase.from('chalets').select('*').eq('vendor_id', user.id)
+          ]);
+          setHalls(hRes.data || []);
+          setChalets(cRes.data || []);
       }
 
+      // 2. Build Query
       let query = supabase
         .from('bookings')
         .select(`
           *,
           halls:hall_id (name, city),
+          chalets:chalet_id (name, city),
           client:user_id (full_name, email, phone_number),
           vendor:vendor_id (business_name, phone_number, email),
           services:service_id (name)
@@ -66,8 +74,8 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
 
       if (user.role === 'vendor') {
         query = query.eq('vendor_id', user.id);
-      } else if (user.role === 'user') {
-        // CRITICAL FIX: Fetch bookings by User ID OR Guest Phone
+      } else {
+        // User/Guest View
         const normalizedPhone = normalizeNumbers(user.phone_number || '');
         if (normalizedPhone) {
             query = query.or(`user_id.eq.${user.id},guest_phone.eq.${normalizedPhone}`);
@@ -77,7 +85,6 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
-      
       if (error) throw error;
       setBookings(data as any[] || []);
     } catch (err: any) {
@@ -88,15 +95,14 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
     }
   }, [user.id, user.role, user.phone_number, toast]);
 
+  // Realtime Subscription
   useEffect(() => {
     fetchBookings();
+    
     const channel = supabase.channel('bookings_realtime')
-      .on('postgres_changes', { 
-          event: '*', 
-          schema: 'public', 
-          table: 'bookings'
-      }, () => {
-          fetchBookings(); 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+          fetchBookings();
+          // Optional: Add a toast "New booking received"
       })
       .subscribe();
 
@@ -108,136 +114,116 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
       if (user.role === 'vendor') {
           setIsEditModalOpen(true);
           if (!(booking as any).is_read) {
-              const { error } = await supabase.from('bookings').update({ is_read: true }).eq('id', booking.id);
-              if (!error) {
-                  setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, is_read: true } : b));
-              }
+              await supabase.from('bookings').update({ is_read: true }).eq('id', booking.id);
+              setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, is_read: true } : b));
           }
       } else {
           setIsGuestDetailsOpen(true);
       }
   };
 
+  // Filter Logic
   const filteredBookings = bookings.filter(b => {
-    const searchTerm = normalizeNumbers(columnFilters.client.toLowerCase());
-    const matchClient = !searchTerm || 
+    const searchTerm = normalizeNumbers(filters.search.toLowerCase());
+    const matchSearch = !searchTerm || 
         (b.client?.full_name || b.guest_name || 'عميل').toLowerCase().includes(searchTerm) || 
         normalizeNumbers(b.guest_phone || '')?.includes(searchTerm) ||
         b.id.toLowerCase().includes(searchTerm);
     
-    const matchDate = !columnFilters.date || b.booking_date.includes(columnFilters.date);
-    const matchHall = columnFilters.hall === 'all' || b.hall_id === columnFilters.hall;
-    const matchPayment = columnFilters.paymentStatus === 'all' || b.payment_status === columnFilters.paymentStatus;
-    const matchStatus = columnFilters.status === 'all' || b.status === columnFilters.status;
+    const matchDate = !filters.date || b.booking_date.includes(filters.date);
+    
+    const matchAsset = filters.assetType === 'all' || 
+       (filters.assetType === 'hall' && b.hall_id) ||
+       (filters.assetType === 'chalet' && b.chalet_id) ||
+       (filters.assetType === 'service' && b.service_id);
 
-    return matchClient && matchDate && matchHall && matchPayment && matchStatus;
+    const matchPayment = filters.paymentStatus === 'all' || b.payment_status === filters.paymentStatus;
+    const matchStatus = filters.status === 'all' || b.status === filters.status;
+
+    return matchSearch && matchDate && matchAsset && matchPayment && matchStatus;
   });
 
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
   const currentData = filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const getPaymentStatusBadge = (status: string | undefined) => {
-    switch (status) {
-      case 'paid': return <div className="flex items-center gap-1 text-emerald-600 font-bold text-[10px]"><CheckCircle2 className="w-3 h-3" /> تم السداد</div>;
-      case 'partial': return <div className="flex items-center gap-1 text-amber-600 font-bold text-[10px]"><PieChart className="w-3 h-3" /> مدفوع جزئياً</div>;
-      default: return <div className="flex items-center gap-1 text-gray-400 font-bold text-[10px]"><Clock className="w-3 h-3" /> آجل / غير مدفوع</div>;
-    }
+  const getAssetName = (b: Booking) => b.halls?.name || b.chalets?.name || b.services?.name || 'غير محدد';
+  const getAssetIcon = (b: Booking) => {
+      if (b.chalets) return <Palmtree className="w-4 h-4 text-blue-500" />;
+      if (b.services) return <Sparkles className="w-4 h-4 text-orange-500" />;
+      return <Building2 className="w-4 h-4 text-purple-500" />;
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans text-right">
+    <div className="space-y-6 pb-20 font-tajawal text-right">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-primary/5 rounded-2xl flex items-center justify-center text-primary relative">
-                <Inbox className="w-7 h-7" />
+            <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-primary relative border border-gray-100">
+                <Inbox className="w-6 h-6" />
                 {user.role === 'vendor' && bookings.filter(b => !(b as any).is_read).length > 0 && (
-                    <span className="absolute top-3 right-3 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                    <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                 )}
             </div>
             <div>
-                <h2 className="text-3xl font-bold text-primary">{user.role === 'vendor' ? 'إدارة الحجوزات' : 'حجوزاتي'}</h2>
-                <p className="text-sm font-bold text-gray-400 mt-1">
-                    {user.role === 'vendor' 
-                        ? `لديك ${bookings.length} حجز مسجل في النظام.` 
-                        : 'قائمة بجميع حجوزاتك الحالية والسابقة.'}
+                <h2 className="text-2xl font-black text-gray-900">{user.role === 'vendor' ? 'سجل الحجوزات' : 'حجوزاتي'}</h2>
+                <p className="text-xs font-bold text-gray-400 mt-1">
+                    {bookings.length} حجز مسجل في النظام
                 </p>
             </div>
          </div>
          {user.role === 'vendor' && (
-            <div className="flex gap-3 w-full md:w-auto">
-                <Button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none gap-2 h-12 rounded-xl font-bold shadow-lg shadow-primary/20">
-                    <Plus className="w-4 h-4" /> حجز يدوي
-                </Button>
-            </div>
+            <Button onClick={() => setIsAddModalOpen(true)} className="gap-2 h-12 rounded-2xl font-black shadow-lg shadow-primary/20 bg-gray-900 text-white">
+                <Plus className="w-4 h-4" /> حجز يدوي
+            </Button>
          )}
       </div>
 
-      {/* Inbox Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 p-5 bg-gray-50/50 border-b border-gray-100">
-            <div className="md:col-span-2 relative">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input 
-                    placeholder={user.role === 'vendor' ? "بحث بالاسم، الجوال، أو رقم الحجز..." : "بحث برقم الحجز..."}
-                    className="w-full h-10 bg-white border border-gray-200 rounded-xl pr-10 pl-4 text-xs font-bold focus:ring-1 focus:ring-primary outline-none"
-                    value={columnFilters.client}
-                    onChange={e => setColumnFilters({...columnFilters, client: e.target.value})}
-                />
-            </div>
-            {user.role === 'vendor' && (
-                <div>
-                    <select 
-                        className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" 
-                        value={columnFilters.hall} 
-                        onChange={e => setColumnFilters({...columnFilters, hall: e.target.value})}
-                    >
-                        <option value="all">كل القاعات</option>
-                        {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                    </select>
-                </div>
-            )}
-            <div><input type="date" className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.date} onChange={e => setColumnFilters({...columnFilters, date: e.target.value})} /></div>
-            <div>
-                <select className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.status} onChange={e => setColumnFilters({...columnFilters, status: e.target.value})}>
-                    <option value="all">كل الحالات</option>
-                    <option value="pending">جديد</option>
-                    <option value="confirmed">مؤكد</option>
-                    <option value="cancelled">ملغي</option>
-                </select>
-            </div>
-            <div>
-                <select className="w-full h-10 bg-white border border-gray-200 rounded-xl px-4 text-xs font-bold" value={columnFilters.paymentStatus} onChange={e => setColumnFilters({...columnFilters, paymentStatus: e.target.value})}>
-                    <option value="all">كل الدفعات</option>
-                    <option value="paid">مدفوع</option>
-                    <option value="unpaid">آجل</option>
-                </select>
-            </div>
-        </div>
+      {/* Filters Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm">
+         <div className="md:col-span-2 relative">
+            <input 
+                placeholder="بحث..."
+                className="w-full h-11 bg-gray-50 border border-gray-100 rounded-xl px-4 pl-10 text-xs font-bold focus:bg-white transition-all outline-none"
+                value={filters.search}
+                onChange={e => setFilters({...filters, search: e.target.value})}
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+         </div>
+         <select className="h-11 bg-gray-50 border border-gray-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer" value={filters.assetType} onChange={e => setFilters({...filters, assetType: e.target.value})}>
+            <option value="all">كل الأصول</option>
+            <option value="hall">القاعات</option>
+            <option value="chalet">الشاليهات</option>
+            <option value="service">الخدمات</option>
+         </select>
+         <select className="h-11 bg-gray-50 border border-gray-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
+            <option value="all">كل الحالات</option>
+            <option value="confirmed">مؤكد</option>
+            <option value="pending">معلق</option>
+            <option value="cancelled">ملغي</option>
+         </select>
+         <input type="date" className="h-11 bg-gray-50 border border-gray-100 rounded-xl px-4 text-xs font-bold outline-none cursor-pointer" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
+      </div>
 
-        {/* Table */}
+      {/* Table */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
         <div className="overflow-x-auto custom-scrollbar flex-1">
             <table className="w-full text-right border-collapse">
-                <thead className="bg-gray-50/50 text-gray-400 text-[10px] font-bold uppercase tracking-wider sticky top-0">
+                <thead className="bg-gray-50 text-gray-400 text-[10px] font-black uppercase tracking-wider">
                     <tr>
-                        <th className="p-4 w-[25%]">{user.role === 'vendor' ? 'تفاصيل العميل' : 'رقم الحجز'}</th>
-                        <th className="p-4 w-[20%]">الموعد والمكان</th>
-                        <th className="p-4 w-[15%]">الحالة</th>
-                        <th className="p-4 w-[20%]">المالية</th>
-                        <th className="p-4 w-[15%] text-center">وقت الطلب</th>
-                        <th className="p-4 w-[5%] text-center"></th>
+                        <th className="p-5 w-[25%]">{user.role === 'vendor' ? 'العميل' : 'رقم الحجز'}</th>
+                        <th className="p-5 w-[20%]">الأصل المحجوز</th>
+                        <th className="p-5 w-[15%]">الحالة</th>
+                        <th className="p-5 w-[20%]">المالية</th>
+                        <th className="p-5 w-[15%] text-center">التاريخ</th>
+                        <th className="p-5 w-[5%]"></th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-50">
                     {loading ? (
-                        Array.from({length: 5}).map((_, i) => <tr key={i} className="animate-pulse bg-white"><td colSpan={6} className="p-6"><div className="h-4 bg-gray-100 rounded w-full"></div></td></tr>)
+                        Array.from({length: 5}).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={6} className="p-6"><div className="h-4 bg-gray-100 rounded w-full"></div></td></tr>)
                     ) : currentData.length === 0 ? (
-                        <tr><td colSpan={6} className="p-20 text-center text-gray-400 font-bold flex flex-col items-center justify-center w-full gap-2">
-                            <Inbox className="w-10 h-10 opacity-50" />
-                            لا توجد حجوزات مطابقة
-                        </td></tr>
+                        <tr><td colSpan={6} className="p-20 text-center text-gray-400 font-bold">لا توجد حجوزات مطابقة</td></tr>
                     ) : currentData.map((b) => {
                         const isRead = (b as any).is_read;
                         return (
@@ -245,63 +231,39 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                                 key={b.id} 
                                 onClick={() => handleBookingClick(b)}
                                 className={`
-                                    group transition-all cursor-pointer border-l-4
-                                    ${!isRead && user.role === 'vendor'
-                                        ? 'bg-white hover:bg-gray-50 border-l-primary font-bold shadow-sm' 
-                                        : 'bg-gray-50/30 hover:bg-gray-100 text-gray-500 border-l-transparent'}
+                                    group transition-all cursor-pointer hover:bg-gray-50
+                                    ${!isRead && user.role === 'vendor' ? 'bg-primary/5' : 'bg-white'}
                                 `}
                             >
-                                <td className="p-4">
-                                    {user.role === 'vendor' ? (
-                                        <>
-                                            <div className={`text-sm ${!isRead ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {b.client?.full_name || b.guest_name || 'عميل خارجي'}
-                                            </div>
-                                            <div className="flex gap-2 items-center mt-1">
-                                                <span className="text-[9px] font-mono bg-gray-100 px-1 rounded text-gray-500">#{b.id.slice(0,8)}</span>
-                                                <span className="text-[10px] text-gray-400 truncate max-w-[100px] font-mono">{b.guest_phone || b.client?.phone_number}</span>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-sm font-black font-mono text-gray-900">#{b.id.slice(0,8).toUpperCase()}</span>
-                                            <span className="text-[10px] font-bold text-gray-400">{b.vendor?.business_name}</span>
-                                        </div>
-                                    )}
+                                <td className="p-5">
+                                    <div className="font-bold text-gray-900 text-sm">{b.client?.full_name || b.guest_name || 'عميل'}</div>
+                                    <div className="text-[10px] text-gray-400 font-mono mt-1">#{b.id.slice(0,8)}</div>
                                 </td>
-                                <td className="p-4">
+                                <td className="p-5">
                                     <div className="flex items-center gap-2">
-                                        <div className={`p-1.5 rounded-lg ${!isRead && user.role === 'vendor' ? 'bg-primary/10 text-primary' : 'bg-gray-200 text-gray-500'}`}>
-                                            <Calendar className="w-3.5 h-3.5" />
-                                        </div>
+                                        <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">{getAssetIcon(b)}</div>
                                         <div>
-                                            <div className="text-xs text-gray-800 font-mono">{format(new Date(b.booking_date), 'yyyy-MM-dd')}</div>
-                                            <div className="text-[10px] text-gray-400">{b.halls?.name || b.services?.name}</div>
+                                            <div className="text-xs font-bold text-gray-900">{getAssetName(b)}</div>
+                                            <div className="text-[10px] text-gray-400 font-mono">{b.booking_date}</div>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="p-4">
-                                    <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
-                                        {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'طلب جديد' : b.status === 'cancelled' ? 'ملغي' : 'مكتمل'}
+                                <td className="p-5">
+                                    <Badge variant={b.status === 'confirmed' ? 'success' : b.status === 'pending' ? 'warning' : 'destructive'} className="text-[10px] px-2 py-1 rounded-lg">
+                                        {b.status === 'confirmed' ? 'مؤكد' : b.status === 'pending' ? 'جديد' : b.status === 'cancelled' ? 'ملغي' : b.status}
                                     </Badge>
                                 </td>
-                                <td className="p-4">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="text-sm font-bold font-mono">
-                                            {b.total_amount.toLocaleString()} <span className="text-[9px] font-normal text-gray-400 font-sans">ر.س</span>
-                                        </div>
-                                        {getPaymentStatusBadge(b.payment_status)}
+                                <td className="p-5">
+                                    <div className="text-sm font-black text-gray-900">{b.total_amount.toLocaleString()} <span className="text-[9px] font-medium text-gray-400">ر.س</span></div>
+                                    <div className={`text-[9px] font-bold mt-1 ${b.payment_status === 'paid' ? 'text-green-600' : 'text-orange-500'}`}>
+                                        {b.payment_status === 'paid' ? 'مدفوع بالكامل' : b.payment_status === 'partial' ? `متبقي: ${(b.total_amount - (b.paid_amount || 0)).toLocaleString()}` : 'غير مدفوع'}
                                     </div>
                                 </td>
-                                <td className="p-4 text-center">
-                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
-                                        {format(new Date(b.created_at || ''), 'dd/MM p', { locale: arSA })}
-                                    </span>
+                                <td className="p-5 text-center text-[10px] font-bold text-gray-400">
+                                    {format(new Date(b.created_at || ''), 'dd/MM p', { locale: arSA })}
                                 </td>
-                                <td className="p-4 text-center">
-                                    <button onClick={(e) => { e.stopPropagation(); handleBookingClick(b); }} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-primary transition-colors">
-                                        {user.role === 'vendor' ? <CreditCard className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
+                                <td className="p-5 text-center">
+                                    <ChevronLeft className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
                                 </td>
                             </tr>
                         );
@@ -309,13 +271,13 @@ export const Bookings: React.FC<BookingsProps> = ({ user }) => {
                 </tbody>
             </table>
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
-            <div className="text-[10px] font-bold text-gray-400">صفحة {currentPage} من {totalPages || 1}</div>
+        
+        {/* Pagination */}
+        <div className="p-4 border-t border-gray-50 flex justify-between items-center bg-gray-50/50">
+            <span className="text-[10px] font-bold text-gray-400">صفحة {currentPage} من {totalPages || 1}</span>
             <div className="flex gap-2">
-                <Button variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 p-0"><ChevronRight className="w-4 h-4" /></Button>
-                <Button variant="outline" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 p-0"><ChevronLeft className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-8 w-8 rounded-lg bg-white border-gray-200"><ChevronRight className="w-4 h-4" /></Button>
+                <Button variant="outline" size="icon" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)} className="h-8 w-8 rounded-lg bg-white border-gray-200"><ChevronLeft className="w-4 h-4" /></Button>
             </div>
         </div>
       </div>

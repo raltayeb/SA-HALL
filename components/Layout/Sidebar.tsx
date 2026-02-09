@@ -23,16 +23,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, platformLogo }) => {
-  const [vendorHalls, setVendorHalls] = useState<Hall[]>([]);
   const { unreadCount, markAllAsRead } = useNotifications();
-
-  useEffect(() => {
-    if (user?.role === 'vendor') {
-      supabase.from('halls').select('*').eq('vendor_id', user.id).then(({ data }) => {
-        if (data) setVendorHalls(data);
-      });
-    }
-  }, [user]);
 
   if (!user) return null;
 
@@ -70,14 +61,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         title: "الرئيسية",
         items: [
           { id: 'dashboard', label: 'لوحة المعلومات', icon: <LayoutGrid className="w-5 h-5" /> },
-          { id: 'calendar', label: 'التقويم والحجوزات', icon: <CalendarDays className="w-5 h-5" /> },
+          { id: 'calendar', label: 'التقويم', icon: <CalendarDays className="w-5 h-5" /> },
+          { id: 'hall_bookings', label: 'سجل الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
         ]
       },
       {
         title: "المالية",
         items: [
           { id: 'accounting', label: 'الفواتير والحسابات', icon: <Receipt className="w-5 h-5" /> },
-          { id: 'coupons', label: 'العروض والخصم', icon: <Tag className="w-5 h-5" /> },
+          { id: 'coupons', label: 'الخصومات والعروض', icon: <Tag className="w-5 h-5" /> },
+          { id: 'vendor_marketplace', label: 'متجر المنصة', icon: <Store className="w-5 h-5" /> },
         ]
       },
       {
@@ -86,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
           { id: 'my_halls', label: 'القاعات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'my_chalets', label: 'الشاليهات', icon: <Palmtree className="w-5 h-5" /> },
           { id: 'my_services', label: 'الخدمات', icon: <Sparkles className="w-5 h-5" /> },
-          { id: 'hall_bookings', label: 'سجل الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
+          { id: 'my_clients', label: 'العملاء', icon: <UserCheck className="w-5 h-5" /> },
         ]
       },
       {

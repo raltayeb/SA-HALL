@@ -34,7 +34,7 @@ export interface UserProfile {
   instagram_url?: string;
   twitter_url?: string;
   pos_config?: POSConfig;
-  vendor_amenities?: string[]; // New: Custom amenities defined by vendor
+  vendor_amenities?: string[];
 }
 
 export interface VendorClient {
@@ -83,26 +83,6 @@ export interface FooterConfig {
   };
 }
 
-export interface SystemSettings {
-  site_name: string;
-  commission_rate: number;
-  vat_enabled: boolean;
-  platform_logo_url?: string;
-  hall_listing_fee: number;
-  service_listing_fee: number;
-  footer_config?: FooterConfig;
-  payment_gateways: {
-    visa_enabled: boolean;
-    cash_enabled: boolean;
-    visa_merchant_id?: string;
-    visa_secret_key?: string;
-    hyperpay_enabled: boolean;
-    hyperpay_entity_id?: string;
-    hyperpay_access_token?: string;
-    hyperpay_mode?: 'test' | 'live';
-  };
-}
-
 export interface ServiceCategory {
   id: string;
   name: string;
@@ -114,8 +94,27 @@ export interface ContentPage {
   slug: string;
   title: string;
   content: string;
-  is_published: boolean;
-  updated_at?: string;
+  updated_at: string;
+}
+
+export interface SystemSettings {
+  site_name: string;
+  commission_rate: number;
+  vat_enabled: boolean;
+  platform_logo_url: string;
+  hall_listing_fee: number;
+  service_listing_fee: number;
+  footer_config: FooterConfig;
+  payment_gateways: {
+    visa_enabled: boolean;
+    cash_enabled: boolean;
+    visa_merchant_id: string;
+    visa_secret_key: string;
+    hyperpay_enabled: boolean;
+    hyperpay_entity_id: string;
+    hyperpay_access_token: string;
+    hyperpay_mode: 'test' | 'live';
+  };
 }
 
 export interface HallAddon {
@@ -136,7 +135,7 @@ export interface Hall {
   name: string;
   name_en?: string;
   city: string;
-  type?: 'hall' | 'chalet' | 'resort' | 'lounge'; 
+  type?: 'hall' | 'lounge' | 'chalet' | 'resort'; 
   address?: string; 
   latitude?: number;
   longitude?: number;
@@ -144,8 +143,6 @@ export interface Hall {
   capacity_men?: number;
   capacity_women?: number;
   price_per_night: number;
-  price_per_adult?: number; // New
-  price_per_child?: number; // New
   description: string;
   description_en?: string;
   policies?: string; 
@@ -154,6 +151,27 @@ export interface Hall {
   amenities: string[];
   addons?: HallAddon[]; 
   packages?: HallPackage[]; 
+  is_active: boolean;
+  created_at?: string;
+}
+
+// NEW CHALET INTERFACE
+export interface Chalet {
+  id: string;
+  vendor_id: string;
+  name: string;
+  city: string;
+  address?: string;
+  capacity: number;
+  price_per_night: number;
+  price_per_adult?: number;
+  price_per_child?: number;
+  description: string;
+  policies?: string;
+  image_url: string;
+  images: string[];
+  amenities: string[];
+  addons?: HallAddon[];
   is_active: boolean;
   created_at?: string;
 }
@@ -167,7 +185,7 @@ export interface Service {
   description: string;
   image_url: string;
   images?: string[]; 
-  service_areas?: string[]; // Added: Areas where service is provided
+  service_areas?: string[]; 
   is_active: boolean;
   created_at?: string;
 }
@@ -183,6 +201,7 @@ export interface BookingItem {
 export interface Booking {
   id: string;
   hall_id?: string;
+  chalet_id?: string; // ADDED
   service_id?: string;
   user_id: string | null; 
   vendor_id: string;
@@ -203,12 +222,13 @@ export interface Booking {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold'; 
   guest_name?: string;
   guest_phone?: string;
-  guest_email?: string; // New
+  guest_email?: string; 
   guests_adults?: number; 
   guests_children?: number; 
   notes?: string;
   created_at?: string;
   halls?: Hall;
+  chalets?: Chalet; // ADDED
   profiles?: UserProfile;
   services?: Service;
   client?: UserProfile;

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Hall, SAUDI_CITIES, CHALET_AMENITIES, HallAddon } from '../types';
+import { UserProfile, Chalet, SAUDI_CITIES, CHALET_AMENITIES, HallAddon } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
@@ -15,14 +15,14 @@ interface VendorChaletsProps {
 }
 
 export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
-  const [chalets, setChalets] = useState<Hall[]>([]);
+  const [chalets, setChalets] = useState<Chalet[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   
-  const [currentChalet, setCurrentChalet] = useState<Partial<Hall>>({ 
-      images: [], amenities: [], city: SAUDI_CITIES[0], type: 'chalet', policies: '', addons: [], price_per_adult: 0, price_per_child: 0
+  const [currentChalet, setCurrentChalet] = useState<Partial<Chalet>>({ 
+      images: [], amenities: [], city: SAUDI_CITIES[0], policies: '', addons: [], price_per_adult: 0, price_per_child: 0
   });
   
   const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0 });
@@ -34,10 +34,10 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('halls').select('*').eq('vendor_id', user.id).in('type', ['chalet', 'resort']);
+      // Changed table from 'halls' to 'chalets'
+      const { data } = await supabase.from('chalets').select('*').eq('vendor_id', user.id);
       setChalets(data || []);
       
-      // Load Vendor Defined Amenities
       if (user.vendor_amenities) {
           setVendorCustomAmenities(user.vendor_amenities);
       }
@@ -48,7 +48,17 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
     }
   }, [user.id, toast, user.vendor_amenities]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+      fetchData();
+      
+      // Realtime
+      const channel = supabase.channel('chalets_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chalets', filter: `vendor_id=eq.${user.id}` }, () => {
+            fetchData();
+        })
+        .subscribe();
+      return () => { supabase.removeChannel(channel); };
+  }, [fetchData]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -97,31 +107,29 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
           vendor_id: user.id, 
           image_url: currentChalet.images?.[0] || '',
           capacity: Number(currentChalet.capacity) || 0,
-          price_per_night: Number(currentChalet.price_per_adult), // Fallback or base
-          type: 'chalet' 
+          price_per_night: Number(currentChalet.price_per_night) || 0, // Ensure main price is set
       };
       
-      const { error } = currentChalet.id ? await supabase.from('halls').update(payload).eq('id', currentChalet.id) : await supabase.from('halls').insert([payload]);
+      const { error } = currentChalet.id ? await supabase.from('chalets').update(payload).eq('id', currentChalet.id) : await supabase.from('chalets').insert([payload]);
       if (error) throw error;
       toast({ title: 'تم الحفظ', variant: 'success' });
       setIsEditing(false);
-      fetchData();
+      // Fetch will happen via realtime or manually
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
-  // Combine standard and custom amenities
   const allAmenities = [...CHALET_AMENITIES, ...vendorCustomAmenities];
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-8 pb-10 font-tajawal text-right">
       <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
         <div>
            <h2 className="text-3xl font-black text-primary flex items-center gap-2"><Palmtree className="w-8 h-8" /> إدارة الشاليهات</h2>
            <p className="text-sm text-gray-400 mt-1 font-bold">إدارة الاستراحات والمنتجعات الخاصة بك.</p>
         </div>
-        <Button onClick={() => { setCurrentChalet({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, type: 'chalet', policies: '', addons: [], price_per_adult: 0, price_per_child: 0 }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
+        <Button onClick={() => { setCurrentChalet({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, policies: '', addons: [], price_per_adult: 0, price_per_child: 0 }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow-xl shadow-primary/20">
             <Plus className="w-4 h-4" /> إضافة شاليه
         </Button>
       </div>
@@ -140,10 +148,7 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
                 </div>
                 <div className="flex gap-4">
                     <div className="text-xs font-bold text-gray-500">
-                        البالغ: <span className="text-primary">{chalet.price_per_adult}</span>
-                    </div>
-                    <div className="text-xs font-bold text-gray-500">
-                        الطفل: <span className="text-primary">{chalet.price_per_child}</span>
+                        سعر الليلة: <span className="text-primary font-black">{chalet.price_per_night}</span>
                     </div>
                 </div>
                 <div className="mt-auto pt-4 border-t border-gray-50">
@@ -154,7 +159,6 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
         ))}
       </div>
 
-      {/* Edit Modal */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="w-full md:max-w-4xl h-full bg-white border-l border-gray-100 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
@@ -180,8 +184,11 @@ export const VendorChalets: React.FC<VendorChaletsProps> = ({ user }) => {
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                         <Input label="السعة (أشخاص)" type="number" value={currentChalet.capacity || ''} onChange={e => setCurrentChalet({...currentChalet, capacity: Number(e.target.value)})} className="h-12 rounded-xl" />
-                        <Input label="سعر الفرد البالغ" type="number" value={currentChalet.price_per_adult || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_adult: Number(e.target.value)})} className="h-12 rounded-xl" />
-                        <Input label="سعر الطفل" type="number" value={currentChalet.price_per_child || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_child: Number(e.target.value)})} className="h-12 rounded-xl" />
+                        <Input label="سعر الليلة (أساسي)" type="number" value={currentChalet.price_per_night || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_night: Number(e.target.value)})} className="h-12 rounded-xl" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Input label="سعر الفرد البالغ (اختياري)" type="number" value={currentChalet.price_per_adult || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_adult: Number(e.target.value)})} className="h-12 rounded-xl" />
+                        <Input label="سعر الطفل (اختياري)" type="number" value={currentChalet.price_per_child || ''} onChange={e => setCurrentChalet({...currentChalet, price_per_child: Number(e.target.value)})} className="h-12 rounded-xl" />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-500">الوصف</label>
