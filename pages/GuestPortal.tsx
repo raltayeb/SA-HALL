@@ -39,17 +39,24 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({ user, onLogout }) => {
       setLoading(true);
       try {
         const phone = normalizeNumbers(user.phone_number || '');
+        const email = user.email;
         
-        // 1. Fetch Bookings
+        // 1. Fetch Bookings (Enhanced Logic)
         let bookingQuery = supabase.from('bookings')
             .select('*, halls(name, city, image_url), chalets(name, city, image_url), services(name, image_url), vendor:vendor_id(business_name)')
             .order('booking_date', { ascending: false });
 
+        // Logic: Match user_id OR phone OR email
         if (user.role === 'user' && user.email !== 'guest') {
-             bookingQuery = bookingQuery.eq('user_id', user.id);
+             // For registered/verified guests, check all possible identifiers
+             const conditions = [`user_id.eq.${user.id}`];
+             if (phone) conditions.push(`guest_phone.eq.${phone}`);
+             if (email) conditions.push(`guest_email.eq.${email}`);
+             bookingQuery = bookingQuery.or(conditions.join(','));
         } else if (phone) {
              bookingQuery = bookingQuery.eq('guest_phone', phone);
         } else {
+             // Fallback
              bookingQuery = bookingQuery.eq('user_id', user.id);
         }
 

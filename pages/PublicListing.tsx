@@ -4,7 +4,6 @@ import { supabase } from '../supabaseClient';
 import { Hall, Service, UserProfile } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
-// Added Sparkles to the imported icons from lucide-react
 import { MapPin, Users, Star, ArrowLeft, ArrowRight, Loader2, Filter, Search, ChevronLeft, Sparkles } from 'lucide-react';
 
 interface PublicListingProps {
@@ -25,18 +24,19 @@ export const PublicListing: React.FC<PublicListingProps> = ({ type, title, subti
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const table = type === 'service' ? 'services' : 'halls';
+      // Determine table name based on type
+      const table = type === 'service' ? 'services' : (type === 'chalet' ? 'chalets' : 'halls');
       
       let featuredQuery = supabase.from(table).select('*, vendor:vendor_id(*)').eq('is_active', true).limit(5);
+      
+      // If type is Hall, filter by type hall (though mostly redundant if chalets moved, safe to keep)
       if (type === 'hall') featuredQuery = featuredQuery.eq('type', 'hall');
-      if (type === 'chalet') featuredQuery = featuredQuery.eq('type', 'chalet');
       
       const { data: featured } = await featuredQuery;
       setFeaturedItems(featured || []);
 
       let allQuery = supabase.from(table).select('*, vendor:vendor_id(*)').eq('is_active', true);
       if (type === 'hall') allQuery = allQuery.eq('type', 'hall');
-      if (type === 'chalet') allQuery = allQuery.eq('type', 'chalet');
       
       const { data: all } = await allQuery;
       setItems(all || []);

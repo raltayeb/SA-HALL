@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { Hall, UserProfile, Service, POSItem } from '../types';
@@ -36,7 +37,7 @@ const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon: a
 
 export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
-  const [resorts, setResorts] = useState<Hall[]>([]);
+  const [resorts, setResorts] = useState<Hall[]>([]); // Using Hall type for Chalet is compatible mostly
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<POSItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,16 +54,22 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [hRes, rRes, sRes, pRes] = await Promise.all([
-        supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(3),
-        supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).in('type', ['chalet', 'resort']).limit(3),
-        supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3),
-        supabase.from('pos_items').select('*, vendor:vendor_id!inner(role)').eq('vendor.role', 'super_admin').gt('stock', 0).limit(4)
-      ]);
-      setHalls(hRes.data || []);
-      setResorts(rRes.data || []);
-      setServices(sRes.data || []);
-      setProducts(pRes.data || []);
+      // 1. Get Halls
+      const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(3);
+      
+      // 2. Get Chalets (from chalets table)
+      const { data: rData } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3);
+      
+      // 3. Get Services
+      const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3);
+      
+      // 4. Get Products
+      const { data: pData } = await supabase.from('pos_items').select('*, vendor:vendor_id!inner(role)').eq('vendor.role', 'super_admin').gt('stock', 0).limit(4);
+
+      setHalls(hData || []);
+      setResorts(rData as any[] || []);
+      setServices(sData || []);
+      setProducts(pData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,10 +79,10 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const renderCard = (item: any, type: 'hall' | 'service', label: string) => (
+  const renderCard = (item: any, type: 'hall' | 'service' | 'chalet', label: string) => (
     <div 
         key={item.id} 
-        onClick={() => onNavigate('hall_details', { item, type })} 
+        onClick={() => onNavigate('hall_details', { item, type: type === 'chalet' ? 'chalet' : type })} 
         className="group relative cursor-pointer text-right transition-all duration-300 border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white hover:border-primary/20"
     >
         <div className="relative aspect-[4/3] overflow-hidden">
@@ -98,7 +105,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             </div>
             <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
                 <PriceTag amount={item.price_per_night || item.price} className="text-xl text-primary" />
-                {type === 'hall' && (
+                {type !== 'service' && (
                         <div className="flex items-center gap-1 text-yellow-500 text-xs font-bold">
                         <Star className="w-3 h-3 fill-current" /> 4.9
                         </div>
@@ -133,7 +140,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900">
       
-      {/* 1. Hero Section (Buttons Removed) */}
+      {/* 1. Hero Section */}
       <section className="relative w-full pt-28 pb-8 flex justify-center">
         <div className="w-[95%] h-[600px] md:h-[750px] relative rounded-[3rem] overflow-hidden shadow-2xl group ring-1 ring-black/5 bg-gray-900">
           
@@ -192,7 +199,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         </div>
       </section>
 
-      {/* 2. Main Sections with Show More Buttons */}
+      {/* 2. Main Sections */}
       <section className="py-24 px-6 lg:px-20 max-w-7xl mx-auto space-y-32">
           
           {/* Halls */}
@@ -208,11 +215,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             </div>
           </div>
 
-          {/* Resorts */}
+          {/* Resorts/Chalets */}
           <div className="space-y-12">
             <SectionHeader title="شاليهات ومنتجعات" icon={Palmtree} subtitle="خصوصية وراحة" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'hall', 'شاليه'))}
+                {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'chalet', 'شاليه'))}
             </div>
             <div className="flex justify-center pt-8">
                 <Button variant="outline" onClick={() => onNavigate('chalets_page')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
@@ -234,7 +241,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             </div>
           </div>
 
-          {/* Redesigned Store Section (Light Mode & Brand Color) */}
+          {/* Store Section */}
           {products.length > 0 && (
             <div className="bg-primary/[0.03] border border-primary/10 rounded-[4rem] p-12 lg:p-20 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -mr-48 -mt-48"></div>

@@ -41,11 +41,21 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
+      // Fetch Halls
+      const { data: halls, error: hError } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
       
-      const { data, error } = await query;
-      if (error) throw error;
-      setRawData(data as Hall[] || []);
+      // Fetch Chalets (now in a separate table)
+      const { data: chalets, error: cError } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true);
+      
+      if (hError || cError) throw hError || cError;
+
+      // Merge and normalize (inject 'type' for chalets as they are now in a separate table without type column sometimes)
+      const combinedData = [
+          ...(halls || []).map(h => ({ ...h, type: 'hall' })),
+          ...(chalets || []).map(c => ({ ...c, type: 'chalet' }))
+      ];
+
+      setRawData(combinedData as any[]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -67,7 +77,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
       // 3. Type
       if (filters.type !== 'all') {
           if (filters.type === 'hall' && item.type !== 'hall') return false;
-          if (filters.type === 'chalet' && !['chalet', 'resort', 'lounge'].includes(item.type || '')) return false;
+          if (filters.type === 'chalet' && item.type !== 'chalet') return false;
       }
 
       // 4. Price Range
