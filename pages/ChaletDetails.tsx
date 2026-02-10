@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Info, Sparkles, Check, Users, Clock, Mail, Palmtree
+  Calendar as CalendarIcon, Info, Sparkles, Check, Users, Clock, Mail, Palmtree, Tag
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -31,8 +31,12 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
   
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
-  
   const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit' | 'hold'>('deposit');
+
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number } | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   const { toast } = useToast();
 
@@ -49,8 +53,11 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
     return sum;
   }, [selectedAddons, basePrice]);
 
-  const vat = subTotal * VAT_RATE;
-  const grandTotal = subTotal + vat;
+  const discountAmount = appliedCoupon ? appliedCoupon.amount : 0;
+  const taxableAmount = Math.max(0, subTotal - discountAmount);
+
+  const vat = taxableAmount * VAT_RATE;
+  const grandTotal = taxableAmount + vat;
   const depositAmount = grandTotal * 0.30; 
   
   useEffect(() => {
@@ -66,6 +73,55 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
 
   const toggleAddon = (addon: HallAddon) => {
       setSelectedAddons(prev => prev.some(a => a.name === addon.name) ? prev.filter(a => a.name !== addon.name) : [...prev, addon]);
+  };
+
+  const handleApplyCoupon = async () => {
+      if (!couponCode) return;
+      setValidatingCoupon(true);
+      try {
+          const { data, error } = await supabase.from('coupons')
+            .select('*')
+            .eq('code', couponCode.toUpperCase())
+            .eq('vendor_id', item.vendor_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (error || !data) {
+              toast({ title: 'كود غير صالح', description: 'تأكد من صحة الكود.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          const today = new Date().toISOString().split('T')[0];
+          if (data.start_date > today || data.end_date < today) {
+              toast({ title: 'منتهي الصلاحية', description: 'هذا الكوبون غير ساري حالياً.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          if (data.target_ids && data.target_ids.length > 0 && !data.target_ids.includes(item.id)) {
+              toast({ title: 'غير مخصص', description: 'هذا الكوبون لا يشمل هذا الشاليه.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          let discountVal = 0;
+          if (data.discount_type === 'percentage') {
+              discountVal = subTotal * (data.discount_value / 100);
+          } else {
+              discountVal = data.discount_value;
+          }
+          discountVal = Math.min(discountVal, subTotal);
+
+          setAppliedCoupon({ code: data.code, amount: discountVal });
+          toast({ title: 'تم تطبيق الخصم', description: `تم خصم ${discountVal} ر.س بنجاح.`, variant: 'success' });
+
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء التحقق.', variant: 'destructive' });
+      } finally {
+          setValidatingCoupon(false);
+      }
   };
 
   const handleBooking = async () => {
@@ -88,6 +144,8 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
         total_amount: grandTotal,
         vat_amount: vat,
         paid_amount: paidAmount,
+        discount_amount: discountAmount,
+        applied_coupon: appliedCoupon?.code,
         payment_status: paymentStatus,
         status: status,
         booking_method: paymentMethod,
@@ -260,6 +318,33 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                                 <PriceTag amount={selectedAddons.reduce((s, a) => s + a.price, 0)} />
                             </div>
                         )}
+
+                        <div className="flex gap-2 pt-2">
+                            <div className="relative flex-1">
+                                <input 
+                                    className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-bold focus:bg-white transition-colors"
+                                    placeholder="كود الخصم"
+                                    value={couponCode}
+                                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                    disabled={!!appliedCoupon}
+                                />
+                                <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            </div>
+                            {appliedCoupon ? (
+                                <Button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} variant="destructive" className="h-10 rounded-xl px-3 text-xs font-bold">إزالة</Button>
+                            ) : (
+                                <Button onClick={handleApplyCoupon} disabled={!couponCode || validatingCoupon} className="h-10 rounded-xl px-3 text-xs font-bold bg-gray-900 text-white shadow-none">
+                                    {validatingCoupon ? <Loader2 className="w-3 h-3 animate-spin" /> : 'تطبيق'}
+                                </Button>
+                            )}
+                        </div>
+                        {appliedCoupon && (
+                            <div className="flex justify-between text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                                <span>خصم كوبون ({appliedCoupon.code})</span>
+                                <span>- {appliedCoupon.amount} ر.س</span>
+                            </div>
+                        )}
+
                         <div className="flex justify-between text-sm font-bold text-gray-500">
                             <span>الضريبة (15%)</span>
                             <PriceTag amount={vat} />

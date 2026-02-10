@@ -16,13 +16,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   if (!booking) return null;
 
   const isConsultation = booking.booking_type === 'consultation';
-  const isPackageBooking = !!booking.package_name; // Check if a package was selected
+  const isPackageBooking = !!booking.package_name; 
   
-  // Calculate Totals based on stored data or recalculate if needed
-  // If it's a package booking, the base hall price is 0 (covered by the package item in items list)
-  const rawSubtotal = isPackageBooking ? 0 : (booking.halls?.price_per_night || booking.services?.price || 0);
+  // Base Price Logic
+  const rawSubtotal = isPackageBooking ? 0 : (booking.halls?.price_per_night || booking.chalets?.price_per_night || booking.services?.price || 0);
   
-  // Add items total (includes package price if applicable)
+  // Items Total
   const itemsTotal = booking.items ? booking.items.reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
   
   const totalSubWithItems = rawSubtotal + itemsTotal;
@@ -37,7 +36,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
 
   return (
-    // Updated max-h to 65vh
     <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "عرض سعر" : "الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[65vh] flex flex-col">
       <div className="space-y-4 text-right pb-2 overflow-y-auto custom-scrollbar flex-1 px-1" id="printable-invoice">
         {/* Header Compact */}
@@ -78,15 +76,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 bg-white">
-              {/* Main Hall/Service */}
-              {(booking.halls || booking.services) && (
+              {/* Main Hall/Service/Chalet */}
+              {(booking.halls || booking.services || booking.chalets) && (
                   <tr>
                     <td className="p-3">
-                      <div className="font-bold text-gray-900 line-clamp-1">{booking.halls?.name || booking.services?.name}</div>
+                      <div className="font-bold text-gray-900 line-clamp-1">{booking.halls?.name || booking.chalets?.name || booking.services?.name}</div>
                       <div className="text-[9px] text-gray-400 font-bold mt-0.5">{booking.booking_date}</div>
                     </td>
                     <td className="p-3 text-left font-mono font-bold text-gray-900">
-                        {isPackageBooking ? <span className="text-[9px] text-gray-400 font-medium">مشمول في الباقة</span> : formatCurrency(booking.halls?.price_per_night || booking.services?.price || 0)}
+                        {isPackageBooking ? <span className="text-[9px] text-gray-400 font-medium">مشمول في الباقة</span> : formatCurrency(booking.halls?.price_per_night || booking.chalets?.price_per_night || booking.services?.price || 0)}
                     </td>
                   </tr>
               )}
@@ -109,10 +107,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
         {/* Financial Details Compact */}
         <div className="space-y-2 text-xs bg-gray-50 p-4 rounded-2xl border border-gray-100">
           <div className="flex justify-between text-gray-600 font-bold">
-            <span>المجموع</span>
+            <span>المجموع الفرعي</span>
             <span className="font-mono">{formatCurrency(totalSubWithItems)}</span>
           </div>
           
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-green-600 font-bold">
+                <span>خصم {booking.applied_coupon ? `(${booking.applied_coupon})` : ''}</span>
+                <span className="font-mono">- {formatCurrency(discountAmount)}</span>
+            </div>
+          )}
+
           {!isConsultation && (
             <div className="flex justify-between text-gray-600 font-bold">
                 <span>الضريبة (15%)</span>
@@ -121,7 +126,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
           )}
           
           <div className="border-t border-gray-200 my-1 pt-2 flex justify-between items-center">
-            <span className="font-black text-sm text-gray-900">الإجمالي</span>
+            <span className="font-black text-sm text-gray-900">الإجمالي النهائي</span>
             <div className="bg-primary text-white px-3 py-1 rounded-lg font-mono font-black text-sm shadow-sm">
                {formatCurrency(booking.total_amount)}
             </div>

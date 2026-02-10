@@ -127,6 +127,7 @@ export interface HallPackage {
   name: string;
   price: number;
   description?: string;
+  items?: string[]; // List of items in the package
 }
 
 export interface Hall {
@@ -143,6 +144,8 @@ export interface Hall {
   capacity_men?: number;
   capacity_women?: number;
   price_per_night: number;
+  price_per_adult?: number;
+  price_per_child?: number;
   description: string;
   description_en?: string;
   policies?: string; 
@@ -316,9 +319,17 @@ export interface Coupon {
 
 export interface StoreOrder {
   id: string;
-  vendor_id: string;
+  vendor_id?: string; // Optional if guest
+  user_id?: string;   // Optional if guest
+  guest_info?: {      // Guest details
+    name: string;
+    phone: string;
+    address: string;
+  };
   items: { product_id: string; name: string; price: number; qty: number }[];
   total_amount: number;
+  payment_method?: 'cod' | 'transfer';
+  delivery_status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
 }
@@ -327,6 +338,6 @@ export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 
 export const HALL_AMENITIES = ['مواقف سيارات', 'جناح للعروس', 'نظام صوتي', 'إضاءة ليزر', 'تكييف مركزي', 'مصعد هيدروليك', 'واي فاي مجاني', 'خدمة فندقية', 'بوفيه مفتوح', 'غرفة كبار الزوار', 'مدخل مستقل'];
 export const CHALET_AMENITIES = ['مسبح خارجي', 'مسبح داخلي', 'ألعاب مائية', 'منطقة شواء', 'مجلس خارجي', 'مطبخ متكامل', 'غرفة نوم ماستر', 'ألعاب أطفال', 'ملعب كرة قدم', 'واي فاي', 'نطيطة'];
 export const SERVICE_CATEGORIES = ['ضيافة', 'تصوير', 'كوش', 'بوفيه', 'إضاءة وصوت', 'زينة وزهور', 'تنسيق حفلات', 'أخرى'];
-export const POS_CATEGORIES = ['مشروبات', 'مأكولات', 'خدمات إضافية', 'تأجير', 'عام'];
+export const POS_CATEGORIES = ['مشروبات', 'مأكولات', 'خدمات إضافية', 'تأجير', 'عام', 'تجهيزات', 'هدايا'];
 export const EXPENSE_CATEGORIES = ['رواتب', 'إيجار', 'صيانة', 'فواتير', 'تسويق', 'أخرى'];
 export const VAT_RATE = 0.15;

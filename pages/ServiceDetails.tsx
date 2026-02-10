@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Info, Sparkles, Mail, Check
+  Calendar as CalendarIcon, Info, Sparkles, Mail, Check, Tag, Image as ImageIcon
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -31,17 +31,78 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
   
   const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit'>('full');
 
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number } | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   const { toast } = useToast();
 
   const allImages = useMemo(() => {
-    const imgs = item.images && item.images.length > 0 ? item.images : [item.image_url].filter(Boolean);
-    return imgs.length > 0 ? imgs : ['https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'];
+    // Combine main image and portfolio images
+    const main = item.image_url ? [item.image_url] : [];
+    const portfolio = item.images || [];
+    // Filter duplicates just in case
+    return Array.from(new Set([...main, ...portfolio]));
   }, [item]);
 
   const basePrice = Number(item.price);
-  const vat = basePrice * VAT_RATE;
-  const grandTotal = basePrice + vat;
+  
+  const discountAmount = appliedCoupon ? appliedCoupon.amount : 0;
+  const taxableAmount = Math.max(0, basePrice - discountAmount);
+
+  const vat = taxableAmount * VAT_RATE;
+  const grandTotal = taxableAmount + vat;
   const depositAmount = grandTotal * 0.30; 
+
+  const handleApplyCoupon = async () => {
+      if (!couponCode) return;
+      setValidatingCoupon(true);
+      try {
+          const { data, error } = await supabase.from('coupons')
+            .select('*')
+            .eq('code', couponCode.toUpperCase())
+            .eq('vendor_id', item.vendor_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (error || !data) {
+              toast({ title: 'كود غير صالح', description: 'تأكد من صحة الكود.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          const today = new Date().toISOString().split('T')[0];
+          if (data.start_date > today || data.end_date < today) {
+              toast({ title: 'منتهي الصلاحية', description: 'هذا الكوبون غير ساري حالياً.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          if (data.target_ids && data.target_ids.length > 0 && !data.target_ids.includes(item.id)) {
+              toast({ title: 'غير مخصص', description: 'هذا الكوبون لا يشمل هذه الخدمة.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          let discountVal = 0;
+          if (data.discount_type === 'percentage') {
+              discountVal = basePrice * (data.discount_value / 100);
+          } else {
+              discountVal = data.discount_value;
+          }
+          discountVal = Math.min(discountVal, basePrice);
+
+          setAppliedCoupon({ code: data.code, amount: discountVal });
+          toast({ title: 'تم تطبيق الخصم', description: `تم خصم ${discountVal} ر.س بنجاح.`, variant: 'success' });
+
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء التحقق.', variant: 'destructive' });
+      } finally {
+          setValidatingCoupon(false);
+      }
+  };
 
   const handleBooking = async () => {
     if (!bookingDate) { toast({ title: 'تنبيه', description: 'الرجاء اختيار تاريخ المناسبة', variant: 'destructive' }); return; }
@@ -62,6 +123,8 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
         total_amount: grandTotal,
         vat_amount: vat,
         paid_amount: paidAmount,
+        discount_amount: discountAmount,
+        applied_coupon: appliedCoupon?.code,
         payment_status: paymentStatus,
         status: 'pending',
         booking_method: paymentMethod,
@@ -112,9 +175,10 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
         <div className="grid lg:grid-cols-3 gap-8">
             
             <div className="lg:col-span-2 space-y-8">
+                {/* Hero Card */}
                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
                     <div className="h-[400px] rounded-[2rem] overflow-hidden mb-6 relative group">
-                        <img src={allImages[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
+                        <img src={allImages[0] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
                         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-4 py-1.5 rounded-full font-black text-xs flex items-center gap-1 text-orange-600">
                             <Sparkles className="w-4 h-4" /> خدمة مناسبات
                         </div>
@@ -147,8 +211,30 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
                         </div>
                     )}
                 </div>
+
+                {/* Portfolio / Previous Work Gallery */}
+                {allImages.length > 1 && (
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                            <ImageIcon className="w-5 h-5 text-primary" /> معرض الأعمال
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {allImages.slice(1).map((img, i) => (
+                                <div key={i} className="aspect-square rounded-2xl overflow-hidden group cursor-pointer border border-gray-100 relative">
+                                    <img 
+                                        src={img} 
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                        alt={`Portfolio ${i}`} 
+                                    />
+                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
+            {/* Sticky Sidebar */}
             <div className="relative">
                 <div className="sticky top-28 bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-xl space-y-6">
                     <div className="text-center pb-2 border-b border-gray-50">
@@ -187,6 +273,33 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
                             <span>السعر</span>
                             <PriceTag amount={basePrice} />
                         </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <div className="relative flex-1">
+                                <input 
+                                    className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-bold focus:bg-white transition-colors"
+                                    placeholder="كود الخصم"
+                                    value={couponCode}
+                                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                    disabled={!!appliedCoupon}
+                                />
+                                <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            </div>
+                            {appliedCoupon ? (
+                                <Button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} variant="destructive" className="h-10 rounded-xl px-3 text-xs font-bold">إزالة</Button>
+                            ) : (
+                                <Button onClick={handleApplyCoupon} disabled={!couponCode || validatingCoupon} className="h-10 rounded-xl px-3 text-xs font-bold bg-gray-900 text-white shadow-none">
+                                    {validatingCoupon ? <Loader2 className="w-3 h-3 animate-spin" /> : 'تطبيق'}
+                                </Button>
+                            )}
+                        </div>
+                        {appliedCoupon && (
+                            <div className="flex justify-between text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                                <span>خصم كوبون ({appliedCoupon.code})</span>
+                                <span>- {appliedCoupon.amount} ر.س</span>
+                            </div>
+                        )}
+
                         <div className="flex justify-between text-sm font-bold text-gray-500">
                             <span>الضريبة (15%)</span>
                             <PriceTag amount={vat} />

@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList, Ticket, LogOut, 
   Sparkles, CalendarDays, Settings, X, Tag, 
   LayoutGrid, FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, UserCheck, Store, Palmtree
+  Receipt, UserCheck, Store, Palmtree, Search
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -90,12 +90,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       }
     ];
   } else {
-    // GUEST / USER VIEW
+    // GUEST / USER VIEW - UPDATED
     menuGroups = [
       {
         title: "حسابي",
         items: [
-          { id: 'my_bookings', label: 'سجل الحجوزات', icon: <Ticket className="w-5 h-5" /> },
+          { id: 'guest_dashboard', label: 'لوحة التحكم', icon: <LayoutGrid className="w-5 h-5" /> },
+          { id: 'browse', label: 'تصفح الخدمات', icon: <Search className="w-5 h-5" /> },
+          { id: 'store_page', label: 'المتجر', icon: <Store className="w-5 h-5" /> },
         ]
       }
     ];
@@ -136,7 +138,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
                   <p className="text-[9px] font-bold text-gray-400 truncate">{user.email}</p>
               </div>
               <button 
-                onClick={() => { setActiveTab(user.role === 'vendor' ? 'hall_bookings' : 'my_bookings'); markAllAsRead(); }} 
+                onClick={() => { setActiveTab(user.role === 'vendor' ? 'hall_bookings' : 'guest_dashboard'); markAllAsRead(); }} 
                 className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:border-primary text-gray-400 hover:text-primary transition-colors"
               >
                 <Bell className="w-4 h-4" />

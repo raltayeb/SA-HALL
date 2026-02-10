@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail
+  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, Image as ImageIcon
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -29,14 +29,16 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   
   const [bookingDate, setBookingDate] = useState<Date | undefined>(undefined);
-  // Guest email is now mandatory for payment/login
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
   
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<HallPackage | null>(null);
-  
-  // Payment methods: 'full', 'deposit', 'hold'
   const [paymentMethod, setPaymentMethod] = useState<'full' | 'deposit' | 'hold'>('deposit');
+
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; amount: number } | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   const { toast } = useToast();
 
@@ -53,12 +55,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
     return sum;
   }, [selectedAddons, basePrice]);
 
-  const vat = subTotal * VAT_RATE;
-  const grandTotal = subTotal + vat;
+  const discountAmount = appliedCoupon ? appliedCoupon.amount : 0;
+  const taxableAmount = Math.max(0, subTotal - discountAmount);
+  
+  const vat = taxableAmount * VAT_RATE;
+  const grandTotal = taxableAmount + vat;
   const depositAmount = grandTotal * 0.30; 
   
-  const dueNow = paymentMethod === 'deposit' ? depositAmount : paymentMethod === 'hold' ? 0 : grandTotal;
-
   useEffect(() => {
     const fetchAvailability = async () => {
       const { data: bookingsData } = await supabase.from('bookings').select('booking_date').eq('hall_id', item.id).neq('status', 'cancelled');
@@ -70,13 +73,63 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
     fetchAvailability();
   }, [item.id]);
 
+  const handleApplyCoupon = async () => {
+      if (!couponCode) return;
+      setValidatingCoupon(true);
+      try {
+          const { data, error } = await supabase.from('coupons')
+            .select('*')
+            .eq('code', couponCode.toUpperCase())
+            .eq('vendor_id', item.vendor_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (error || !data) {
+              toast({ title: 'كود غير صالح', description: 'تأكد من صحة الكود.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          const today = new Date().toISOString().split('T')[0];
+          if (data.start_date > today || data.end_date < today) {
+              toast({ title: 'منتهي الصلاحية', description: 'هذا الكوبون غير ساري حالياً.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          if (data.target_ids && data.target_ids.length > 0 && !data.target_ids.includes(item.id)) {
+              toast({ title: 'غير مخصص', description: 'هذا الكوبون لا يشمل هذه القاعة.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          let discountVal = 0;
+          if (data.discount_type === 'percentage') {
+              discountVal = subTotal * (data.discount_value / 100);
+          } else {
+              discountVal = data.discount_value;
+          }
+
+          discountVal = Math.min(discountVal, subTotal);
+
+          setAppliedCoupon({ code: data.code, amount: discountVal });
+          toast({ title: 'تم تطبيق الخصم', description: `تم خصم ${discountVal} ر.س بنجاح.`, variant: 'success' });
+
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء التحقق.', variant: 'destructive' });
+      } finally {
+          setValidatingCoupon(false);
+      }
+  };
+
   const toggleAddon = (addon: HallAddon) => {
       setSelectedAddons(prev => prev.some(a => a.name === addon.name) ? prev.filter(a => a.name !== addon.name) : [...prev, addon]);
   };
 
   const handleBooking = async () => {
     if (!bookingDate) { toast({ title: 'تنبيه', description: 'الرجاء اختيار تاريخ الحجز', variant: 'destructive' }); return; }
-    if (!guestData.name || !guestData.phone || !guestData.email) { toast({ title: 'تنبيه', description: 'الرجاء إكمال كافة بيانات التواصل بما فيها البريد الإلكتروني لاستلام الفاتورة.', variant: 'destructive' }); return; }
+    if (!guestData.name || !guestData.phone || !guestData.email) { toast({ title: 'تنبيه', description: 'الرجاء إكمال كافة بيانات التواصل بما فيها البريد الإلكتروني.', variant: 'destructive' }); return; }
 
     setIsBooking(true);
     try {
@@ -92,6 +145,8 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
         total_amount: grandTotal,
         vat_amount: vat,
         paid_amount: paidAmount,
+        discount_amount: discountAmount,
+        applied_coupon: appliedCoupon?.code,
         payment_status: paymentStatus,
         status: status,
         booking_method: paymentMethod,
@@ -110,7 +165,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
       if (error) throw error;
       
       if (!user) {
-          // Sync guest to CRM immediately
           await supabase.from('vendor_clients').insert([{
               vendor_id: item.vendor_id,
               full_name: guestData.name,
@@ -135,7 +189,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
   return (
     <div className="min-h-screen bg-[#F8F9FC] pb-20 font-tajawal text-right" dir="rtl">
       
-      {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <button onClick={onBack} className="flex items-center gap-2 text-gray-900 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
@@ -151,7 +204,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
             
-            {/* --- RIGHT COLUMN (Content) --- */}
             <div className="lg:col-span-2 space-y-8">
                 {/* Hero Card */}
                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
@@ -203,32 +255,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                     </div>
                 </div>
 
-                {/* Packages Card */}
-                {item.packages && item.packages.length > 0 && (
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
-                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Package className="w-5 h-5 text-gray-400" /> باقات الحجز</h3>
-                        <div className="space-y-4">
-                            {item.packages.map((pkg, i) => (
-                                <div 
-                                    key={i} 
-                                    onClick={() => setSelectedPackage(selectedPackage?.name === pkg.name ? null : pkg)}
-                                    className={`cursor-pointer p-5 rounded-2xl border-2 transition-all relative overflow-hidden ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h4 className="font-black text-lg text-gray-900">{pkg.name}</h4>
-                                        <PriceTag amount={pkg.price} className="text-primary font-bold" />
-                                    </div>
-                                    <p className="text-sm text-gray-500 font-medium leading-relaxed pl-8">{pkg.description}</p>
-                                    <div className={`absolute top-5 left-5 w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedPackage?.name === pkg.name ? 'bg-primary border-primary' : 'border-gray-300'}`}>
-                                        {selectedPackage?.name === pkg.name && <div className="w-2 h-2 bg-white rounded-full" />}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Additional Services */}
+                {/* Additional Services (Moved Up) */}
                 {item.addons && item.addons.length > 0 && (
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
@@ -251,6 +278,68 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                                         </div>
                                     </div>
                                     <PriceTag amount={addon.price} className="text-sm font-black text-primary" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Packages Card (Moved Down & Styled as Grid Cards) */}
+                {item.packages && item.packages.length > 0 && (
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Package className="w-5 h-5 text-gray-400" /> باقات الحجز</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {item.packages.map((pkg, i) => (
+                                <div 
+                                    key={i} 
+                                    onClick={() => setSelectedPackage(selectedPackage?.name === pkg.name ? null : pkg)}
+                                    className={`cursor-pointer p-6 rounded-[2rem] border-2 transition-all relative overflow-hidden flex flex-col ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${selectedPackage?.name === pkg.name ? 'bg-primary border-primary text-white' : 'border-gray-200 bg-white'}`}>
+                                            {selectedPackage?.name === pkg.name && <Check className="w-4 h-4" />}
+                                        </div>
+                                        <PriceTag amount={pkg.price} className="text-primary font-black text-lg" />
+                                    </div>
+                                    <h4 className="font-black text-lg text-gray-900 mb-2">{pkg.name}</h4>
+                                    
+                                    {/* Description as simple text if items list is empty */}
+                                    {pkg.description && !pkg.items?.length && (
+                                        <p className="text-sm text-gray-500 font-medium leading-relaxed">{pkg.description}</p>
+                                    )}
+
+                                    {/* Items List */}
+                                    {pkg.items && pkg.items.length > 0 && (
+                                        <ul className="space-y-2 mt-2">
+                                            {pkg.items.map((it, idx) => (
+                                                <li key={idx} className="flex items-start gap-2 text-xs font-bold text-gray-600">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 mt-1.5 shrink-0"></div>
+                                                    <span>{it}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Portfolio / Previous Work Gallery */}
+                {allImages.length > 1 && (
+                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                        <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                            <ImageIcon className="w-5 h-5 text-primary" /> معرض الصور
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {allImages.slice(1).map((img, i) => (
+                                <div key={i} className="aspect-square rounded-2xl overflow-hidden group cursor-pointer border border-gray-100 relative">
+                                    <img 
+                                        src={img} 
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                        alt={`Portfolio ${i}`} 
+                                    />
+                                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                                 </div>
                             ))}
                         </div>
@@ -305,6 +394,34 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                                 <PriceTag amount={selectedAddons.reduce((s, a) => s + a.price, 0)} />
                             </div>
                         )}
+                        
+                        {/* Coupon Input */}
+                        <div className="flex gap-2 pt-2">
+                            <div className="relative flex-1">
+                                <input 
+                                    className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-xs font-bold focus:bg-white transition-colors"
+                                    placeholder="كود الخصم"
+                                    value={couponCode}
+                                    onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                    disabled={!!appliedCoupon}
+                                />
+                                <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            </div>
+                            {appliedCoupon ? (
+                                <Button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} variant="destructive" className="h-10 rounded-xl px-3 text-xs font-bold">إزالة</Button>
+                            ) : (
+                                <Button onClick={handleApplyCoupon} disabled={!couponCode || validatingCoupon} className="h-10 rounded-xl px-3 text-xs font-bold bg-gray-900 text-white shadow-none">
+                                    {validatingCoupon ? <Loader2 className="w-3 h-3 animate-spin" /> : 'تطبيق'}
+                                </Button>
+                            )}
+                        </div>
+                        {appliedCoupon && (
+                            <div className="flex justify-between text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                                <span>خصم كوبون ({appliedCoupon.code})</span>
+                                <span>- {appliedCoupon.amount} ر.س</span>
+                            </div>
+                        )}
+
                         <div className="flex justify-between text-sm font-bold text-gray-500">
                             <span>الضريبة (15%)</span>
                             <PriceTag amount={vat} />

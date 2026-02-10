@@ -31,6 +31,7 @@ import { HallDetails } from './pages/HallDetails';
 import { ChaletDetails } from './pages/ChaletDetails';
 import { ServiceDetails } from './pages/ServiceDetails';
 import { GuestLogin } from './pages/GuestLogin'; 
+import { GuestPortal } from './pages/GuestPortal'; 
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -136,7 +137,7 @@ const App: React.FC = () => {
             if (profile.role === 'super_admin' && (isPublicPage || currentTab === 'home')) {
                 setActiveTab('admin_dashboard');
             } else if (profile.role === 'user') {
-                setActiveTab('my_bookings');
+                setActiveTab('guest_dashboard');
             } else if (profile.role === 'vendor' && currentTab === 'guest_login') {
                 setActiveTab('dashboard');
             }
@@ -155,7 +156,7 @@ const App: React.FC = () => {
                      service_limit: 0
                  };
                  setUserProfile(newProfile);
-                 setActiveTab('my_bookings');
+                 setActiveTab('guest_dashboard');
              }
         }
     } catch (error) {
@@ -562,6 +563,7 @@ const App: React.FC = () => {
                 {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
                 {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
                 {activeTab === 'my_bookings' && <Bookings user={userProfile} />}
+                {activeTab === 'guest_dashboard' && <GuestPortal user={userProfile} />}
                 {activeTab === 'admin_dashboard' && userProfile.role === 'super_admin' && <AdminDashboard />}
                 {activeTab === 'admin_users' && userProfile.role === 'super_admin' && <UsersManagement />}
                 {activeTab === 'admin_requests' && userProfile.role === 'super_admin' && <AdminRequests />}

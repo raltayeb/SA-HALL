@@ -1,12 +1,12 @@
 
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Hall, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Plus, MapPin, X, Loader2, Building2, Trash2, Sparkles, Minus, Package, CheckSquare
+  Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -26,7 +26,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   });
   
   const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0 });
-  const [newPackage, setNewPackage] = useState<HallPackage>({ name: '', price: 0, description: '' });
+  const [newPackage, setNewPackage] = useState<HallPackage>({ name: '', price: 0, items: [] });
+  const [tempPackageItem, setTempPackageItem] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -80,10 +81,23 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setNewAddon({ name: '', price: 0 });
   };
 
+  const addPackageItem = () => {
+      if (!tempPackageItem.trim()) return;
+      setNewPackage(prev => ({ ...prev, items: [...(prev.items || []), tempPackageItem] }));
+      setTempPackageItem('');
+  };
+
+  const removePackageItem = (idx: number) => {
+      setNewPackage(prev => ({ ...prev, items: prev.items?.filter((_, i) => i !== idx) }));
+  };
+
   const addPackage = () => {
-      if (!newPackage.name || newPackage.price <= 0) return;
+      if (!newPackage.name || newPackage.price <= 0) {
+          toast({ title: 'تنبيه', description: 'يرجى إدخال اسم الباقة والسعر.', variant: 'destructive' });
+          return;
+      }
       setCurrentHall(prev => ({ ...prev, packages: [...(prev.packages || []), newPackage] }));
-      setNewPackage({ name: '', price: 0, description: '' });
+      setNewPackage({ name: '', price: 0, items: [] });
   };
 
   const handleSave = async () => {
@@ -196,24 +210,60 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     </div>
                  </div>
 
-                 {/* Packages */}
+                 {/* Packages (Modified for List Input) */}
                  <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-                    <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><Package className="w-4 h-4" /> الباقات (اختياري)</h3>
-                    <div className="flex gap-2 mb-4">
-                        <Button onClick={addPackage} className="h-12 w-12 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-6 h-6" /></Button>
-                        <Input placeholder="وصف الباقة" value={newPackage.description || ''} onChange={e => setNewPackage({...newPackage, description: e.target.value})} className="h-12 flex-1 rounded-xl" />
-                        <Input placeholder="السعر" type="number" value={newPackage.price || ''} onChange={e => setNewPackage({...newPackage, price: Number(e.target.value)})} className="h-12 w-24 rounded-xl" />
-                        <Input placeholder="اسم الباقة" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-12 w-40 rounded-xl" />
+                    <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2"><Package className="w-4 h-4" /> باقات الحجز</h3>
+                    
+                    {/* Add Package Form */}
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
+                        <div className="grid grid-cols-3 gap-3">
+                            <Input placeholder="اسم الباقة (مثال: الباقة الملكية)" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-11 rounded-xl bg-white col-span-2" />
+                            <Input placeholder="السعر" type="number" value={newPackage.price || ''} onChange={e => setNewPackage({...newPackage, price: Number(e.target.value)})} className="h-11 rounded-xl bg-white" />
+                        </div>
+                        
+                        {/* Package Items List Builder */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">محتويات الباقة</label>
+                            <div className="flex gap-2">
+                                <Button onClick={addPackageItem} className="h-11 w-11 p-0 rounded-xl bg-primary text-white flex items-center justify-center"><ListPlus className="w-5 h-5" /></Button>
+                                <Input 
+                                    placeholder="أضف ميزة (مثال: بوفيه مفتوح 50 شخص)" 
+                                    value={tempPackageItem} 
+                                    onChange={e => setTempPackageItem(e.target.value)} 
+                                    onKeyDown={e => e.key === 'Enter' && addPackageItem()}
+                                    className="h-11 rounded-xl bg-white flex-1" 
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {newPackage.items && newPackage.items.map((item, idx) => (
+                                    <div key={idx} className="bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-600 flex items-center gap-2">
+                                        {item}
+                                        <button onClick={() => removePackageItem(idx)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                                    </div>
+                                ))}
+                                {(!newPackage.items || newPackage.items.length === 0) && <span className="text-[10px] text-gray-400">لا توجد عناصر مضافة للباقة</span>}
+                            </div>
+                        </div>
+
+                        <Button onClick={addPackage} className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2 mt-2">
+                            <Plus className="w-4 h-4" /> إضافة الباقة للقائمة
+                        </Button>
                     </div>
+
+                    {/* Added Packages List */}
                     <div className="space-y-2">
                         {currentHall.packages?.map((pkg, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-                                <button onClick={() => setCurrentHall(prev => ({...prev, packages: prev.packages?.filter((_, i) => i !== idx)}))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
-                                <div className="flex items-center gap-4 flex-1 justify-end">
-                                    <span className="text-xs text-gray-500">{pkg.description}</span>
-                                    <span className="font-mono text-primary font-bold">{pkg.price} SAR</span>
-                                    <span className="font-bold text-gray-900">{pkg.name}</span>
+                            <div key={idx} className="flex flex-col gap-2 p-4 bg-white border border-gray-200 rounded-2xl relative group">
+                                <button onClick={() => setCurrentHall(prev => ({...prev, packages: prev.packages?.filter((_, i) => i !== idx)}))} className="absolute top-4 left-4 text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"><Minus className="w-4 h-4" /></button>
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-bold text-gray-900">{pkg.name}</h4>
+                                    <PriceTag amount={pkg.price} className="text-primary" />
                                 </div>
+                                {pkg.items && pkg.items.length > 0 && (
+                                    <ul className="text-xs text-gray-500 list-disc list-inside space-y-1 bg-gray-50 p-3 rounded-xl">
+                                        {pkg.items.map((it, i) => <li key={i}>{it}</li>)}
+                                    </ul>
+                                )}
                             </div>
                         ))}
                     </div>
