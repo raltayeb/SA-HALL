@@ -8,7 +8,7 @@ export const Footer: React.FC = () => {
   const [config, setConfig] = useState<FooterConfig>({
     app_section: {
         show: true,
-        image_url: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=600',
+        image_url: '',
         title: 'حمل تطبيق القاعة',
         description: 'تجربة حجز أسرع وأسهل عبر تطبيق الجوال. متاح الآن لأجهزة الآيفون والأندرويد.',
         apple_store_link: '#',
@@ -54,10 +54,13 @@ export const Footer: React.FC = () => {
     fetchConfig();
   }, []);
 
+  // Use a reliable default image if config is empty
+  const appImage = config.app_section.image_url || "https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&q=80&w=1974";
+
   return (
     <footer className="font-sans bg-[#F9FAFB]">
       
-      {/* 1. FAQ Section (Moved to Top) */}
+      {/* 1. FAQ Section */}
       {config.faq_section.show && config.faq_section.items.length > 0 && (
         <section className="bg-[#F9FAFB] py-32 px-6 lg:px-20">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-16 lg:gap-24 text-right">
@@ -98,24 +101,29 @@ export const Footer: React.FC = () => {
         </section>
       )}
 
-      {/* 2. App Download Section (Buttons Right Aligned) */}
+      {/* 2. App Download Section */}
       {config.app_section.show && (
         <section className="bg-[#F9FAFB] pt-24">
             <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
-                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-center min-h-[550px]">
+                {/* Fixed Flex Alignment: items-stretch to ensure image covers height */}
+                <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-stretch min-h-[550px]">
                     <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -mr-40 -mt-40 pointer-events-none"></div>
-                    <div className="w-full md:w-1/2 h-full min-h-[400px] md:min-h-full relative order-2 md:order-1">
+                    
+                    {/* Image Container: Relative with absolute image to cover area */}
+                    <div className="w-full md:w-1/2 relative order-2 md:order-1 min-h-[300px] md:min-h-auto">
                         <img 
-                            src={config.app_section.image_url || "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&q=80&w=800"} 
+                            src={appImage} 
                             className="absolute inset-0 w-full h-full object-cover" 
                             alt="App Screen" 
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/50 to-transparent md:bg-gradient-to-r"></div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent md:bg-gradient-to-r md:from-gray-900 md:via-gray-900/20 md:to-transparent"></div>
                     </div>
+                    
+                    {/* Content Container */}
                     <div className="w-full md:w-1/2 p-12 md:p-20 text-center md:text-right space-y-6 relative z-10 text-white order-1 md:order-2 flex flex-col justify-center">
                         <h2 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{config.app_section.title}</h2>
                         <p className="text-white/80 font-medium text-lg leading-relaxed max-w-lg ml-auto">{config.app_section.description}</p>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4"> {/* Changed to justify-start for Right alignment in RTL */}
+                        <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4">
                             <a href={config.app_section.apple_store_link} target="_blank" rel="noreferrer" className="transition-transform hover:scale-105">
                                 <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on App Store" className="h-14" />
                             </a>
@@ -132,7 +140,7 @@ export const Footer: React.FC = () => {
       {/* 3. Main Footer Links */}
       <div className="bg-white pt-20 pb-10 border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            <div className="grid md:grid-cols-4 gap-12 mb-16 border-b border-gray-50 pb-16">
+            <div className="grid md:grid-cols-4 gap-12 mb-16 border-b border-gray-50 pb-16 text-right">
                 {/* Brand */}
                 <div className="md:col-span-1 space-y-8">
                     <div className="flex items-center gap-3">
