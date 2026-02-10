@@ -386,12 +386,28 @@ const App: React.FC = () => {
                         <p className="mt-2 text-sm font-bold text-gray-500">مرحباً بعودتك! الرجاء إدخال بياناتك للمتابعة.</p>
                     </div>
                     <form onSubmit={handleLogin} className="space-y-6">
-                        <Input type="email" label="البريد الإلكتروني" placeholder="name@example.com" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold" />
+                        <Input 
+                            type="email" 
+                            label="البريد الإلكتروني" 
+                            placeholder="name@example.com" 
+                            value={regData.email} 
+                            onChange={e => setRegData({...regData, email: e.target.value})} 
+                            required 
+                            className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" 
+                        />
                         <div className="relative">
-                            <Input type={showPassword ? "text" : "password"} label="كلمة المرور" placeholder="••••••••" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} required className="h-14 rounded-2xl bg-gray-50 border-none px-5 font-bold" />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-10 text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
+                            <Input 
+                                type={showPassword ? "text" : "password"} 
+                                label="كلمة المرور" 
+                                placeholder="••••••••" 
+                                value={regData.password} 
+                                onChange={e => setRegData({...regData, password: e.target.value})} 
+                                required 
+                                className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" 
+                            />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-12 text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
                         </div>
-                        <Button type="submit" className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20" disabled={authLoading}>
+                        <Button type="submit" className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none" disabled={authLoading}>
                             {authLoading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}
                         </Button>
                         
@@ -432,10 +448,10 @@ const App: React.FC = () => {
                         </div>
                         {regStep === 0 && (
                         <div className="space-y-4 animate-in slide-in-from-right-8 duration-500">
-                            <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-14 rounded-2xl font-bold" />
-                            <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-14 rounded-2xl font-bold" />
-                            <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-14 rounded-2xl font-bold" />
-                            <Button onClick={sendOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl shadow-primary/20 mt-4">{authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل ومتابعة'}</Button>
+                            <Input placeholder="الاسم الكامل" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
+                            <Input placeholder="رقم الجوال (05xxxxxxxx)" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
+                            <Input type="email" placeholder="البريد الإلكتروني" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
+                            <Button onClick={sendOtp} disabled={authLoading} className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none mt-4">{authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل ومتابعة'}</Button>
                             
                             <div className="text-center pt-4 space-y-2">
                                 <div>
@@ -450,8 +466,8 @@ const App: React.FC = () => {
                         <div className="space-y-6 animate-in slide-in-from-right-8 duration-500 text-center">
                             <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mx-auto text-primary"><Mail className="w-10 h-10" /></div>
                             <h3 className="text-xl font-black">رمز التحقق</h3>
-                            <Input placeholder="0 0 0 0 0 0" className="text-center text-3xl tracking-[0.5em] font-black h-20 rounded-3xl border-2" maxLength={6} value={otpCode} onChange={e => setOtpCode(e.target.value)} />
-                            <Button onClick={verifyOtp} disabled={authLoading} className="w-full h-14 rounded-2xl font-bold">تحقق</Button>
+                            <Input placeholder="0 0 0 0 0 0" className="text-center text-3xl tracking-[0.5em] font-black h-20 rounded-3xl border-2 border-gray-100 focus:border-primary outline-none transition-all shadow-none" maxLength={6} value={otpCode} onChange={e => setOtpCode(e.target.value)} />
+                            <Button onClick={verifyOtp} disabled={authLoading} className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none">تحقق</Button>
                         </div>
                         )}
                         {regStep === 2 && (
@@ -459,12 +475,12 @@ const App: React.FC = () => {
                             <h3 className="text-xl font-black text-center">تأمين الحساب</h3>
                             <div className="space-y-4">
                                 <div className="relative">
-                                    <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور الجديدة" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-14 rounded-2xl font-bold" />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-4 text-gray-400">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
+                                    <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور الجديدة" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-6 text-gray-400">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
                                 </div>
-                                <Input type={showPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                                <Input type={showPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
                             </div>
-                            <Button onClick={setPassword} disabled={authLoading || !passValidations.length || !passValidations.match} className="w-full h-14 rounded-2xl font-bold">إنشاء الحساب ومتابعة</Button>
+                            <Button onClick={setPassword} disabled={authLoading || !passValidations.length || !passValidations.match} className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none">إنشاء الحساب ومتابعة</Button>
                         </div>
                         )}
                     </div>
@@ -507,9 +523,9 @@ const App: React.FC = () => {
                         </div>
                         <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
                             <h3 className="text-lg font-black text-primary mb-6 text-right">معلومات أساسية</h3>
-                            <Input label="الاسم" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl border-gray-200 font-bold" />
+                            <Input label="الاسم" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
                         </div>
-                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name} className="flex-1 h-12 rounded-2xl font-black text-lg shadow-xl shadow-primary/20">الدفع والمتابعة</Button>
+                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name} className="flex-1 h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none">الدفع والمتابعة</Button>
                     </div>
                 </div>
             )}
