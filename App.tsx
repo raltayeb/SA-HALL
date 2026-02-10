@@ -405,7 +405,8 @@ const App: React.FC = () => {
                                 required 
                                 className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" 
                             />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-12 text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
+                            {/* Corrected position: top-[3.5rem] aligns centered in input area below label */}
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-[3.5rem] text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
                         </div>
                         <Button type="submit" className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none" disabled={authLoading}>
                             {authLoading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}

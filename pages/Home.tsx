@@ -53,14 +53,14 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Get Halls
-      const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(3);
+      // 1. Get Halls (Limit 4 for new grid)
+      const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(4);
       
       // 2. Get Chalets (from chalets table)
-      const { data: rData } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3);
+      const { data: rData } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
       
       // 3. Get Services
-      const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3);
+      const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
       
       setHalls(hData || []);
       setResorts(rData as any[] || []);
@@ -178,8 +178,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           {/* Halls */}
           <div className="space-y-12">
             <SectionHeader title="أفخم القاعات" icon={Sparkles} subtitle="مساحات ملكية" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
             <div className="flex justify-center pt-8">
                 <Button variant="outline" onClick={() => onNavigate('browse_halls')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
@@ -191,8 +191,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           {/* Resorts/Chalets */}
           <div className="space-y-12">
             <SectionHeader title="شاليهات ومنتجعات" icon={Palmtree} subtitle="خصوصية وراحة" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'chalet', 'شاليه'))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'chalet', 'شاليه'))}
             </div>
             <div className="flex justify-center pt-8">
                 <Button variant="outline" onClick={() => onNavigate('browse_chalets')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
@@ -204,8 +204,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           {/* Services */}
           <div className="space-y-12">
             <SectionHeader title="خدمات المناسبات" icon={Zap} subtitle="تجهيز احترافي" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
             </div>
             <div className="flex justify-center pt-8">
                 <Button variant="outline" onClick={() => onNavigate('services_page')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">

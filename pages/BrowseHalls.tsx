@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, SAUDI_CITIES, Hall, Service, SERVICE_CATEGORIES } from '../types';
@@ -240,7 +241,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, entityType, onBa
                         <input 
                             type="number" 
                             placeholder="من" 
-                            className="flex-1 h-12 rounded-xl bg-gray-50 border border-gray-100 px-4 text-sm font-bold focus:bg-white focus:border-primary/20 outline-none transition-all"
+                            className="flex-1 min-w-0 w-full h-12 rounded-xl bg-gray-50 border border-gray-100 px-2 text-center text-sm font-bold focus:bg-white focus:border-primary/20 outline-none transition-all"
                             value={filters.minPrice}
                             onChange={e => handleFilterChange('minPrice', e.target.value)}
                         />
@@ -248,7 +249,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, entityType, onBa
                         <input 
                             type="number" 
                             placeholder="إلى" 
-                            className="flex-1 h-12 rounded-xl bg-gray-50 border border-gray-100 px-4 text-sm font-bold focus:bg-white focus:border-primary/20 outline-none transition-all"
+                            className="flex-1 min-w-0 w-full h-12 rounded-xl bg-gray-50 border border-gray-100 px-2 text-center text-sm font-bold focus:bg-white focus:border-primary/20 outline-none transition-all"
                             value={filters.maxPrice}
                             onChange={e => handleFilterChange('maxPrice', e.target.value)}
                         />
