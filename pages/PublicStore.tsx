@@ -1,20 +1,23 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { POSItem, POS_CATEGORIES, UserProfile } from '../types';
+import { POSItem, StoreCategory, UserProfile } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Input } from '../components/ui/Input';
 import { 
   Package, ShoppingBag, Loader2, Search, ShoppingCart, 
-  Star, X, Plus, Minus, CheckCircle2, CreditCard, User, Phone, MapPin, Filter, ArrowLeft, Truck
+  X, Plus, CheckCircle2, CreditCard, User, Phone, Filter, ArrowRight, ArrowLeft, Truck, ChevronDown
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { normalizeNumbers } from '../utils/helpers';
 
 export const PublicStore: React.FC = () => {
   const [products, setProducts] = useState<POSItem[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<POSItem[]>([]);
+  const [categories, setCategories] = useState<StoreCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeSlide, setActiveSlide] = useState(0);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +54,10 @@ export const PublicStore: React.FC = () => {
           }
       }
 
+      // Fetch Categories
+      const { data: catData } = await supabase.from('store_categories').select('*').order('name');
+      setCategories(catData || []);
+
       // Fetch Products
       const { data } = await supabase.from('pos_items')
         .select('*, vendor:vendor_id!inner(role)')
@@ -58,11 +65,22 @@ export const PublicStore: React.FC = () => {
         .gt('stock', 0)
         .order('created_at', { ascending: false });
         
-      setProducts(data as any[] || []);
+      if (data) {
+          setProducts(data as any[]);
+          setFeaturedProducts(data.filter((item: any) => item.is_featured) || []);
+      }
       setLoading(false);
     };
     init();
   }, []);
+
+  // Carousel Auto Slide
+  useEffect(() => {
+    const timer = setInterval(() => {
+        setActiveSlide(prev => (prev + 1) % (featuredProducts.length || 1));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [featuredProducts]);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
@@ -160,7 +178,7 @@ export const PublicStore: React.FC = () => {
     <div className="min-h-screen bg-[#F8F9FC] font-tajawal pt-28 pb-20 text-gray-900">
       
       {/* 1. Page Header */}
-      <div className="max-w-[1600px] mx-auto px-6 lg:px-12 mb-12 flex flex-col md:flex-row justify-between items-end gap-6">
+      <div className="max-w-[1600px] mx-auto px-6 lg:px-12 mb-8 flex flex-col md:flex-row justify-between items-end gap-6">
         <div>
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 text-primary border border-primary/10 text-[10px] font-black uppercase tracking-widest mb-3">
                 <ShoppingBag className="w-4 h-4" /> المتجر الرسمي
@@ -185,9 +203,47 @@ export const PublicStore: React.FC = () => {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-6 lg:px-12">
+        
+        {/* 2. Featured Carousel */}
+        {featuredProducts.length > 0 && (
+            <div className="mb-12 relative w-full aspect-[21/9] md:aspect-[24/8] rounded-[3rem] overflow-hidden border border-gray-100 group shadow-sm bg-white">
+                {featuredProducts.map((item, idx) => (
+                    <div 
+                        key={item.id} 
+                        className={`absolute inset-0 transition-all duration-1000 ease-in-out ${idx === activeSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'}`}
+                    >
+                        {/* Background Image with Overlay */}
+                        <img src={item.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=2000'} className="w-full h-full object-cover" alt={item.name} />
+                        <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/40 to-transparent"></div>
+                        
+                        {/* Content */}
+                        <div className="absolute inset-0 flex items-center p-12 md:p-20 text-white text-right">
+                            <div className="max-w-2xl space-y-6">
+                                <div className="inline-flex px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-xs font-black">منتج مميز</div>
+                                <h2 className="text-4xl md:text-5xl font-black leading-tight">{item.name}</h2>
+                                <p className="text-white/80 text-lg font-medium border-r-4 border-primary pl-4 pr-4">{item.category}</p>
+                                <div className="flex items-center gap-6 pt-4">
+                                    <PriceTag amount={item.price} className="text-3xl font-black text-white" />
+                                    <Button onClick={() => addToCart(item)} className="h-12 px-8 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold">
+                                        أضف للسلة
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+                
+                {/* Carousel Controls */}
+                <div className="absolute bottom-8 left-8 flex gap-2 z-10">
+                    <button onClick={() => setActiveSlide(prev => (prev + 1) % featuredProducts.length)} className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white transition-all"><ArrowRight className="w-5 h-5" /></button>
+                    <button onClick={() => setActiveSlide(prev => prev === 0 ? featuredProducts.length - 1 : prev - 1)} className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full text-white transition-all"><ArrowLeft className="w-5 h-5" /></button>
+                </div>
+            </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-10 items-start">
             
-            {/* 2. Sidebar Filter */}
+            {/* 3. Sidebar Filter */}
             <aside className={`
                 lg:w-72 shrink-0 space-y-8 lg:sticky lg:top-32
                 ${showMobileFilter ? 'fixed inset-0 z-50 bg-white p-6 overflow-y-auto' : 'hidden lg:block'}
@@ -213,9 +269,11 @@ export const PublicStore: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Categories */}
+                {/* Categories (Dynamic) */}
                 <div className="space-y-3">
                     <label className="text-xs font-black text-gray-400 uppercase tracking-widest">التصنيفات</label>
+                    
+                    {/* Mobile: Select Dropdown logic could go here, but using List for Desktop/Mobile uniformity in Sidebar style */}
                     <div className="flex flex-col gap-2">
                         <button 
                             onClick={() => setSelectedCategory('الكل')}
@@ -224,14 +282,14 @@ export const PublicStore: React.FC = () => {
                             <span>الكل</span>
                             {selectedCategory === 'الكل' && <CheckCircle2 className="w-4 h-4" />}
                         </button>
-                        {POS_CATEGORIES.map(cat => (
+                        {categories.map(cat => (
                             <button 
-                                key={cat} 
-                                onClick={() => setSelectedCategory(cat)} 
-                                className={`h-12 px-4 rounded-xl text-right text-sm font-bold transition-all border-2 flex justify-between items-center ${selectedCategory === cat ? 'bg-primary text-white border-primary' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+                                key={cat.id} 
+                                onClick={() => setSelectedCategory(cat.name)} 
+                                className={`h-12 px-4 rounded-xl text-right text-sm font-bold transition-all border-2 flex justify-between items-center ${selectedCategory === cat.name ? 'bg-primary text-white border-primary' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
                             >
-                                <span>{cat}</span>
-                                {selectedCategory === cat && <CheckCircle2 className="w-4 h-4" />}
+                                <span>{cat.name}</span>
+                                {selectedCategory === cat.name && <CheckCircle2 className="w-4 h-4" />}
                             </button>
                         ))}
                     </div>
@@ -254,7 +312,7 @@ export const PublicStore: React.FC = () => {
                 )}
             </aside>
 
-            {/* 3. Products Grid */}
+            {/* 4. Products Grid (Updated to 4 columns) */}
             <div className="flex-1 w-full">
                 
                 {/* Mobile Filter Toggle */}
@@ -264,7 +322,7 @@ export const PublicStore: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredProducts.map((item) => (
                         <div key={item.id} className="bg-white border-2 border-gray-50 rounded-[2.5rem] p-4 flex flex-col hover:border-primary/20 transition-all duration-300 group relative">
                             {/* Image */}
@@ -277,11 +335,10 @@ export const PublicStore: React.FC = () => {
                                 {item.stock < 5 && <div className="absolute top-4 left-4 bg-red-50 text-red-500 text-[10px] font-black px-3 py-1.5 rounded-full border border-red-100">بقي القليل</div>}
                             </div>
                             
-                            {/* Content */}
+                            {/* Content (Removed Rating Star) */}
                             <div className="px-2 pb-2 flex-1 flex flex-col text-right">
                                 <div className="flex justify-between items-start mb-2">
-                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">{item.category}</span>
-                                    <div className="flex items-center gap-1 text-yellow-400 text-[10px] font-black"><Star className="w-3 h-3 fill-current" /> 4.9</div>
+                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-100 line-clamp-1">{item.category}</span>
                                 </div>
                                 <h3 className="text-lg font-black text-gray-900 mb-1 line-clamp-1">{item.name}</h3>
                                 
@@ -307,7 +364,7 @@ export const PublicStore: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Cart & Checkout Modal (Flat Design) */}
+      {/* 5. Cart & Checkout Modal (Flat Design) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-sm flex justify-end">
             <div className="w-full max-w-lg bg-white h-full shadow-none border-l border-gray-100 flex flex-col animate-in slide-in-from-left duration-300">

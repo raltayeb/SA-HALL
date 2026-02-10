@@ -89,6 +89,11 @@ export interface ServiceCategory {
   icon?: string;
 }
 
+export interface StoreCategory {
+  id: string;
+  name: string;
+}
+
 export interface ContentPage {
   id: string;
   slug: string;
@@ -299,6 +304,7 @@ export interface POSItem {
   category?: string;
   barcode?: string;
   image_url?: string;
+  is_featured?: boolean;
   created_at?: string;
 }
 
