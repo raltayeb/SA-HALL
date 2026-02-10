@@ -59,6 +59,12 @@ export const PublicListing: React.FC<PublicListingProps> = ({ type, title, subti
 
   const paginatedItems = items.slice(0, page * ITEMS_PER_PAGE);
 
+  const handleFilterClick = () => {
+      if (type === 'hall') onNavigate('browse_halls');
+      else if (type === 'chalet') onNavigate('browse_chalets');
+      // For services, we might not have a dedicated browse page yet, or reuse browse_halls structure if needed, but keeping it simple for now.
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FC]"><Loader2 className="w-10 h-10 text-primary animate-spin" /></div>;
 
   return (
@@ -132,9 +138,11 @@ export const PublicListing: React.FC<PublicListingProps> = ({ type, title, subti
                         <input className="w-full h-14 bg-white border border-gray-100 rounded-2xl px-12 text-right font-bold outline-none focus:border-primary/30 transition-all" placeholder="ابحث بالاسم أو المدينة..." />
                         <Search className="w-5 h-5 text-gray-300 absolute right-4 top-1/2 -translate-y-1/2" />
                     </div>
-                    <button className="h-14 w-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center hover:border-primary/20 transition-all text-gray-400 hover:text-primary">
-                        <Filter className="w-6 h-6" />
-                    </button>
+                    {type !== 'service' && (
+                        <button onClick={handleFilterClick} className="h-14 w-14 bg-white border border-gray-100 rounded-2xl flex items-center justify-center hover:border-primary/20 transition-all text-gray-400 hover:text-primary">
+                            <Filter className="w-6 h-6" />
+                        </button>
+                    )}
                 </div>
             </div>
 

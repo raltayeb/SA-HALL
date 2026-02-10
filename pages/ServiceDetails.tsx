@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Info, Sparkles, Mail, Check, Tag, Image as ImageIcon
+  Calendar as CalendarIcon, Info, Sparkles, Mail, Check, Tag, Image as ImageIcon, ChevronLeft
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -161,9 +161,19 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
       
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <button onClick={onBack} className="flex items-center gap-2 text-gray-900 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
-            <ArrowRight className="w-5 h-5" /> الخدمات
-          </button>
+          <div className="flex items-center gap-4">
+             <button onClick={onBack} className="flex items-center gap-2 text-gray-500 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
+               <ArrowRight className="w-5 h-5" /> رجوع
+             </button>
+             {/* Breadcrumbs */}
+             <nav className="hidden md:flex text-xs font-bold text-gray-400 items-center">
+                <span>الرئيسية</span>
+                <ChevronLeft className="w-4 h-4 mx-1" />
+                <span>الخدمات</span>
+                <ChevronLeft className="w-4 h-4 mx-1" />
+                <span className="text-orange-600">{item.name}</span>
+             </nav>
+          </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="icon" className="rounded-full bg-white"><Share2 className="w-4 h-4" /></Button>
             <Button variant="ghost" size="icon" className="rounded-full bg-white"><Heart className="w-4 h-4" /></Button>

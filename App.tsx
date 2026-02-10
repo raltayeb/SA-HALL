@@ -132,7 +132,7 @@ const App: React.FC = () => {
 
           if (forceRedirect) {
             const currentTab = activeTabRef.current;
-            const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab);
+            const isPublicPage = ['home', 'browse_halls', 'browse_chalets', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(currentTab);
             
             if (profile.role === 'super_admin' && (isPublicPage || currentTab === 'home')) {
                 setActiveTab('admin_dashboard');
@@ -358,7 +358,7 @@ const App: React.FC = () => {
     return activeTab;
   }, [activeTab, selectedEntity]);
 
-  const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(activeTab);
+  const isPublicPage = ['home', 'browse_halls', 'browse_chalets', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(activeTab);
   const isGuestPortal = activeTab === 'guest_dashboard';
   const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
   const isAuthPage = ['login', 'register', 'guest_login'].includes(activeTab);
@@ -520,18 +520,28 @@ const App: React.FC = () => {
         <Home 
           user={userProfile} onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
           onRegisterClick={() => { setActiveTab('register'); setRegStep(0); window.scrollTo(0,0); }}
-          onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse'); }} 
+          onBrowseHalls={(filters) => { setBrowseFilters(filters); setActiveTab('browse_halls'); }} 
           onNavigate={navigateToDetails} onLogout={handleLogout}
         />
     );
 
-    if (activeTab === 'browse') return (
-        <BrowseHalls user={userProfile} mode="halls" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} initialFilters={browseFilters} />
+    if (activeTab === 'browse_halls') return (
+        <BrowseHalls user={userProfile} entityType="hall" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} initialFilters={browseFilters} />
     );
 
-    if (activeTab === 'halls_page') return <PublicListing type="hall" title="قاعات المناسبات" subtitle="تصفح أرقى القاعات لحفلات الزفاف والمناسبات الخاصة" onNavigate={navigateToDetails} />;
-    if (activeTab === 'chalets_page') return <PublicListing type="chalet" title="الشاليهات والمنتجعات" subtitle="أماكن استثنائية للاستجمام والفعاليات الخارجية" onNavigate={navigateToDetails} />;
-    if (activeTab === 'services_page') return <PublicListing type="service" title="خدمات المناسبات" subtitle="كل ما تحتاجه لإكمال فرحتك من ضيافة وتصوير وتجهيزات" onNavigate={navigateToDetails} />;
+    if (activeTab === 'browse_chalets') return (
+        <BrowseHalls user={userProfile} entityType="chalet" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} initialFilters={browseFilters} />
+    );
+
+    if (activeTab === 'browse_services') return (
+        <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} initialFilters={browseFilters} />
+    );
+
+    // Consolidated Routing for Public Pages
+    if (activeTab === 'halls_page') return <BrowseHalls user={userProfile} entityType="hall" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
+    if (activeTab === 'chalets_page') return <BrowseHalls user={userProfile} entityType="chalet" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
+    if (activeTab === 'services_page') return <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
+    
     if (activeTab === 'store_page') return <PublicStore />;
 
     // Conditional Rendering based on Entity Type

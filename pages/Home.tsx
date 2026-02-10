@@ -209,7 +209,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
             <div className="flex justify-center pt-8">
-                <Button variant="outline" onClick={() => onNavigate('halls_page')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
+                <Button variant="outline" onClick={() => onNavigate('browse_halls')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
                     عرض جميع القاعات <ArrowLeft className="w-4 h-4" />
                 </Button>
             </div>
@@ -222,7 +222,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 {loading ? [1,2,3].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'chalet', 'شاليه'))}
             </div>
             <div className="flex justify-center pt-8">
-                <Button variant="outline" onClick={() => onNavigate('chalets_page')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
+                <Button variant="outline" onClick={() => onNavigate('browse_chalets')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
                     عرض جميع الشاليهات <ArrowLeft className="w-4 h-4" />
                 </Button>
             </div>

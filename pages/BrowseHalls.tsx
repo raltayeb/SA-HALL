@@ -1,37 +1,35 @@
-
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, SAUDI_CITIES, Hall } from '../types';
+import { UserProfile, SAUDI_CITIES, Hall, Service, SERVICE_CATEGORIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Input } from '../components/ui/Input';
 import { 
   Search, MapPin, Star, Users, Filter, SlidersHorizontal, 
-  ArrowLeft, ArrowRight, LayoutGrid, List, Check, X,
-  Building2, Palmtree, Sparkles, ChevronLeft
+  LayoutGrid, List, X, ChevronLeft, Palmtree, Sparkles, Building2, Package
 } from 'lucide-react';
 
 interface BrowseHallsProps {
   user: UserProfile | null;
-  mode: 'halls' | 'services'; 
+  entityType: 'hall' | 'chalet' | 'service'; // Now supports service
   onBack: () => void;
   onNavigate: (tab: string, item?: any) => void;
   initialFilters?: any;
 }
 
-export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, onNavigate, initialFilters }) => {
+export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, entityType, onBack, onNavigate, initialFilters }) => {
   // --- Data State ---
-  const [rawData, setRawData] = useState<Hall[]>([]);
+  const [rawData, setRawData] = useState<(Hall | Service)[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<any[]>([]); // For services
   
   // --- Filter State ---
   const [filters, setFilters] = useState({
     search: '',
     city: initialFilters?.city || 'all',
-    type: initialFilters?.type || 'all',
     minPrice: '',
     maxPrice: '',
     minCapacity: 0,
+    category: 'all', // For Services
   });
 
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -41,27 +39,40 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Halls
-      const { data: halls, error: hError } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true);
-      
-      // Fetch Chalets (now in a separate table)
-      const { data: chalets, error: cError } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true);
-      
-      if (hError || cError) throw hError || cError;
+      let query;
+      let tableName = '';
 
-      // Merge and normalize (inject 'type' for chalets as they are now in a separate table without type column sometimes)
-      const combinedData = [
-          ...(halls || []).map(h => ({ ...h, type: 'hall' })),
-          ...(chalets || []).map(c => ({ ...c, type: 'chalet' }))
-      ];
+      if (entityType === 'service') {
+          tableName = 'services';
+          // Also fetch categories if services
+          const { data: catData } = await supabase.from('service_categories').select('*');
+          setCategories(catData || []);
+      } else if (entityType === 'chalet') {
+          tableName = 'chalets';
+      } else {
+          tableName = 'halls';
+      }
+      
+      query = supabase.from(tableName).select('*, vendor:vendor_id(*)').eq('is_active', true);
+      
+      if (entityType === 'hall') {
+          query = query.eq('type', 'hall');
+      }
 
-      setRawData(combinedData as any[]);
+      const { data, error } = await query;
+      
+      if (error) throw error;
+
+      // Inject type for rendering consistency
+      const normalizedData = (data || []).map(item => ({ ...item, type: entityType }));
+      setRawData(normalizedData as any[]);
+
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [entityType]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -71,27 +82,30 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
       // 1. Search Text
       if (filters.search && !item.name.toLowerCase().includes(filters.search.toLowerCase())) return false;
       
-      // 2. City
-      if (filters.city !== 'all' && item.city !== filters.city) return false;
-      
-      // 3. Type
-      if (filters.type !== 'all') {
-          if (filters.type === 'hall' && item.type !== 'hall') return false;
-          if (filters.type === 'chalet' && item.type !== 'chalet') return false;
+      // 2. City (Skip for services usually, or check service_areas if implemented)
+      if (entityType !== 'service') {
+          if (filters.city !== 'all' && (item as Hall).city !== filters.city) return false;
       }
-
-      // 4. Price Range
-      const price = Number(item.price_per_night);
+      
+      // 3. Price Range
+      const price = Number(entityType === 'service' ? (item as Service).price : (item as Hall).price_per_night);
       if (filters.minPrice && price < Number(filters.minPrice)) return false;
       if (filters.maxPrice && price > Number(filters.maxPrice)) return false;
 
-      // 5. Capacity
-      const cap = Number(item.capacity);
-      if (filters.minCapacity > 0 && cap < filters.minCapacity) return false;
+      // 4. Capacity (Halls/Chalets only)
+      if (entityType !== 'service') {
+          const cap = Number((item as Hall).capacity);
+          if (filters.minCapacity > 0 && cap < filters.minCapacity) return false;
+      }
+
+      // 5. Category (Services only)
+      if (entityType === 'service' && filters.category !== 'all') {
+          if ((item as Service).category !== filters.category) return false;
+      }
 
       return true;
     });
-  }, [rawData, filters]);
+  }, [rawData, filters, entityType]);
 
   // --- Render Helpers ---
   const handleFilterChange = (key: string, value: any) => {
@@ -102,12 +116,32 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
       setFilters({
           search: '',
           city: 'all',
-          type: 'all',
           minPrice: '',
           maxPrice: '',
-          minCapacity: 0
+          minCapacity: 0,
+          category: 'all'
       });
   };
+
+  const getPageTitle = () => {
+      if (entityType === 'hall') return 'تصفح قاعات الأفراح';
+      if (entityType === 'chalet') return 'تصفح الشاليهات والمنتجعات';
+      return 'تصفح خدمات المناسبات';
+  };
+
+  const getPageSubtitle = () => {
+      if (entityType === 'hall') return 'اختر القاعة المثالية لليلة العمر';
+      if (entityType === 'chalet') return 'أماكن استثنائية للراحة والاستجمام';
+      return 'أفضل مزودي الخدمات لإكمال فرحتك';
+  };
+
+  const getThemeColor = () => {
+      if (entityType === 'hall') return 'purple';
+      if (entityType === 'chalet') return 'blue';
+      return 'orange';
+  };
+
+  const theme = getThemeColor();
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] text-gray-900 pb-20 pt-28 font-tajawal" dir="rtl">
@@ -117,8 +151,8 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
           {/* Header & Mobile Filter Toggle */}
           <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
              <div>
-                <h1 className="text-3xl font-black text-gray-900">تصفح القاعات والشاليهات</h1>
-                <p className="text-gray-500 font-bold mt-2 text-sm">اختر المكان الأنسب لمناسبتك من بين {filteredData.length} خيار متاح</p>
+                <h1 className="text-3xl font-black text-gray-900">{getPageTitle()}</h1>
+                <p className="text-gray-500 font-bold mt-2 text-sm">{getPageSubtitle()} - {filteredData.length} خيار متاح</p>
              </div>
              <button 
                 onClick={() => setShowMobileFilters(true)} 
@@ -147,11 +181,11 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
 
                  {/* 1. Search */}
                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">اسم المكان</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">البحث بالاسم</label>
                     <div className="relative">
                         <input 
                             className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 pl-10 text-sm font-bold focus:bg-white focus:border-primary/20 outline-none transition-all placeholder:text-gray-300"
-                            placeholder="ابحث بالاسم..."
+                            placeholder="ابحث..."
                             value={filters.search}
                             onChange={e => handleFilterChange('search', e.target.value)}
                         />
@@ -159,46 +193,49 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                     </div>
                  </div>
 
-                 {/* 2. Type Selector */}
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">نوع المكان</label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {[
-                            { id: 'all', label: 'الكل', icon: LayoutGrid },
-                            { id: 'hall', label: 'قاعات', icon: Building2 },
-                            { id: 'chalet', label: 'منتجعات', icon: Palmtree }
-                        ].map(type => (
-                            <button 
-                                key={type.id}
-                                onClick={() => handleFilterChange('type', type.id)}
-                                className={`flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border transition-all ${filters.type === type.id ? 'bg-primary text-white border-primary' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                 {/* 2. City (Hide for Services if not relevant) */}
+                 {entityType !== 'service' && (
+                     <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">المدينة</label>
+                        <div className="relative">
+                            <select 
+                                className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-bold outline-none cursor-pointer appearance-none text-gray-700 focus:bg-white focus:border-primary/20 transition-all"
+                                value={filters.city}
+                                onChange={e => handleFilterChange('city', e.target.value)}
                             >
-                                <type.icon className="w-5 h-5" />
-                                <span className="text-[10px] font-bold">{type.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                 </div>
+                                <option value="all">كل المدن</option>
+                                {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <MapPin className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                     </div>
+                 )}
 
-                 {/* 3. City */}
-                 <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">المدينة</label>
-                    <div className="relative">
-                        <select 
-                            className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-bold outline-none cursor-pointer appearance-none text-gray-700 focus:bg-white focus:border-primary/20 transition-all"
-                            value={filters.city}
-                            onChange={e => handleFilterChange('city', e.target.value)}
-                        >
-                            <option value="all">كل المدن</option>
-                            {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <MapPin className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                 </div>
+                 {/* 3. Category (Services Only) */}
+                 {entityType === 'service' && (
+                     <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">التصنيف</label>
+                        <div className="relative">
+                            <select 
+                                className="w-full h-12 bg-gray-50 border border-gray-100 rounded-xl px-4 text-sm font-bold outline-none cursor-pointer appearance-none text-gray-700 focus:bg-white focus:border-primary/20 transition-all"
+                                value={filters.category}
+                                onChange={e => handleFilterChange('category', e.target.value)}
+                            >
+                                <option value="all">كل الخدمات</option>
+                                {categories.length > 0 ? categories.map(c => (
+                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                )) : SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <Filter className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        </div>
+                     </div>
+                 )}
 
                  {/* 4. Price Range */}
                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">الميزانية (لليلة الواحدة)</label>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                        {entityType === 'service' ? 'السعر (يبدأ من)' : 'الميزانية (لليلة الواحدة)'}
+                    </label>
                     <div className="flex items-center gap-2">
                         <input 
                             type="number" 
@@ -218,20 +255,22 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                     </div>
                  </div>
 
-                 {/* 5. Capacity */}
-                 <div className="space-y-4 pt-2">
-                    <div className="flex justify-between">
-                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">السعة (أفراد)</label>
-                        <span className="text-xs font-black text-primary">{filters.minCapacity}+</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        min="0" max="2000" step="50"
-                        value={filters.minCapacity}
-                        onChange={e => handleFilterChange('minCapacity', Number(e.target.value))}
-                        className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                 </div>
+                 {/* 5. Capacity (Halls/Chalets Only) */}
+                 {entityType !== 'service' && (
+                     <div className="space-y-4 pt-2">
+                        <div className="flex justify-between">
+                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">السعة (أفراد)</label>
+                            <span className="text-xs font-black text-primary">{filters.minCapacity}+</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            min="0" max="2000" step="50"
+                            value={filters.minCapacity}
+                            onChange={e => handleFilterChange('minCapacity', Number(e.target.value))}
+                            className="w-full h-2 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                     </div>
+                 )}
 
                  {showMobileFilters && (
                      <Button onClick={() => setShowMobileFilters(false)} className="w-full h-14 rounded-2xl font-black text-lg mt-8 bg-primary text-white">
@@ -246,8 +285,10 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                  {/* Top Controls */}
                  <div className="flex flex-row justify-between items-center bg-white p-2 pl-4 rounded-[1.5rem] border border-gray-100">
                     <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-black text-white bg-black px-3 py-1.5 rounded-xl ml-2 hidden sm:inline-block">نتائج البحث</span>
-                       <span className="text-sm font-bold text-gray-500">{filteredData.length} مكان</span>
+                       <span className={`text-[10px] font-black text-white px-3 py-1.5 rounded-xl ml-2 hidden sm:inline-block ${entityType === 'hall' ? 'bg-purple-600' : entityType === 'chalet' ? 'bg-blue-600' : 'bg-orange-600'}`}>
+                           {entityType === 'hall' ? 'القاعات' : entityType === 'chalet' ? 'الشاليهات' : 'الخدمات'}
+                       </span>
+                       <span className="text-sm font-bold text-gray-500">{filteredData.length} نتيجة</span>
                     </div>
                     
                     <div className="flex items-center gap-3">
@@ -270,7 +311,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                             <Search className="w-8 h-8 text-gray-300" />
                         </div>
                         <h3 className="text-xl font-black text-gray-900 mb-2">لم نجد نتائج مطابقة</h3>
-                        <p className="text-gray-400 font-bold max-w-xs mx-auto mb-8">جرب تغيير معايير البحث أو إزالة بعض الفلاتر لرؤية المزيد من الخيارات.</p>
+                        <p className="text-gray-400 font-bold max-w-xs mx-auto mb-8">جرب تغيير معايير البحث أو إزالة بعض الفلاتر.</p>
                         <Button onClick={clearFilters} variant="outline" className="h-12 px-8 rounded-xl font-bold border-gray-200">إزالة كافة الفلاتر</Button>
                     </div>
                  ) : (
@@ -278,7 +319,7 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                         {filteredData.map(item => (
                             <div 
                                 key={item.id} 
-                                onClick={() => onNavigate('hall_details', { item, type: item.type === 'hall' ? 'hall' : 'chalet' })}
+                                onClick={() => onNavigate('hall_details', { item, type: entityType })}
                                 className={`
                                     group bg-white border border-gray-100 rounded-[2.5rem] overflow-hidden cursor-pointer
                                     hover:border-primary/30 transition-all duration-300 relative
@@ -293,11 +334,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                                         alt={item.name}
                                     />
                                     <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1 border border-gray-100">
-                                        <MapPin className="w-3 h-3 text-primary" /> {item.city}
+                                        {entityType === 'service' ? (
+                                            <span className="text-primary">{(item as Service).category}</span>
+                                        ) : (
+                                            <><MapPin className="w-3 h-3 text-primary" /> {(item as Hall).city}</>
+                                        )}
                                     </div>
-                                    <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Users className="w-3 h-3" /> {item.capacity}
-                                    </div>
+                                    {entityType !== 'service' && (
+                                        <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Users className="w-3 h-3" /> {(item as Hall).capacity}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Content */}
@@ -305,8 +352,10 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${item.type === 'hall' ? 'bg-purple-500' : 'bg-blue-500'}`}></span>
-                                                <span className="text-[10px] font-bold text-gray-400">{item.type === 'hall' ? 'قاعة أفراح' : 'شاليه / منتجع'}</span>
+                                                <span className={`w-2 h-2 rounded-full ${entityType === 'hall' ? 'bg-purple-500' : entityType === 'chalet' ? 'bg-blue-500' : 'bg-orange-500'}`}></span>
+                                                <span className="text-[10px] font-bold text-gray-400">
+                                                    {entityType === 'hall' ? 'قاعة أفراح' : entityType === 'chalet' ? 'شاليه / منتجع' : 'خدمة'}
+                                                </span>
                                             </div>
                                             <h3 className="font-black text-lg text-gray-900 group-hover:text-primary transition-colors line-clamp-1">{item.name}</h3>
                                         </div>
@@ -315,15 +364,17 @@ export const BrowseHalls: React.FC<BrowseHallsProps> = ({ user, mode, onBack, on
                                         </div>
                                     </div>
 
-                                    {/* Description - Show only in Grid or short in List */}
+                                    {/* Description */}
                                     <p className="text-xs text-gray-500 font-medium line-clamp-2 leading-relaxed mb-6 mt-2">
                                         {item.description || 'استمتع بتجربة فريدة ومميزة في هذا المكان الرائع..'}
                                     </p>
 
                                     <div className="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
                                         <div className="flex flex-col">
-                                            <span className="text-[9px] font-bold text-gray-400 uppercase">سعر الليلة يبدأ من</span>
-                                            <PriceTag amount={item.price_per_night} className="text-xl font-black text-gray-900" />
+                                            <span className="text-[9px] font-bold text-gray-400 uppercase">
+                                                {entityType === 'service' ? 'السعر يبدأ من' : 'سعر الليلة يبدأ من'}
+                                            </span>
+                                            <PriceTag amount={entityType === 'service' ? (item as Service).price : (item as Hall).price_per_night} className="text-xl font-black text-gray-900" />
                                         </div>
                                         <div className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center group-hover:bg-primary group-hover:text-white group-hover:border-primary transition-all">
                                             <ChevronLeft className="w-5 h-5" />
