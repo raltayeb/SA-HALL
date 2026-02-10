@@ -1,12 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
-import { supabase } from '../../supabaseClient';
-import { UserProfile, Hall } from '../../types';
+import React from 'react';
+import { UserProfile } from '../../types';
 import { 
-  LayoutDashboard, Users, Building2, ClipboardList, Ticket, LogOut, 
-  Sparkles, CalendarDays, Settings, X, Tag, 
-  LayoutGrid, FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, UserCheck, Store, Palmtree, Search
+  LayoutDashboard, Users, Building2, ClipboardList, 
+  CalendarDays, Settings, X, Tag, 
+  FileText, BarChart3, Layers, Inbox, Bell,
+  Receipt, Store, Palmtree, LogOut
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -18,7 +17,6 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
-  siteName?: string;
   platformLogo?: string;
 }
 
@@ -60,13 +58,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {
         title: "الرئيسية",
         items: [
-          { id: 'dashboard', label: 'لوحة المعلومات', icon: <LayoutGrid className="w-5 h-5" /> },
+          { id: 'dashboard', label: 'لوحة المعلومات', icon: <LayoutDashboard className="w-5 h-5" /> },
           { id: 'calendar', label: 'التقويم', icon: <CalendarDays className="w-5 h-5" /> },
           { id: 'hall_bookings', label: 'سجل الحجوزات', icon: <ClipboardList className="w-5 h-5" /> },
         ]
       },
       {
-        title: "المالية",
+        title: "المالية والمشتريات",
         items: [
           { id: 'accounting', label: 'الفواتير والحسابات', icon: <Receipt className="w-5 h-5" /> },
           { id: 'coupons', label: 'الخصومات والعروض', icon: <Tag className="w-5 h-5" /> },
@@ -78,8 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         items: [
           { id: 'my_halls', label: 'القاعات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'my_chalets', label: 'الشاليهات', icon: <Palmtree className="w-5 h-5" /> },
-          { id: 'my_services', label: 'الخدمات', icon: <Sparkles className="w-5 h-5" /> },
-          { id: 'my_clients', label: 'العملاء', icon: <UserCheck className="w-5 h-5" /> },
+          // Removed Services for simplicity as requested by flow, kept logic if needed
         ]
       },
       {
@@ -89,9 +86,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         ]
       }
     ];
-  } else {
-    // Guest has no sidebar items as requested
-    return null; 
   }
 
   return (

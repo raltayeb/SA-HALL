@@ -5,10 +5,9 @@ import { UserProfile, Hall, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
-import { 
-  Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus
-} from 'lucide-react';
+import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus, Lock, CreditCard } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { Modal } from '../components/ui/Modal';
 
 interface VendorHallsProps {
   user: UserProfile;
@@ -18,8 +17,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false); // Paywall
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
   
   const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ 
       images: [], amenities: [], city: SAUDI_CITIES[0], addons: [], packages: [] 
@@ -31,6 +30,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const LISTING_FEE = 150; // Dynamic from settings in real app
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -46,10 +47,41 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handleAddNew = () => {
+      // Logic: In a real app, check subscription limit. Here we force payment for new assets.
+      // For editing existing, skip payment.
+      setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [], packages: [], type: 'hall' });
+      setIsPaymentModalOpen(true);
+  };
+
+  const handleEdit = (hall: Hall) => {
+      setCurrentHall(hall);
+      setIsEditing(true);
+  };
+
+  const processPaymentAndOpenEditor = async () => {
+      setPaymentProcessing(true);
+      // Simulate Payment Processing
+      await new Promise(r => setTimeout(r, 1500));
+      
+      // Record Fee as Expense
+      await supabase.from('expenses').insert([{
+          vendor_id: user.id,
+          title: 'رسوم إضافة قاعة جديدة',
+          amount: LISTING_FEE,
+          category: 'رسوم منصة',
+          expense_date: new Date().toISOString().split('T')[0]
+      }]);
+
+      toast({ title: 'تم الدفع بنجاح', description: 'يمكنك الآن إضافة القاعة.', variant: 'success' });
+      setPaymentProcessing(false);
+      setIsPaymentModalOpen(false);
+      setIsEditing(true);
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    setUploading(true);
     try {
       const file = files[0];
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
@@ -61,8 +93,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       toast({ title: 'تم الرفع', variant: 'success' });
     } catch (error: any) {
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -105,10 +135,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       toast({ title: 'تنبيه', description: 'يرجى إكمال البيانات الأساسية.', variant: 'destructive' });
       return;
     }
-    setSaving(true);
     try {
       const totalCapacity = (Number(currentHall.capacity_men) || 0) + (Number(currentHall.capacity_women) || 0);
-      
       const payload = { 
           ...currentHall, 
           vendor_id: user.id, 
@@ -124,7 +152,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       fetchData();
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
-    } finally { setSaving(false); }
+    }
   };
 
   return (
@@ -134,7 +162,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
            <h2 className="text-3xl font-black text-primary">إدارة القاعات</h2>
            <p className="text-sm text-gray-400 mt-1 font-bold">إضافة وتعديل القاعات والأسعار.</p>
         </div>
-        <Button onClick={() => { setCurrentHall({ images: [], amenities: [], is_active: true, city: SAUDI_CITIES[0], capacity: 0, addons: [], packages: [], type: 'hall' }); setIsEditing(true); }} className="rounded-xl h-12 px-8 font-black gap-2 shadow">
+        <Button onClick={handleAddNew} className="rounded-xl h-12 px-8 font-black gap-2 shadow">
             <Plus className="w-4 h-4" /> إضافة قاعة
         </Button>
       </div>
@@ -153,12 +181,32 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                 </div>
                 <PriceTag amount={hall.price_per_night} className="text-xl" />
                 <div className="mt-auto pt-4 border-t border-gray-100">
-                  <Button variant="outline" className="w-full rounded-xl h-10 text-xs font-black border-gray-200" onClick={() => { setCurrentHall(hall); setIsEditing(true); }}>تعديل التفاصيل</Button>
+                  <Button variant="outline" className="w-full rounded-xl h-10 text-xs font-black border-gray-200" onClick={() => handleEdit(hall)}>تعديل التفاصيل</Button>
                 </div>
               </div>
             </div>
         ))}
       </div>
+
+      {/* Payment Wall Modal */}
+      <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="رسوم الخدمة">
+          <div className="text-center space-y-6">
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary"><Lock className="w-8 h-8" /></div>
+              <div>
+                  <h3 className="text-xl font-black">مطلوب دفع رسوم الإضافة</h3>
+                  <p className="text-gray-500 font-bold text-sm mt-2">لإضافة قاعة جديدة، يجب سداد رسوم إدارية لمرة واحدة.</p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                  <div className="flex justify-between items-center text-sm font-bold">
+                      <span>رسوم إضافة قاعة</span>
+                      <PriceTag amount={LISTING_FEE} />
+                  </div>
+              </div>
+              <Button onClick={processPaymentAndOpenEditor} disabled={paymentProcessing} className="w-full h-14 rounded-2xl font-black text-lg bg-gray-900 text-white shadow-xl">
+                  {paymentProcessing ? <Loader2 className="animate-spin w-6 h-6" /> : `دفع ${LISTING_FEE} ر.س ومتابعة`}
+              </Button>
+          </div>
+      </Modal>
 
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
@@ -296,7 +344,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                     <div className="flex flex-wrap gap-4 justify-end">
                         <div onClick={() => fileInputRef.current?.click()} className="w-40 h-40 rounded-xl bg-purple-50 border-2 border-dashed border-purple-200 flex items-center justify-center cursor-pointer hover:bg-purple-100 transition-all group">
                             <div className="bg-primary text-white rounded-lg p-2 group-hover:scale-110 transition-transform">
-                                {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Plus className="w-6 h-6" />}
+                                <Plus className="w-6 h-6" />
                             </div>
                         </div>
                         <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
@@ -312,8 +360,8 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
               <div className="p-6 border-t border-gray-100 bg-white z-10 flex gap-4">
                 <Button variant="outline" onClick={() => setIsEditing(false)} className="h-12 px-8 rounded-xl font-bold flex-1 border-gray-200">إلغاء</Button>
-                <Button onClick={handleSave} disabled={saving} className="h-12 px-8 rounded-xl font-black text-sm flex-[2] bg-primary text-white shadow-none">
-                    {saving ? <Loader2 className="animate-spin w-5 h-5" /> : 'حفظ ونشر القاعة'}
+                <Button onClick={handleSave} className="h-12 px-8 rounded-xl font-black text-sm flex-[2] bg-primary text-white shadow-none">
+                    حفظ ونشر القاعة
                 </Button>
               </div>
             </div>

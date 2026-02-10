@@ -1,12 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Booking, Hall } from '../types';
+import { UserProfile, Booking } from '../types';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
-import { Badge } from '../components/ui/Badge';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Plus, Trash2, Edit, List, Grid3X3, Users, Building2, MapPin, Loader2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, Edit, List, Grid3X3, Users, Filter, Loader2 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
@@ -15,28 +14,48 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [halls, setHalls] = useState<Hall[]>([]);
+  const [assets, setAssets] = useState<{id: string, name: string}[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<string>('all');
+  
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Partial<Booking> | null>(null);
   const { toast } = useToast();
+
+  // Fetch Assets
+  useEffect(() => {
+      const fetchAssets = async () => {
+          const [halls, chalets] = await Promise.all([
+              supabase.from('halls').select('id, name').eq('vendor_id', user.id),
+              supabase.from('chalets').select('id, name').eq('vendor_id', user.id)
+          ]);
+          setAssets([...(halls.data || []), ...(chalets.data || [])]);
+      };
+      fetchAssets();
+  }, [user.id]);
 
   const fetchCalendarData = async () => {
     setLoading(true);
     const firstDay = format(startOfMonth(currentDate), 'yyyy-MM-dd');
     const lastDay = format(endOfMonth(currentDate), 'yyyy-MM-dd');
 
-    const [bookingsRes, hallsRes] = await Promise.all([
-      supabase.from('bookings').select('*, profiles:user_id(full_name), halls(*)').eq('vendor_id', user.id).gte('booking_date', firstDay).lte('booking_date', lastDay).neq('status', 'cancelled'),
-      supabase.from('halls').select('*').eq('vendor_id', user.id)
-    ]);
+    let query = supabase.from('bookings')
+        .select('*, profiles:user_id(full_name), halls(name), chalets(name)')
+        .eq('vendor_id', user.id)
+        .gte('booking_date', firstDay)
+        .lte('booking_date', lastDay)
+        .neq('status', 'cancelled');
 
-    if (bookingsRes.data) setBookings(bookingsRes.data as any[]);
-    if (hallsRes.data) setHalls(hallsRes.data);
+    if (selectedAsset !== 'all') {
+        query = query.or(`hall_id.eq.${selectedAsset},chalet_id.eq.${selectedAsset}`);
+    }
+
+    const { data } = await query;
+    setBookings(data as any[] || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetchCalendarData(); }, [currentDate]);
+  useEffect(() => { fetchCalendarData(); }, [currentDate, selectedAsset]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -50,20 +69,43 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (existing) {
       setSelectedBooking(existing);
     } else {
-      setSelectedBooking({ booking_date: format(day, 'yyyy-MM-dd'), status: 'confirmed', vendor_id: user.id });
+      setSelectedBooking({ 
+          booking_date: format(day, 'yyyy-MM-dd'), 
+          status: 'confirmed', 
+          vendor_id: user.id,
+          hall_id: selectedAsset !== 'all' ? selectedAsset : (assets[0]?.id || '') 
+      });
     }
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!selectedBooking?.hall_id || !selectedBooking?.booking_date) {
-      toast({ title: 'خطأ', description: 'يرجى اختيار القاعة والتاريخ.', variant: 'destructive' });
+    if (!selectedBooking?.hall_id && !selectedBooking?.chalet_id) {
+      toast({ title: 'خطأ', description: 'يرجى اختيار القاعة/الشاليه.', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
-    const payload = {
-      ...selectedBooking,
+    // Determine target based on asset list
+    const isChalet = assets.find(a => a.id === selectedBooking.hall_id)?.name.includes('شاليه'); // Simplistic check, better to use type in assets
+    
+    // Correction: AddBookingModal handles ID assignment correctly, here we assume hall_id in state maps to selected asset ID
+    // We need to verify if the ID belongs to hall or chalet table
+    const targetId = selectedBooking.hall_id;
+    let finalPayload: any = { ...selectedBooking };
+    
+    // Check against hall list
+    const { data: isHall } = await supabase.from('halls').select('id').eq('id', targetId).maybeSingle();
+    if(isHall) {
+        finalPayload.hall_id = targetId;
+        finalPayload.chalet_id = null;
+    } else {
+        finalPayload.chalet_id = targetId;
+        finalPayload.hall_id = null;
+    }
+
+    finalPayload = {
+      ...finalPayload,
       vendor_id: user.id,
       user_id: selectedBooking.user_id || null, 
       total_amount: selectedBooking.total_amount || 0,
@@ -71,8 +113,8 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
 
     const { error } = selectedBooking.id 
-      ? await supabase.from('bookings').update(payload).eq('id', selectedBooking.id)
-      : await supabase.from('bookings').insert([payload]);
+      ? await supabase.from('bookings').update(finalPayload).eq('id', selectedBooking.id)
+      : await supabase.from('bookings').insert([finalPayload]);
 
     if (!error) {
       toast({ title: 'نجاح', description: 'تم حفظ الموعد بنجاح.', variant: 'success' });
@@ -81,6 +123,7 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
     } else {
       toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
 
   const handleDelete = async () => {
@@ -103,25 +146,22 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
           <h2 className="text-3xl font-black text-primary tracking-tighter flex items-center gap-3">
             <CalendarDays className="w-8 h-8" /> لوحة المواعيد
           </h2>
-          <p className="text-gray-400 font-bold text-sm mt-1">جدول زمني متقدم لإدارة جميع قاعاتك في مكان واحد.</p>
+          <p className="text-gray-400 font-bold text-sm mt-1">جدول زمني متقدم لإدارة جميع أصولك.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex bg-white border border-gray-200 rounded-2xl p-1">
-            <button 
-              onClick={() => setViewMode('grid')} 
-              className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-primary text-white shadow' : 'text-gray-400 hover:bg-gray-50'}`}
-            >
-              <Grid3X3 className="w-5 h-5" />
-            </button>
-            <button 
-              onClick={() => setViewMode('list')} 
-              className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-primary text-white shadow' : 'text-gray-400 hover:bg-gray-50'}`}
-            >
-              <List className="w-5 h-5" />
-            </button>
+          <div className="flex items-center gap-2 bg-white border border-gray-200 p-2 rounded-2xl">
+             <Filter className="w-4 h-4 text-gray-400" />
+             <select 
+                className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer"
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+             >
+                <option value="all">كافة الأصول</option>
+                {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+             </select>
           </div>
-          
+
           <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl p-1">
             <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setCurrentDate(subMonths(currentDate, 1))}><ChevronRight className="w-5 h-5" /></Button>
             <span className="px-6 font-black text-sm min-w-[140px] text-center">
@@ -136,9 +176,8 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Grid View (Flat Design) */}
-      {viewMode === 'grid' ? (
-        <div className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden relative">
+      {/* Grid View */}
+      <div className="bg-white border border-gray-200 rounded-[2.5rem] overflow-hidden relative">
           <div className="grid grid-cols-7 border-b border-gray-200">
             {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map(d => (
               <div key={d} className="p-4 text-center text-[10px] font-black uppercase tracking-widest text-gray-400 border-l border-gray-200 last:border-l-0 bg-gray-50/50">{d}</div>
@@ -173,67 +212,33 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="space-y-1.5 max-h-[100px] overflow-y-auto no-scrollbar">
                     {dayBookings.slice(0, 3).map(b => (
                       <div key={b.id} className="text-[9px] font-black p-2 rounded-xl border border-gray-100 bg-white shadow-sm flex flex-col gap-0.5 hover:border-primary/30 transition-colors">
-                        <span className="text-primary truncate">{b.halls?.name}</span>
+                        <span className="text-primary truncate">{b.halls?.name || b.chalets?.name}</span>
                         <span className="text-gray-400 opacity-80 truncate flex items-center gap-1">
-                          <Users className="w-2 h-2" /> {b.profiles?.full_name || b.guest_name || 'حجز خارجي'}
+                          <Users className="w-2 h-2" /> {b.guest_name || 'عميل'}
                         </span>
                       </div>
                     ))}
-                    {dayBookings.length > 3 && (
-                      <div className="text-[8px] font-bold text-center text-gray-400 py-1 bg-gray-50 rounded-lg">
-                        + {dayBookings.length - 3} حجوزات أخرى
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      ) : (
-        /* List View */
-        <div className="grid gap-4">
-          {bookings.length === 0 ? (
-            <div className="py-20 text-center border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50">
-              <CalendarDays className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="font-black text-gray-400">لا توجد حجوزات مسجلة لهذا الشهر.</p>
-            </div>
-          ) : (
-            bookings.map((b) => (
-              <div key={b.id} onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="bg-white border border-gray-200 rounded-[2rem] p-6 hover:border-primary/30 transition-all flex flex-col md:flex-row items-center gap-6 cursor-pointer group">
-                 <div className="w-16 h-16 rounded-2xl bg-primary/5 flex flex-col items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-white transition-colors border border-primary/10">
-                    <span className="text-[10px] font-black uppercase">{format(new Date(b.booking_date), 'MMM', { locale: arSA })}</span>
-                    <span className="text-xl font-black">{format(new Date(b.booking_date), 'dd')}</span>
-                 </div>
-                 <div className="flex-1 text-center md:text-right">
-                    <h3 className="text-lg font-black group-hover:text-primary transition-colors">{b.halls?.name}</h3>
-                    <div className="flex items-center justify-center md:justify-start gap-4 mt-1 text-xs text-gray-400 font-bold">
-                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {b.profiles?.full_name || b.guest_name || 'حجز خارجي'}</span>
-                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {b.halls?.city}</span>
-                    </div>
-                 </div>
-                 <div className="px-6 border-r border-gray-100 flex flex-col items-center md:items-end gap-2">
-                    <Badge variant={b.status === 'confirmed' ? 'success' : 'warning'}>
-                      {b.status === 'confirmed' ? 'مؤكد' : 'معلق'}
-                    </Badge>
-                    <span className="text-[10px] font-black text-gray-400">ID: {b.id.slice(0, 8)}</span>
-                 </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      </div>
 
       {/* Booking Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedBooking?.id ? 'تفاصيل الموعد' : 'إضافة حجز يدوي'}>
         <div className="space-y-6 text-right">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-              <Building2 className="w-3.5 h-3.5" /> القاعة المستهدفة
+               المكان المستهدف
             </label>
-            <select className="w-full h-12 bg-white border border-gray-200 rounded-2xl px-4 text-sm font-bold outline-none appearance-none" value={selectedBooking?.hall_id || ''} onChange={e => setSelectedBooking({...selectedBooking, hall_id: e.target.value})}>
-              <option value="">اختر القاعة من القائمة</option>
-              {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            <select 
+                className="w-full h-12 bg-white border border-gray-200 rounded-2xl px-4 text-sm font-bold outline-none appearance-none" 
+                value={selectedBooking?.hall_id || selectedBooking?.chalet_id || ''} 
+                onChange={e => setSelectedBooking({...selectedBooking, hall_id: e.target.value})} // We handle id split on save
+            >
+              <option value="">اختر من القائمة</option>
+              {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -261,7 +266,7 @@ export const CalendarBoard: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex gap-3 justify-end pt-6 border-t border-gray-100">
             {selectedBooking?.id && <Button variant="destructive" onClick={handleDelete} className="gap-2 rounded-xl h-12 px-6 font-bold"><Trash2 className="w-4 h-4" /> حذف الموعد</Button>}
             <Button variant="outline" onClick={() => setIsModalOpen(false)} className="rounded-xl h-12 px-6 font-bold border-gray-200">إلغاء</Button>
-            <Button onClick={handleSave} className="gap-2 rounded-xl h-12 px-8 font-black shadow">
+            <Button onClick={handleSave} disabled={loading} className="gap-2 rounded-xl h-12 px-8 font-black shadow">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit className="w-4 h-4" />}
               {selectedBooking?.id ? 'تحديث البيانات' : 'تأكيد الحجز'}
             </Button>

@@ -4,13 +4,13 @@ import { supabase } from '../supabaseClient';
 import { UserProfile, Booking } from '../types';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  CalendarCheck, Building2, Loader2, TrendingUp, Star, Inbox, 
-  Wallet, Users, CheckCircle2, Clock, PieChart, ArrowUpRight
+  CalendarCheck, Building2, Loader2, TrendingUp, Inbox, 
+  Clock, CheckCircle2, ArrowUpRight, Filter
 } from 'lucide-react';
 import { 
   XAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, YAxis
 } from 'recharts';
-import { format, subMonths, isSameMonth, startOfMonth, eachMonthOfInterval } from 'date-fns';
+import { format, subMonths, isSameMonth, eachMonthOfInterval } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 
 interface DashboardProps {
@@ -19,6 +19,9 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
+  const [assets, setAssets] = useState<{id: string, name: string, type: string}[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<string>('all');
+  
   const [stats, setStats] = useState({ 
     totalBookings: 0, 
     confirmedBookings: 0,
@@ -27,10 +30,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     paidAmount: 0,
     outstandingAmount: 0,
     activeHalls: 0,
-    clientsCount: 0
   });
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
+
+  // Fetch Assets List
+  useEffect(() => {
+      const fetchAssets = async () => {
+          const [halls, chalets] = await Promise.all([
+              supabase.from('halls').select('id, name').eq('vendor_id', user.id),
+              supabase.from('chalets').select('id, name').eq('vendor_id', user.id)
+          ]);
+          const combined = [
+              ...(halls.data || []).map(h => ({ ...h, type: 'hall' })),
+              ...(chalets.data || []).map(c => ({ ...c, type: 'chalet' }))
+          ];
+          setAssets(combined);
+      };
+      fetchAssets();
+  }, [user.id]);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -38,16 +56,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     try {
       const today = new Date();
       
-      const { data: bookings } = await supabase
+      let query = supabase
         .from('bookings')
-        .select('*, halls(name), profiles:user_id(full_name)')
+        .select('*, halls(name), chalets(name), profiles:user_id(full_name)')
         .eq('vendor_id', user.id)
         .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
 
+      if (selectedAsset !== 'all') {
+          query = query.or(`hall_id.eq.${selectedAsset},chalet_id.eq.${selectedAsset}`);
+      }
+
+      const { data: bookings } = await query;
       const allBookings = (bookings as Booking[]) || [];
-      
-      const { count: hallCount } = await supabase.from('halls').select('*', { count: 'exact', head: true }).eq('vendor_id', user.id).eq('is_active', true);
       
       const totalRevenue = allBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
       const paidAmount = allBookings.reduce((sum, b) => sum + (Number(b.paid_amount) || 0), 0);
@@ -59,8 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         totalRevenue,
         paidAmount,
         outstandingAmount: totalRevenue - paidAmount,
-        activeHalls: hallCount || 0,
-        clientsCount: 0
+        activeHalls: assets.length,
       });
 
       const months = eachMonthOfInterval({ start: subMonths(today, 5), end: today });
@@ -81,7 +101,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
     } finally {
       setLoading(false);
     }
-  }, [user.id]);
+  }, [user.id, selectedAsset, assets.length]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -92,57 +112,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10 font-sans text-right">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10 font-tajawal text-right">
       
-      {/* 1. Overview Banner (Flat Design) */}
+      {/* 1. Overview Banner */}
       <div className="bg-white rounded-[2rem] p-8 border border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-8">
-        <div className="space-y-2 text-center lg:text-right">
+        <div className="space-y-2 text-center lg:text-right w-full lg:w-auto">
           <h2 className="text-3xl font-black text-gray-900">أهلاً بك، {user.business_name || user.full_name}</h2>
-          <p className="text-gray-500 font-bold text-sm">نظرة عامة على أداء منشأتك اليوم.</p>
+          <p className="text-gray-500 font-bold text-sm">نظرة عامة على أداء منشأتك.</p>
         </div>
         
-        <div className="flex flex-wrap justify-center gap-4">
-           <div className="bg-emerald-50 px-6 py-4 rounded-2xl border border-emerald-100 text-center min-w-[160px]">
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">المبالغ المحصلة</p>
-              <PriceTag amount={stats.paidAmount} className="text-xl font-black text-emerald-700 justify-center" />
-           </div>
-           <div className="bg-orange-50 px-6 py-4 rounded-2xl border border-orange-100 text-center min-w-[160px]">
-              <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">المبالغ الآجلة</p>
-              <PriceTag amount={stats.outstandingAmount} className="text-xl font-black text-orange-700 justify-center" />
-           </div>
+        {/* Asset Filter */}
+        <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+            <Filter className="w-5 h-5 text-gray-400 mr-2" />
+            <select 
+                className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer min-w-[150px]"
+                value={selectedAsset}
+                onChange={(e) => setSelectedAsset(e.target.value)}
+            >
+                <option value="all">كافة الأصول</option>
+                {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.type === 'hall' ? 'قاعة' : 'شاليه'})</option>)}
+            </select>
         </div>
       </div>
 
-      {/* 2. Key Metrics Grid (Flat Design) */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Total Bookings */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 hover:border-primary/20 transition-all group">
-           <div className="flex justify-between items-start mb-4">
-               <div className="p-3 bg-blue-50 rounded-xl text-blue-600 border border-blue-100"><CalendarCheck className="w-6 h-6" /></div>
-               <span className="text-[10px] font-black bg-gray-50 text-gray-500 px-2 py-1 rounded-lg border border-gray-100">الكل</span>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+           <div className="bg-emerald-50 px-6 py-6 rounded-[2rem] border border-emerald-100 text-center">
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">المبالغ المحصلة</p>
+              <PriceTag amount={stats.paidAmount} className="text-2xl font-black text-emerald-700 justify-center" />
            </div>
-           <div className="text-3xl font-black text-gray-900">{stats.totalBookings}</div>
-           <p className="text-[10px] text-gray-400 font-bold mt-1">إجمالي الحجوزات المسجلة</p>
-        </div>
+           <div className="bg-orange-50 px-6 py-6 rounded-[2rem] border border-orange-100 text-center">
+              <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">المبالغ الآجلة</p>
+              <PriceTag amount={stats.outstandingAmount} className="text-2xl font-black text-orange-700 justify-center" />
+           </div>
+           
+            <div className="bg-white px-6 py-6 rounded-[2rem] border border-gray-200 text-center">
+               <div className="flex justify-center mb-2 text-blue-500"><CalendarCheck className="w-6 h-6" /></div>
+               <div className="text-3xl font-black text-gray-900">{stats.totalBookings}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">إجمالي الحجوزات</p>
+            </div>
 
-        {/* Pending Requests */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 hover:border-primary/20 transition-all group">
-           <div className="flex justify-between items-start mb-4">
-               <div className="p-3 bg-orange-50 rounded-xl text-orange-600 border border-orange-100"><Inbox className="w-6 h-6" /></div>
-               {stats.pendingRequests > 0 && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>}
-           </div>
-           <div className="text-3xl font-black text-orange-600">{stats.pendingRequests}</div>
-           <p className="text-[10px] text-gray-400 font-bold mt-1">طلبات بانتظار الموافقة</p>
-        </div>
-
-        {/* Active Halls */}
-        <div className="bg-white p-6 rounded-[2rem] border border-gray-200 hover:border-primary/20 transition-all group">
-           <div className="flex justify-between items-start mb-4">
-               <div className="p-3 bg-purple-50 rounded-xl text-purple-600 border border-purple-100"><Building2 className="w-6 h-6" /></div>
-           </div>
-           <div className="text-3xl font-black text-gray-900">{stats.activeHalls}</div>
-           <p className="text-[10px] text-gray-400 font-bold mt-1">وحدة متاحة للحجز</p>
-        </div>
+            <div className="bg-white px-6 py-6 rounded-[2rem] border border-gray-200 text-center">
+               <div className="flex justify-center mb-2 text-orange-500"><Inbox className="w-6 h-6" /></div>
+               <div className="text-3xl font-black text-orange-600">{stats.pendingRequests}</div>
+               <p className="text-[10px] text-gray-400 font-bold mt-1">طلبات جديدة</p>
+            </div>
       </div>
 
       {/* 3. Charts & Recent Activity */}
@@ -190,10 +203,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </div>
                         <div className="min-w-0">
                            <p className="text-xs font-black text-gray-900 truncate">
-                              {b.profiles?.full_name || b.guest_name}
+                              {b.guest_name || b.profiles?.full_name || 'عميل'}
                            </p>
                            <p className="text-[10px] font-bold text-gray-400 truncate">
-                              {b.halls?.name || b.services?.name}
+                              {b.halls?.name || b.chalets?.name || 'خدمة'}
                            </p>
                         </div>
                      </div>
