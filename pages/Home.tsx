@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, Service, POSItem } from '../types';
+import { Hall, UserProfile, Service } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Sparkles, Star, MapPin, Zap, Palmtree, ArrowLeft, ShoppingBag, ShoppingCart, ChevronLeft, Package
+  Sparkles, Star, MapPin, Zap, Palmtree, ArrowLeft, ShoppingBag, Store
 } from 'lucide-react';
 
 interface HomeProps {
@@ -39,7 +39,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const [halls, setHalls] = useState<Hall[]>([]);
   const [resorts, setResorts] = useState<Hall[]>([]); // Using Hall type for Chalet is compatible mostly
   const [services, setServices] = useState<Service[]>([]);
-  const [products, setProducts] = useState<POSItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
 
@@ -63,13 +62,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       // 3. Get Services
       const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(3);
       
-      // 4. Get Products
-      const { data: pData } = await supabase.from('pos_items').select('*, vendor:vendor_id!inner(role)').eq('vendor.role', 'super_admin').gt('stock', 0).limit(4);
-
       setHalls(hData || []);
       setResorts(rData as any[] || []);
       setServices(sData || []);
-      setProducts(pData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -110,28 +105,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                         <Star className="w-3 h-3 fill-current" /> 4.9
                         </div>
                 )}
-            </div>
-        </div>
-    </div>
-  );
-
-  const renderProductCard = (product: POSItem) => (
-    <div key={product.id} onClick={() => onNavigate('store_page')} className="group bg-white border border-primary/10 rounded-[2rem] p-6 hover:border-primary/30 transition-all cursor-pointer flex flex-col text-center">
-        <div className="aspect-square bg-gray-50 rounded-2xl flex items-center justify-center mb-4 text-gray-300 group-hover:bg-primary/5 group-hover:text-primary transition-colors relative overflow-hidden">
-            {product.image_url ? (
-                <img src={product.image_url} className="w-full h-full object-cover" />
-            ) : (
-                <Package className="w-10 h-10" />
-            )}
-            <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-lg text-[8px] font-black border border-gray-100">باقي {product.stock}</div>
-        </div>
-        <h3 className="font-bold text-gray-900 text-sm mb-1 truncate">{product.name}</h3>
-        <p className="text-[10px] font-bold text-gray-400 mb-3">{product.category}</p>
-        <div className="mt-auto pt-3 border-t border-gray-50 flex flex-col gap-2">
-            <PriceTag amount={product.price} className="justify-center text-lg font-black text-primary" />
-            <div className="text-[10px] font-black text-primary flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>تسوّق الآن</span>
-                <ChevronLeft className="w-3 h-3" />
             </div>
         </div>
     </div>
@@ -241,30 +214,48 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             </div>
           </div>
 
-          {/* Store Section */}
-          {products.length > 0 && (
-            <div className="bg-primary/[0.03] border border-primary/10 rounded-[4rem] p-12 lg:p-20 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-[120px] -mr-48 -mt-48"></div>
-              <div className="absolute bottom-0 left-0 w-64 h-64 bg-gold/5 rounded-full blur-[100px] -ml-32 -mb-32"></div>
-              
-              <div className="relative z-10 flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
-                <div className="text-right space-y-4">
-                    <div className="flex items-center justify-end gap-2 text-primary">
-                        <ShoppingBag className="w-5 h-5" />
-                        <span className="text-xs font-black uppercase tracking-widest">متجر المنصة الحصري</span>
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">تجهيزات ومعدات <br/> <span className="text-primary">للمناسبات الفاخرة</span></h2>
-                </div>
-                <Button onClick={() => onNavigate('store_page')} className="h-14 px-8 rounded-2xl bg-primary text-white hover:bg-primary/90 font-black shadow-none border-none gap-2">
-                    زيارة المتجر <ShoppingCart className="w-5 h-5" />
-                </Button>
+          {/* Store CTA Section (Redesigned) */}
+          <div className="w-full">
+            <div className="relative rounded-[3rem] overflow-hidden bg-gray-900 min-h-[500px] flex flex-col md:flex-row items-center group shadow-2xl">
+              {/* Background Image with Overlay */}
+              <div className="absolute inset-0">
+                 <img
+                   src="https://images.unsplash.com/photo-1478146896981-b80fe463b330?q=80&w=2670&auto=format&fit=crop"
+                   className="w-full h-full object-cover opacity-40 transition-transform duration-[2000ms] group-hover:scale-105"
+                   alt="Store Background"
+                 />
+                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent"></div>
               </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-                  {products.map(p => renderProductCard(p))}
+              {/* Content */}
+              <div className="relative z-10 w-full md:w-2/3 p-12 md:p-24 text-right space-y-8 font-tajawal">
+                 <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] backdrop-blur-md">
+                    <Store className="w-4 h-4" />
+                    <span className="text-xs font-black uppercase tracking-[0.2em]">متجر القاعة</span>
+                 </div>
+
+                 <h2 className="text-5xl md:text-7xl font-black text-white leading-tight">
+                    كل ما تحتاجه <br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-yellow-200">
+                      لإكمال فرحتك
+                    </span>
+                 </h2>
+
+                 <p className="text-xl text-gray-300 font-medium leading-relaxed max-w-xl border-r-4 border-[#D4AF37]/50 pr-8">
+                    تصفح متجرنا الحصري الذي يوفر لك أرقى التجهيزات، من أثاث فاخر وإضاءة احترافية إلى أدوات الضيافة، لتجعل من مناسبتك حدثاً استثنائياً لا يُنسى.
+                 </p>
+
+                 <div className="flex flex-wrap gap-4 pt-6">
+                    <Button
+                      onClick={() => onNavigate('store_page')}
+                      className="h-16 px-12 rounded-[2rem] bg-white text-gray-900 hover:bg-[#D4AF37] hover:text-white font-black text-lg shadow-xl shadow-black/20 border-none gap-3 transition-all"
+                    >
+                      زيارة المتجر <ShoppingBag className="w-5 h-5" />
+                    </Button>
+                 </div>
               </div>
             </div>
-          )}
+          </div>
       </section>
 
       {/* 3. Stats Section - Full Width */}
