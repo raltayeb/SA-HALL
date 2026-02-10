@@ -5,7 +5,7 @@ import { Hall, Booking, VendorClient } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { Loader2, AlertCircle, UserCheck } from 'lucide-react';
+import { Loader2, AlertCircle, UserCheck, CalendarCheck, Coins, CreditCard, User, Phone, FileText } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
 interface AddBookingModalProps {
@@ -17,7 +17,7 @@ interface AddBookingModalProps {
 
 export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClose, vendorId, onSuccess }) => {
   const [loading, setLoading] = useState(false);
-  const [halls, setHalls] = useState<Hall[]>([]);
+  const [halls, setHalls] = useState<{id: string, name: string, price: number, type: string}[]>([]);
   const [clients, setClients] = useState<VendorClient[]>([]); 
   const { toast } = useToast();
 
@@ -37,23 +37,45 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       const fetchData = async () => {
-        const { data: hallsData } = await supabase.from('halls').select('*').eq('vendor_id', vendorId);
-        setHalls(hallsData || []);
-        if (hallsData && hallsData.length > 0) {
+        const [hallsRes, chaletsRes, clientsRes] = await Promise.all([
+            supabase.from('halls').select('id, name, price_per_night').eq('vendor_id', vendorId),
+            supabase.from('chalets').select('id, name, price_per_night').eq('vendor_id', vendorId),
+            supabase.from('vendor_clients').select('*').eq('vendor_id', vendorId).order('full_name')
+        ]);
+
+        const allAssets = [
+            ...(hallsRes.data || []).map(h => ({...h, type: 'hall'})),
+            ...(chaletsRes.data || []).map(c => ({...c, type: 'chalet'}))
+        ];
+        
+        setHalls(allAssets as any);
+        setClients(clientsRes.data || []);
+
+        if (allAssets.length > 0) {
             setFormData(prev => ({ 
               ...prev, 
-              hall_id: hallsData[0].id, 
-              total_amount: hallsData[0].price_per_night,
+              hall_id: allAssets[0].type === 'hall' ? allAssets[0].id : undefined,
+              chalet_id: allAssets[0].type === 'chalet' ? allAssets[0].id : undefined,
+              total_amount: allAssets[0].price_per_night || 0,
               paid_amount: 0
             }));
         }
-
-        const { data: clientsData } = await supabase.from('vendor_clients').select('*').eq('vendor_id', vendorId).order('full_name');
-        setClients(clientsData || []);
       };
       fetchData();
     }
   }, [isOpen, vendorId]);
+
+  const handleAssetChange = (assetId: string) => {
+      const asset = halls.find(h => h.id === assetId);
+      if (asset) {
+          setFormData(prev => ({
+              ...prev,
+              hall_id: asset.type === 'hall' ? asset.id : null,
+              chalet_id: asset.type === 'chalet' ? asset.id : null,
+              total_amount: asset.price || 0
+          }));
+      }
+  };
 
   const handleClientSelect = (clientId: string) => {
       setSelectedClientId(clientId);
@@ -68,20 +90,8 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
   };
 
   const handleSubmit = async () => {
-    if (!formData.hall_id || !guestName) {
-        toast({ title: 'نقص في البيانات', description: 'يرجى اختيار القاعة واسم العميل.', variant: 'destructive' });
-        return;
-    }
-
-    // Check for existing booking on this day
-    const { data: existing } = await supabase.from('bookings')
-        .select('id')
-        .eq('hall_id', formData.hall_id)
-        .eq('booking_date', formData.booking_date)
-        .neq('status', 'cancelled');
-    
-    if (existing && existing.length > 0) {
-        toast({ title: 'التاريخ محجوز', description: 'يوجد حجز مؤكد مسبقاً في هذا التاريخ.', variant: 'destructive' });
+    if ((!formData.hall_id && !formData.chalet_id) || !guestName) {
+        toast({ title: 'بيانات ناقصة', description: 'يرجى اختيار المكان واسم العميل.', variant: 'destructive' });
         return;
     }
 
@@ -92,8 +102,6 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             finalPaidAmount = formData.total_amount || 0;
         } else if (formData.payment_status === 'partial') {
             finalPaidAmount = Number(formData.paid_amount) || 0;
-            if (finalPaidAmount <= 0) throw new Error('يرجى إدخال مبلغ المقدم بشكل صحيح.');
-            if (finalPaidAmount >= (formData.total_amount || 0)) formData.payment_status = 'paid'; 
         }
 
         const payload = {
@@ -110,15 +118,13 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
         const { error } = await supabase.from('bookings').insert([payload]);
         if (error) throw error;
 
-        toast({ title: 'تمت الإضافة', description: 'تم إنشاء الحجز وتحديث سجل العملاء.', variant: 'success' });
+        toast({ title: 'تمت الإضافة', description: 'تم إنشاء الحجز بنجاح.', variant: 'success' });
         onSuccess();
         onClose();
         
         // Reset
         setGuestName('');
         setGuestPhone('');
-        setSelectedClientId('');
-        setFormData(prev => ({ ...prev, paid_amount: 0 }));
     } catch (err: any) {
         toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally {
@@ -127,100 +133,91 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="إضافة حجز جديد">
-        <div className="space-y-5 text-right">
-            {/* Hall Selection */}
-            <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-500">القاعة / الباقة</label>
-                <select 
-                    className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none"
-                    value={formData.hall_id}
-                    onChange={e => {
-                        const hall = halls.find(h => h.id === e.target.value);
-                        setFormData({...formData, hall_id: e.target.value, total_amount: hall?.price_per_night || 0});
-                    }}
-                >
-                    {halls.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                </select>
+    <Modal isOpen={isOpen} onClose={onClose} title="تسجيل حجز جديد">
+        <div className="space-y-6 text-right font-tajawal">
+            
+            {/* 1. Asset & Date */}
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarCheck className="w-3.5 h-3.5" /> المكان</label>
+                    <select 
+                        className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none"
+                        onChange={e => handleAssetChange(e.target.value)}
+                    >
+                        {halls.map(h => <option key={h.id} value={h.id}>{h.name} ({h.type === 'hall' ? 'قاعة' : 'شاليه'})</option>)}
+                    </select>
+                </div>
+                <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">تاريخ الحجز</label>
+                    <Input type="date" value={formData.booking_date} onChange={e => setFormData({...formData, booking_date: e.target.value})} className="h-12 rounded-xl font-bold" />
+                </div>
             </div>
 
-            {/* Client Selection */}
-            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3">
+            {/* 2. Client Info */}
+            <div className="bg-gray-50 p-5 rounded-[2rem] border border-gray-100 space-y-4">
                 <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-gray-500 flex items-center gap-1"><UserCheck className="w-4 h-4" /> بيانات العميل</label>
-                    {selectedClientId && <button onClick={() => { setSelectedClientId(''); setGuestName(''); setGuestPhone(''); }} className="text-[10px] text-red-500 font-bold hover:underline">إلغاء التحديد</button>}
+                    <h4 className="text-xs font-black text-primary uppercase tracking-widest flex items-center gap-2"><UserCheck className="w-4 h-4" /> بيانات العميل</h4>
+                    <select 
+                        className="h-8 border border-gray-200 rounded-lg px-2 text-xs font-bold bg-white outline-none"
+                        value={selectedClientId}
+                        onChange={e => handleClientSelect(e.target.value)}
+                    >
+                        <option value="">اختر عميل سابق</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                    </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <Input placeholder="الاسم الكامل" value={guestName} onChange={e => setGuestName(e.target.value)} className="h-12 rounded-xl bg-white" icon={<User className="w-4 h-4" />} />
+                    <Input placeholder="رقم الجوال" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} className="h-12 rounded-xl bg-white" icon={<Phone className="w-4 h-4" />} />
+                </div>
+            </div>
+
+            {/* 3. Financials */}
+            <div className="bg-white border border-gray-100 p-5 rounded-[2rem] space-y-4 shadow-sm">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Coins className="w-4 h-4" /> التفاصيل المالية</h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="المبلغ الإجمالي" type="number" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: Number(e.target.value)})} className="h-12 rounded-xl text-right font-black" />
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500">حالة الدفع</label>
+                        <select 
+                            className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-gray-50 outline-none"
+                            value={formData.payment_status}
+                            onChange={e => setFormData({...formData, payment_status: e.target.value as any})}
+                        >
+                            <option value="unpaid">أجل (غير مدفوع)</option>
+                            <option value="partial">دفعة مقدمة (عربون)</option>
+                            <option value="paid">مدفوع بالكامل</option>
+                        </select>
+                    </div>
                 </div>
                 
-                <select 
-                    className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none"
-                    value={selectedClientId}
-                    onChange={e => handleClientSelect(e.target.value)}
-                >
-                    <option value="">-- اختر عميل سابق --</option>
-                    {clients.map(c => <option key={c.id} value={c.id}>{c.full_name} ({c.phone_number})</option>)}
-                </select>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                    <Input placeholder="اسم العميل (جديد)" value={guestName} onChange={e => { setGuestName(e.target.value); if(selectedClientId) setSelectedClientId(''); }} className="bg-white" />
-                    <Input placeholder="رقم الجوال" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} className="bg-white" />
-                </div>
-            </div>
-
-            {/* Financials */}
-            <div className="grid grid-cols-2 gap-3">
-                <Input type="date" label="تاريخ الحجز" value={formData.booking_date} onChange={e => setFormData({...formData, booking_date: e.target.value})} className="h-12" />
-                <Input type="number" label="المبلغ الإجمالي" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: Number(e.target.value)})} className="h-12" />
-            </div>
-
-            {/* Payment Status */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500">حالة الدفع</label>
-                    <select 
-                        className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none"
-                        value={formData.payment_status}
-                        onChange={e => setFormData({...formData, payment_status: e.target.value as any})}
-                    >
-                        <option value="paid">مدفوع بالكامل</option>
-                        <option value="partial">مدفوع جزئياً (مقدم)</option>
-                        <option value="unpaid">غير مدفوع (أجل)</option>
-                    </select>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500">حالة الحجز</label>
-                    <select 
-                        className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white focus:ring-2 focus:ring-primary/10 outline-none"
-                        value={formData.status}
-                        onChange={e => setFormData({...formData, status: e.target.value as any})}
-                    >
-                        <option value="confirmed">مؤكد</option>
-                        <option value="pending">قيد الانتظار</option>
-                    </select>
-                </div>
-            </div>
-
-            {formData.payment_status === 'partial' && (
-                <div className="animate-in slide-in-from-top-2 fade-in">
-                    <div className="bg-yellow-50 border border-yellow-100 p-4 rounded-xl space-y-2">
-                        <div className="flex items-center gap-2 text-[10px] font-bold text-yellow-700">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            <span>قيمة العربون / المقدم</span>
-                        </div>
+                {formData.payment_status === 'partial' && (
+                    <div className="animate-in slide-in-from-top-2 fade-in bg-yellow-50 p-4 rounded-xl border border-yellow-100 flex items-center gap-3">
+                        <CreditCard className="w-5 h-5 text-yellow-600" />
                         <Input 
+                            label="قيمة العربون" 
                             type="number" 
                             value={formData.paid_amount} 
                             onChange={e => setFormData({...formData, paid_amount: Number(e.target.value)})}
-                            className="bg-white border-yellow-200 focus:border-yellow-400 h-12"
+                            className="h-10 bg-white border-yellow-200"
                         />
-                        <p className="text-[10px] text-gray-400 font-bold text-left px-1">
-                            المتبقي للتحصيل: {Math.max(0, (formData.total_amount || 0) - (formData.paid_amount || 0))} ر.س
-                        </p>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
-            <Button onClick={handleSubmit} disabled={loading} className="w-full h-14 rounded-xl font-black mt-4 border-2 border-primary/10 hover:border-primary/30">
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ وإنشاء الحجز'}
+            {/* 4. Notes */}
+            <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> ملاحظات إضافية</label>
+                <textarea 
+                    className="w-full h-20 bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm font-bold outline-none resize-none focus:bg-white focus:border-primary/20 transition-all"
+                    placeholder="أي تفاصيل إضافية عن الحجز..."
+                    value={formData.notes}
+                    onChange={e => setFormData({...formData, notes: e.target.value})}
+                />
+            </div>
+
+            <Button onClick={handleSubmit} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg bg-gray-900 text-white shadow-xl hover:bg-black transition-transform active:scale-95">
+                {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : 'تأكيد وحفظ الحجز'}
             </Button>
         </div>
     </Modal>

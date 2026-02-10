@@ -32,6 +32,8 @@ import { ChaletDetails } from './pages/ChaletDetails';
 import { ServiceDetails } from './pages/ServiceDetails';
 import { GuestLogin } from './pages/GuestLogin'; 
 import { GuestPortal } from './pages/GuestPortal'; 
+import { VendorMarketplace } from './pages/VendorMarketplace';
+import { VendorClients } from './pages/VendorClients'; // Kept for logic if needed but removed from sidebar
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { 
@@ -112,12 +114,13 @@ const App: React.FC = () => {
           }
 
           if (profile.role === 'vendor') {
-             const [ { count: hallCount }, { count: serviceCount } ] = await Promise.all([
+             const [ { count: hallCount }, { count: serviceCount }, { count: chaletCount } ] = await Promise.all([
                 supabase.from('halls').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id),
-                supabase.from('services').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id)
+                supabase.from('services').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id),
+                supabase.from('chalets').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id)
              ]);
              
-             if ((hallCount || 0) > 0 || (serviceCount || 0) > 0) {
+             if ((hallCount || 0) > 0 || (serviceCount || 0) > 0 || (chaletCount || 0) > 0) {
                  const isPublicOrAuthPage = ['home', 'login', 'register', 'guest_login'].includes(activeTabRef.current);
                  if (forceRedirect || isPublicOrAuthPage) {
                      setActiveTab('dashboard');
@@ -283,8 +286,8 @@ const App: React.FC = () => {
   };
 
   const handleAssetSetupAndPay = async () => {
-    if (!assetData.name) {
-        toast({ title: 'بيانات ناقصة', description: 'يرجى إكمال الحقول الأساسية.', variant: 'destructive' });
+    if (!assetData.name || assetData.name.trim() === '') {
+        toast({ title: 'بيانات ناقصة', description: 'يرجى إدخال اسم المنشأة.', variant: 'destructive' });
         return;
     }
     setAuthLoading(true);
@@ -292,38 +295,49 @@ const App: React.FC = () => {
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) throw new Error("No user");
 
-        await new Promise(r => setTimeout(r, 1500));
+        // Simulate Payment
+        await new Promise(r => setTimeout(r, 2000));
 
-        if (selectedType === 'hall' || selectedType === 'chalet') {
-            const totalCapacity = (Number(assetData.capacity_men) || 0) + (Number(assetData.capacity_women) || 0);
-            await supabase.from('halls').insert([{
+        let insertError = null;
+
+        if (selectedType === 'hall') {
+            const { error } = await supabase.from('halls').insert([{
                 vendor_id: user.id,
                 name: assetData.name,
                 name_en: assetData.name_en,
                 price_per_night: 0,
                 city: assetData.city,
-                type: selectedType === 'chalet' ? 'chalet' : 'hall',
-                description: assetData.description,
-                description_en: assetData.description_en,
-                capacity: totalCapacity,
-                capacity_men: Number(assetData.capacity_men),
-                capacity_women: Number(assetData.capacity_women),
-                image_url: assetData.images[0] || '',
-                images: assetData.images,
+                type: 'hall',
+                description: assetData.description || 'تم الإنشاء حديثاً',
+                capacity: 100,
                 is_active: true
             }]);
+            insertError = error;
+        } else if (selectedType === 'chalet') {
+            const { error } = await supabase.from('chalets').insert([{
+                vendor_id: user.id,
+                name: assetData.name,
+                city: assetData.city,
+                price_per_night: 0,
+                description: assetData.description || 'تم الإنشاء حديثاً',
+                is_active: true
+            }]);
+            insertError = error;
         } else if (selectedType === 'service') {
-            await supabase.from('services').insert([{
+            const { error } = await supabase.from('services').insert([{
                 vendor_id: user.id,
                 name: assetData.name,
                 price: 0,
                 category: assetData.category,
-                description: assetData.description,
-                image_url: assetData.images[0] || '',
+                description: assetData.description || 'تم الإنشاء حديثاً',
                 is_active: true
             }]);
+            insertError = error;
         }
 
+        if (insertError) throw insertError;
+
+        // Update Profile
         await supabase.from('profiles').update({
             status: 'approved',
             payment_status: 'paid',
@@ -332,11 +346,13 @@ const App: React.FC = () => {
             service_limit: selectedType === 'service' ? 1 : 0
         }).eq('id', user.id);
 
-        toast({ title: 'تم بنجاح', description: 'تم تفعيل حسابك وإضافة الخدمة.', variant: 'success' });
-        window.location.reload(); 
+        // Fetch profile to trigger redirect
+        await fetchProfile(user.id, true);
+        toast({ title: 'تم الاشتراك بنجاح', description: 'تم تفعيل حسابك وإضافة المنشأة.', variant: 'success' });
 
     } catch (err: any) {
-        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+        console.error(err);
+        toast({ title: 'خطأ', description: 'حدث خطأ أثناء إنشاء المنشأة. حاول مرة أخرى.', variant: 'destructive' });
     } finally {
         setAuthLoading(false);
     }
@@ -405,8 +421,8 @@ const App: React.FC = () => {
                                 required 
                                 className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" 
                             />
-                            {/* Corrected position: top-[3.5rem] aligns centered in input area below label */}
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-[3.5rem] text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
+                            {/* Updated Eye Icon Position: top-[3.2rem] to sit nicely inside the input below the label */}
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-[3.2rem] text-gray-400 hover:text-primary transition-colors">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
                         </div>
                         <Button type="submit" className="w-full h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none" disabled={authLoading}>
                             {authLoading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}
@@ -477,7 +493,8 @@ const App: React.FC = () => {
                             <div className="space-y-4">
                                 <div className="relative">
                                     <Input type={showPassword ? "text" : "password"} placeholder="كلمة المرور الجديدة" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
-                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-6 text-gray-400">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
+                                    {/* Fix Eye position here too */}
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-6 top-5 text-gray-400">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button>
                                 </div>
                                 <Input type={showPassword ? "text" : "password"} placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
                             </div>
@@ -524,9 +541,11 @@ const App: React.FC = () => {
                         </div>
                         <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
                             <h3 className="text-lg font-black text-primary mb-6 text-right">معلومات أساسية</h3>
-                            <Input label="الاسم" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" />
+                            <Input label="الاسم (القاعة / الشاليه / الخدمة)" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-16 bg-gray-50 border-2 border-gray-100 focus:border-primary focus:bg-white rounded-2xl px-6 font-bold text-lg transition-all outline-none" required />
                         </div>
-                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name} className="flex-1 h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none">الدفع والمتابعة</Button>
+                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading || !assetData.name} className="flex-1 h-16 rounded-2xl font-black text-xl bg-primary text-white hover:bg-primary/90 transition-transform active:scale-95 shadow-none">
+                            {authLoading ? <Loader2 className="animate-spin" /> : 'الدفع وتفعيل الحساب'}
+                        </Button>
                     </div>
                 </div>
             )}
@@ -598,6 +617,7 @@ const App: React.FC = () => {
                 {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
                 {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
                 {activeTab === 'my_bookings' && <Bookings user={userProfile} />}
+                {activeTab === 'vendor_marketplace' && <VendorMarketplace user={userProfile} />}
                 {activeTab === 'admin_dashboard' && userProfile.role === 'super_admin' && <AdminDashboard />}
                 {activeTab === 'admin_users' && userProfile.role === 'super_admin' && <UsersManagement />}
                 {activeTab === 'admin_requests' && userProfile.role === 'super_admin' && <AdminRequests />}
