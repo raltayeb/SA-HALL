@@ -1,10 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal } from '../ui/Modal';
 import { Booking, VAT_RATE } from '../../types';
 import { formatCurrency } from '../../utils/currency';
-import { Printer, Download, QrCode } from 'lucide-react';
+import { Printer, Download, QrCode, Share2, Send, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { useToast } from '../../context/ToastContext';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -13,6 +16,9 @@ interface InvoiceModalProps {
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking }) => {
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const { toast } = useToast();
+
   if (!booking) return null;
 
   const isConsultation = booking.booking_type === 'consultation';
@@ -35,47 +41,94 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
   const vendorName = booking.vendor?.business_name || booking.profiles?.business_name || 'SA Hall';
   const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
 
+  // --- ACTIONS ---
+
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPdf(true);
+    const element = document.getElementById('printable-invoice');
+    if (!element) return;
+
+    try {
+      // Use html2canvas to capture the invoice div as an image (preserves Arabic fonts)
+      const canvas = await html2canvas(element, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`invoice_${booking.id.slice(0,8)}.pdf`);
+      toast({ title: 'تم التحميل', description: 'تم حفظ الفاتورة بنجاح.', variant: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'خطأ', description: 'حدث خطأ أثناء إنشاء الملف.', variant: 'destructive' });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const text = `فاتورة حجز من ${vendorName}\nرقم المرجع: #${booking.id.slice(0, 8)}\nالإجمالي: ${formatCurrency(booking.total_amount)}\nالتاريخ: ${booking.booking_date}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'فاتورة حجز',
+          text: text,
+        });
+      } catch (err) {
+        console.log('Share canceled');
+      }
+    } else {
+      // Fallback to WhatsApp
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    }
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "عرض سعر" : "الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[65vh] flex flex-col">
-      <div className="space-y-4 text-right pb-2 overflow-y-auto custom-scrollbar flex-1 px-1" id="printable-invoice">
+    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "تصدير عرض سعر" : "خيارات الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[85vh] flex flex-col">
+      
+      {/* Invoice Content (Visible & Printable) */}
+      <div className="bg-white p-6 rounded-t-xl overflow-y-auto custom-scrollbar flex-1" id="printable-invoice">
         {/* Header Compact */}
-        <div className="flex flex-col-reverse justify-between items-center border-b pb-4 gap-4 text-center">
+        <div className="flex flex-col-reverse justify-between items-center border-b pb-6 gap-4 text-center">
           <div>
-            <h2 className="text-xl font-black text-primary leading-none">{vendorName}</h2>
-            <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-widest">{isConsultation ? 'عرض مبدئي' : 'فاتورة ضريبية'}</p>
+            <h2 className="text-2xl font-black text-primary leading-none">{vendorName}</h2>
+            <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-widest">{isConsultation ? 'عرض مبدئي' : 'فاتورة ضريبية مبسطة'}</p>
             <p className="text-[10px] text-gray-900 font-bold mt-1">الرقم الضريبي: <span className="font-mono">{taxId}</span></p>
           </div>
-          <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
-             <QrCode className="w-12 h-12 text-primary" />
+          <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10">
+             <QrCode className="w-16 h-16 text-primary" />
           </div>
         </div>
 
         {/* Info Compact */}
-        <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 text-xs">
-          <div className="flex justify-between mb-2">
-             <span className="text-gray-400 font-bold">العميل:</span>
-             <span className="font-black text-gray-900">{booking.profiles?.full_name || booking.guest_name || 'عميل'}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-             <span className="text-gray-400 font-bold">رقم المرجع:</span>
-             <span className="font-mono font-black text-primary">#{booking.id.slice(0, 8).toUpperCase()}</span>
-          </div>
-          <div className="flex justify-between">
-             <span className="text-gray-400 font-bold">التاريخ:</span>
-             <span className="font-bold font-mono">{new Date(booking.created_at || '').toLocaleDateString('ar-SA')}</span>
-          </div>
+        <div className="py-6 space-y-4">
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <span className="text-gray-500 text-xs font-bold">العميل</span>
+                <span className="font-black text-gray-900 text-sm">{booking.profiles?.full_name || booking.guest_name || 'عميل'}</span>
+            </div>
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <span className="text-gray-500 text-xs font-bold">رقم المرجع</span>
+                <span className="font-mono font-black text-primary text-sm">#{booking.id.slice(0, 8).toUpperCase()}</span>
+            </div>
+            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <span className="text-gray-500 text-xs font-bold">التاريخ</span>
+                <span className="font-bold font-mono text-sm">{new Date(booking.created_at || '').toLocaleDateString('ar-SA')}</span>
+            </div>
         </div>
 
         {/* Table Compact */}
-        <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm mb-6">
           <table className="w-full text-xs">
-            <thead className="bg-gray-50 text-gray-500 font-black text-[9px] uppercase">
+            <thead className="bg-gray-900 text-white font-black text-[10px] uppercase">
               <tr>
-                <th className="p-3 text-right">البيان</th>
+                <th className="p-3 text-right">الوصف</th>
                 <th className="p-3 text-left">المبلغ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 bg-white">
+            <tbody className="divide-y divide-gray-100 bg-white">
               {/* Main Hall/Service/Chalet */}
               {(booking.halls || booking.services || booking.chalets) && (
                   <tr>
@@ -105,63 +158,91 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, boo
         </div>
 
         {/* Financial Details Compact */}
-        <div className="space-y-2 text-xs bg-gray-50 p-4 rounded-2xl border border-gray-100">
-          <div className="flex justify-between text-gray-600 font-bold">
+        <div className="space-y-3 text-xs">
+          <div className="flex justify-between text-gray-500 font-bold px-2">
             <span>المجموع الفرعي</span>
             <span className="font-mono">{formatCurrency(totalSubWithItems)}</span>
           </div>
           
           {discountAmount > 0 && (
-            <div className="flex justify-between text-green-600 font-bold">
+            <div className="flex justify-between text-green-600 font-bold px-2">
                 <span>خصم {booking.applied_coupon ? `(${booking.applied_coupon})` : ''}</span>
                 <span className="font-mono">- {formatCurrency(discountAmount)}</span>
             </div>
           )}
 
           {!isConsultation && (
-            <div className="flex justify-between text-gray-600 font-bold">
+            <div className="flex justify-between text-gray-500 font-bold px-2">
                 <span>الضريبة (15%)</span>
                 <span className="font-mono">{formatCurrency(vatAmount)}</span>
             </div>
           )}
           
-          <div className="border-t border-gray-200 my-1 pt-2 flex justify-between items-center">
-            <span className="font-black text-sm text-gray-900">الإجمالي النهائي</span>
-            <div className="bg-primary text-white px-3 py-1 rounded-lg font-mono font-black text-sm shadow-sm">
-               {formatCurrency(booking.total_amount)}
-            </div>
+          <div className="bg-gray-900 text-white p-4 rounded-2xl flex justify-between items-center shadow-lg mt-2">
+            <span className="font-black text-sm">الإجمالي النهائي</span>
+            <span className="font-mono font-black text-lg">{formatCurrency(booking.total_amount)}</span>
           </div>
 
           {!isConsultation && (
-            <div className="pt-2 space-y-1 border-t border-dashed border-gray-200">
-                <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>المدفوع</span>
-                    <span className="font-mono">{formatCurrency(paidAmount)}</span>
+            <div className="pt-4 grid grid-cols-2 gap-4">
+                <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-center">
+                    <span className="block text-[10px] text-emerald-600 font-bold mb-1">المدفوع</span>
+                    <span className="font-mono font-black text-emerald-700">{formatCurrency(paidAmount)}</span>
                 </div>
-                {remainingAmount > 0 && (
-                    <div className="flex justify-between text-red-500 font-bold">
-                        <span>المتبقي</span>
-                        <span className="font-mono">{formatCurrency(remainingAmount)}</span>
+                {remainingAmount > 0 ? (
+                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl text-center">
+                        <span className="block text-[10px] text-red-500 font-bold mb-1">المتبقي</span>
+                        <span className="font-mono font-black text-red-600">{formatCurrency(remainingAmount)}</span>
+                    </div>
+                ) : (
+                    <div className="bg-gray-50 border border-gray-100 p-3 rounded-xl text-center">
+                        <span className="block text-[10px] text-gray-400 font-bold mb-1">المتبقي</span>
+                        <span className="font-mono font-black text-gray-400">0.00</span>
                     </div>
                 )}
             </div>
           )}
         </div>
-        
-        <div className="text-center pt-2">
-            <p className="text-[9px] text-gray-400 font-bold">تم الإصدار إلكترونياً عبر منصة القاعة</p>
-        </div>
       </div>
 
-      <div className="flex gap-2 pt-2 border-t border-gray-100 no-print mt-auto">
-        <Button variant="outline" className="flex-1 gap-1 rounded-xl h-10 font-bold text-xs" onClick={() => window.print()}>
-          <Printer className="w-4 h-4" /> طباعة
-        </Button>
-        <Button className="flex-1 gap-1 rounded-xl h-10 font-bold text-xs shadow-none">
-          <Download className="w-4 h-4" /> PDF
+      {/* Action Buttons (Visible only on screen) */}
+      <div className="p-4 bg-gray-50 border-t border-gray-100 no-print space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+            <Button 
+                onClick={handleDownloadPDF} 
+                disabled={isGeneratingPdf} 
+                className="h-12 rounded-xl font-black gap-2 bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
+            >
+                {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                تحميل PDF
+            </Button>
+            <Button 
+                onClick={() => window.print()} 
+                variant="outline" 
+                className="h-12 rounded-xl font-bold gap-2 border-2 border-gray-200 hover:border-gray-300 bg-white"
+            >
+                <Printer className="w-4 h-4" /> طباعة
+            </Button>
+        </div>
+        <Button 
+            onClick={handleShare} 
+            variant="secondary" 
+            className="w-full h-12 rounded-xl font-bold gap-2 bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20"
+        >
+            <Share2 className="w-4 h-4" /> إرسال عبر واتساب / مشاركة
         </Button>
       </div>
-      <style>{`@media print { body * { visibility: hidden; } #printable-invoice, #printable-invoice * { visibility: visible; } #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; border: none; } .no-print { display: none !important; } }`}</style>
+
+      <style>{`
+        @media print { 
+            body * { visibility: hidden; } 
+            #printable-invoice, #printable-invoice * { visibility: visible; } 
+            #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; } 
+            .no-print { display: none !important; } 
+            /* Fix chart/background colors in print */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+      `}</style>
     </Modal>
   );
 };
