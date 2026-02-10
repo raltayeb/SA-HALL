@@ -214,41 +214,42 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             </div>
           </div>
 
-          {/* Store CTA Section (Redesigned) */}
+          {/* Store CTA Section */}
           <div className="w-full">
-            <div className="relative rounded-[3rem] overflow-hidden bg-gray-900 min-h-[500px] flex flex-col md:flex-row items-center group shadow-2xl">
-              {/* Background Image with Overlay */}
+            <div className="relative rounded-[3rem] overflow-hidden bg-white min-h-[500px] flex flex-col md:flex-row items-center group shadow-xl border border-gray-100">
+              {/* Background Image */}
               <div className="absolute inset-0">
                  <img
-                   src="https://images.unsplash.com/photo-1478146896981-b80fe463b330?q=80&w=2670&auto=format&fit=crop"
-                   className="w-full h-full object-cover opacity-40 transition-transform duration-[2000ms] group-hover:scale-105"
+                   src="https://www.arabiaweddings.com/sites/default/files/styles/max980/public/articles/2019/11/mideaval_wedding_in_saudi_arabia_4.jpg?itok=LQ8x27vo"
+                   className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-105"
                    alt="Store Background"
                  />
-                 <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent"></div>
+                 {/* Daytime Gradient: White on right (text area), transparent on left */}
+                 <div className="absolute inset-0 bg-gradient-to-l from-white via-white/90 to-transparent opacity-95"></div>
               </div>
 
               {/* Content */}
               <div className="relative z-10 w-full md:w-2/3 p-12 md:p-24 text-right space-y-8 font-tajawal">
-                 <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] backdrop-blur-md">
+                 <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-purple-50 border border-purple-100 text-primary backdrop-blur-sm shadow-sm">
                     <Store className="w-4 h-4" />
                     <span className="text-xs font-black uppercase tracking-[0.2em]">متجر القاعة</span>
                  </div>
 
-                 <h2 className="text-5xl md:text-7xl font-black text-white leading-tight">
+                 <h2 className="text-5xl md:text-7xl font-black text-gray-900 leading-tight">
                     كل ما تحتاجه <br />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] to-yellow-200">
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">
                       لإكمال فرحتك
                     </span>
                  </h2>
 
-                 <p className="text-xl text-gray-300 font-medium leading-relaxed max-w-xl border-r-4 border-[#D4AF37]/50 pr-8">
+                 <p className="text-xl text-gray-600 font-medium leading-relaxed max-w-xl border-r-4 border-primary/20 pr-8">
                     تصفح متجرنا الحصري الذي يوفر لك أرقى التجهيزات، من أثاث فاخر وإضاءة احترافية إلى أدوات الضيافة، لتجعل من مناسبتك حدثاً استثنائياً لا يُنسى.
                  </p>
 
                  <div className="flex flex-wrap gap-4 pt-6">
                     <Button
                       onClick={() => onNavigate('store_page')}
-                      className="h-16 px-12 rounded-[2rem] bg-white text-gray-900 hover:bg-[#D4AF37] hover:text-white font-black text-lg shadow-xl shadow-black/20 border-none gap-3 transition-all"
+                      className="h-16 px-12 rounded-[2rem] bg-primary text-white hover:bg-[#3b0066] font-black text-lg shadow-xl shadow-primary/20 border-none gap-3 transition-all active:scale-95"
                     >
                       زيارة المتجر <ShoppingBag className="w-5 h-5" />
                     </Button>
