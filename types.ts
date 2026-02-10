@@ -113,11 +113,10 @@ export interface SystemSettings {
   payment_gateways: {
     visa_enabled: boolean;
     cash_enabled: boolean;
-    visa_merchant_id: string;
-    visa_secret_key: string;
     hyperpay_enabled: boolean;
     hyperpay_entity_id: string;
     hyperpay_access_token: string;
+    hyperpay_base_url: string; // Added Base URL
     hyperpay_mode: 'test' | 'live';
   };
 }
@@ -334,7 +333,7 @@ export interface StoreOrder {
   };
   items: { product_id: string; name: string; price: number; qty: number }[];
   total_amount: number;
-  payment_method?: 'cod' | 'transfer';
+  payment_method?: 'cod' | 'transfer' | 'card';
   delivery_status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;

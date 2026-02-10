@@ -33,9 +33,12 @@ import { ServiceDetails } from './pages/ServiceDetails';
 import { GuestLogin } from './pages/GuestLogin'; 
 import { GuestPortal } from './pages/GuestPortal'; 
 import { VendorMarketplace } from './pages/VendorMarketplace';
-import { VendorClients } from './pages/VendorClients'; // Kept for logic if needed but removed from sidebar
+import { VendorClients } from './pages/VendorClients'; 
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
+import { Modal } from './components/ui/Modal'; 
+import { prepareCheckout, verifyPaymentStatus } from './services/paymentService';
+import { HyperPayForm } from './components/Payment/HyperPayForm';
 import { 
   Loader2, CheckCircle2, Mail, ArrowLeft,
   Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight
@@ -82,6 +85,12 @@ const App: React.FC = () => {
     images: [] as string[]
   });
 
+  // Payment State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentCheckoutId, setPaymentCheckoutId] = useState('');
+  const [paymentBaseUrl, setPaymentBaseUrl] = useState('');
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+
   const { toast } = useToast();
 
   const passValidations = {
@@ -94,6 +103,41 @@ const App: React.FC = () => {
       activeTabRef.current = activeTab; 
       regStepRef.current = regStep;
   }, [activeTab, regStep]);
+
+  // Payment Verification on Load
+  useEffect(() => {
+    const checkPaymentReturn = async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const resourcePath = urlParams.get('resourcePath');
+        const paymentContext = localStorage.getItem('pending_payment_context'); // 'registration' or 'store'
+
+        if (resourcePath && paymentContext === 'registration') {
+            setVerifyingPayment(true);
+            const isSuccess = await verifyPaymentStatus(resourcePath);
+            
+            if (isSuccess) {
+                // Restore Data
+                const savedAssetData = localStorage.getItem('pending_asset_data');
+                const savedType = localStorage.getItem('pending_asset_type');
+                if (savedAssetData && savedType) {
+                    setAssetData(JSON.parse(savedAssetData));
+                    setSelectedType(savedType as any);
+                    await finalizeAssetCreation(); // Proceed to create logic
+                }
+            } else {
+                toast({ title: 'فشل الدفع', description: 'لم تتم عملية الدفع بنجاح.', variant: 'destructive' });
+            }
+            
+            // Cleanup
+            localStorage.removeItem('pending_payment_context');
+            localStorage.removeItem('pending_asset_data');
+            localStorage.removeItem('pending_asset_type');
+            window.history.replaceState({}, document.title, window.location.pathname); // Clear URL
+            setVerifyingPayment(false);
+        }
+    };
+    checkPaymentReturn();
+  }, []);
 
   const fetchProfile = async (id: string, forceRedirect = false) => {
     if (profileIdRef.current === id && userProfile) {
@@ -114,6 +158,8 @@ const App: React.FC = () => {
           }
 
           if (profile.role === 'vendor') {
+             // Logic to redirect vendors to dashboard if already active
+             // ... existing logic ...
              const [ { count: hallCount }, { count: serviceCount }, { count: chaletCount } ] = await Promise.all([
                 supabase.from('halls').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id),
                 supabase.from('services').select('*', { count: 'exact', head: true }).eq('vendor_id', profile.id),
@@ -223,6 +269,7 @@ const App: React.FC = () => {
       }
   };
 
+  // ... (SendOtp, VerifyOtp, SetPassword functions remain unchanged)
   const sendOtp = async () => {
     if (!regData.fullName || !regData.email || !regData.phone) {
         toast({ title: 'بيانات ناقصة', description: 'يرجى تعبئة جميع الحقول.', variant: 'destructive' });
@@ -285,6 +332,7 @@ const App: React.FC = () => {
     setAuthLoading(false);
   };
 
+  // STEP 1: Initiate Payment
   const handleAssetSetupAndPay = async () => {
     if (!assetData.name || assetData.name.trim() === '') {
         toast({ title: 'بيانات ناقصة', description: 'يرجى إدخال اسم المنشأة.', variant: 'destructive' });
@@ -292,13 +340,45 @@ const App: React.FC = () => {
     }
     setAuthLoading(true);
     try {
+        // Fetch fee from settings (or hardcode fallback)
+        const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').single();
+        const fee = settings?.value?.hall_listing_fee || 100; // Default fee
+
+        // Prepare HyperPay Checkout
+        const payment = await prepareCheckout(fee);
+        
+        if (payment) {
+            // Save state for return
+            localStorage.setItem('pending_payment_context', 'registration');
+            localStorage.setItem('pending_asset_data', JSON.stringify(assetData));
+            localStorage.setItem('pending_asset_type', selectedType || '');
+            
+            setPaymentCheckoutId(payment.checkoutId);
+            setPaymentBaseUrl(payment.url);
+            setIsPaymentModalOpen(true);
+        } else {
+            toast({ title: 'خطأ في الدفع', description: 'فشل الاتصال ببوابة الدفع.', variant: 'destructive' });
+        }
+    } catch (err: any) {
+        console.error(err);
+        toast({ title: 'خطأ', description: 'حدث خطأ غير متوقع.', variant: 'destructive' });
+    } finally {
+        setAuthLoading(false);
+    }
+  };
+
+  // STEP 2: Finalize after Payment Success
+  const finalizeAssetCreation = async () => {
+      setAuthLoading(true);
+      try {
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) throw new Error("No user");
 
-        // Simulate Payment
-        await new Promise(r => setTimeout(r, 2000));
-
         let insertError = null;
+
+        // Determine Table based on stored state
+        // Re-read form state if component didn't unmount, or use localStorage
+        // Note: state (assetData) is refreshed in useEffect if returning from redirect
 
         if (selectedType === 'hall') {
             const { error } = await supabase.from('halls').insert([{
@@ -337,7 +417,7 @@ const App: React.FC = () => {
 
         if (insertError) throw insertError;
 
-        // Update Profile
+        // Update Profile to Paid/Approved
         await supabase.from('profiles').update({
             status: 'approved',
             payment_status: 'paid',
@@ -346,16 +426,14 @@ const App: React.FC = () => {
             service_limit: selectedType === 'service' ? 1 : 0
         }).eq('id', user.id);
 
-        // Fetch profile to trigger redirect
-        await fetchProfile(user.id, true);
         toast({ title: 'تم الاشتراك بنجاح', description: 'تم تفعيل حسابك وإضافة المنشأة.', variant: 'success' });
+        await fetchProfile(user.id, true);
 
-    } catch (err: any) {
-        console.error(err);
-        toast({ title: 'خطأ', description: 'حدث خطأ أثناء إنشاء المنشأة. حاول مرة أخرى.', variant: 'destructive' });
-    } finally {
-        setAuthLoading(false);
-    }
+      } catch (err: any) {
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء حفظ البيانات بعد الدفع.', variant: 'destructive' });
+      } finally {
+          setAuthLoading(false);
+      }
   };
 
   const navigateToDetails = (tab: string, item?: any) => {
@@ -384,6 +462,14 @@ const App: React.FC = () => {
   const showSidebar = !isPublicPage && !isGuestPortal && userProfile && !isLocked;
 
   const renderContent = () => {
+    if (verifyingPayment) return (
+        <div className="flex h-screen items-center justify-center bg-white flex-col gap-6">
+            <Loader2 className="w-16 h-16 animate-spin text-primary" />
+            <h2 className="text-2xl font-black text-gray-900">جاري التحقق من عملية الدفع...</h2>
+            <p className="text-gray-500 font-bold">يرجى الانتظار، سيتم توجيهك تلقائياً.</p>
+        </div>
+    );
+
     if (loading) return (
         <div className="flex h-screen items-center justify-center bg-white flex-col gap-4">
           <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-20 w-auto animate-pulse" />
@@ -552,6 +638,7 @@ const App: React.FC = () => {
         </div>
     );
 
+    // ... (Existing Routes for home, browse, etc.)
     if (activeTab === 'home') return (
         <Home 
           user={userProfile} onLoginClick={() => { setActiveTab('login'); window.scrollTo(0,0); }}
@@ -573,14 +660,12 @@ const App: React.FC = () => {
         <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} initialFilters={browseFilters} />
     );
 
-    // Consolidated Routing for Public Pages
     if (activeTab === 'halls_page') return <BrowseHalls user={userProfile} entityType="hall" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
     if (activeTab === 'chalets_page') return <BrowseHalls user={userProfile} entityType="chalet" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
     if (activeTab === 'services_page') return <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={navigateToDetails} />;
     
     if (activeTab === 'store_page') return <PublicStore />;
 
-    // Conditional Rendering based on Entity Type
     if (activeTab === 'hall_details' && selectedEntity) {
         const handleBack = () => {
             const hallItem = selectedEntity.item as Hall;
@@ -661,6 +746,18 @@ const App: React.FC = () => {
         <main>
           {renderContent()}
         </main>
+        
+        {/* Payment Modal Wrapper */}
+        <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="إتمام الدفع الآمن">
+            <div className="min-h-[400px]">
+                <HyperPayForm 
+                    checkoutId={paymentCheckoutId} 
+                    baseUrl={paymentBaseUrl}
+                    redirectUrl={window.location.href} // Return to current page
+                />
+            </div>
+        </Modal>
+
         {showNavbar && <Footer />}
       </div>
     </NotificationProvider>

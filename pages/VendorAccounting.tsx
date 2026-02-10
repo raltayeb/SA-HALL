@@ -6,9 +6,10 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { TransactionDetailsModal } from '../components/Accounting/TransactionDetailsModal';
 import { 
   Receipt, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft,
-  Wallet, Filter, Loader2, Calendar, Search, ExternalLink, Printer, User, Building2, ShoppingBag
+  Wallet, Filter, Loader2, Calendar, Search, ExternalLink, Printer, User, Building2, ShoppingBag, ChevronLeft
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { useToast } from '../context/ToastContext';
@@ -45,6 +46,10 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('all');
+
+  // Modal State
+  const [selectedTransaction, setSelectedTransaction] = useState<LedgerItem | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -182,6 +187,11 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
     return { totalIncome, totalExpense, netProfit: totalIncome - totalExpense };
   }, [ledgerData]);
 
+  const handleRowClick = (item: LedgerItem) => {
+      setSelectedTransaction(item);
+      setIsDetailsOpen(true);
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans text-right">
       
@@ -251,13 +261,18 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
                      <th className="p-4">الوصف</th>
                      <th className="p-4">النوع</th>
                      <th className="p-4">المبلغ</th>
+                     <th className="p-4 w-10"></th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
                   {ledgerData.filter(item => item.description.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
-                     <tr key={`${item.type}-${item.id}`} className="hover:bg-gray-50 transition-colors">
+                     <tr 
+                        key={`${item.type}-${item.id}`} 
+                        onClick={() => handleRowClick(item)}
+                        className="hover:bg-gray-50 transition-all cursor-pointer group"
+                     >
                         <td className="p-4 font-mono text-xs font-bold text-gray-500">{item.date}</td>
-                        <td className="p-4 font-bold text-gray-900">{item.description}</td>
+                        <td className="p-4 font-bold text-gray-900 group-hover:text-primary transition-colors">{item.description}</td>
                         <td className="p-4">
                            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
                                item.type.startsWith('income') ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'
@@ -270,12 +285,21 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
                               {item.type.startsWith('income') ? '+' : '-'} {item.amount.toLocaleString()}
                            </span>
                         </td>
+                        <td className="p-4">
+                            <ChevronLeft className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+                        </td>
                      </tr>
                   ))}
                </tbody>
             </table>
          </div>
       </div>
+
+      <TransactionDetailsModal 
+        isOpen={isDetailsOpen} 
+        onClose={() => setIsDetailsOpen(false)} 
+        transaction={selectedTransaction} 
+      />
     </div>
   );
 };
