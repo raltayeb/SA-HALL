@@ -190,7 +190,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
     <div className="min-h-screen bg-[#F8F9FC] pb-20 font-tajawal text-right" dir="rtl">
       
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
              <button onClick={onBack} className="flex items-center gap-2 text-gray-500 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
                <ArrowRight className="w-5 h-5" /> رجوع
@@ -211,13 +211,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
             
             <div className="lg:col-span-2 space-y-8">
                 {/* Hero Card */}
-                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-                    <div className="h-[400px] rounded-[2rem] overflow-hidden mb-6 relative group">
+                <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100">
+                    <div className="h-[400px] md:h-[500px] rounded-[2rem] overflow-hidden mb-6 relative group">
                         <img src={allImages[0]} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
                         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-4 py-1.5 rounded-full font-black text-xs flex items-center gap-1 text-purple-600">
                             <Sparkles className="w-4 h-4" /> قاعة أفراح
@@ -239,7 +239,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                 </div>
 
                 {/* Description Card */}
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Info className="w-5 h-5 text-gray-400" /> تفاصيل المكان</h3>
                     <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
                     
@@ -254,7 +254,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
                 </div>
 
                 {/* Amenities Card */}
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900">المرافق والخدمات</h3>
                     <div className="grid grid-cols-2 gap-4">
                         {(item.amenities?.length ? item.amenities : HALL_AMENITIES).map((amenity, i) => (
@@ -267,7 +267,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                 {/* Additional Services (Moved Up) */}
                 {item.addons && item.addons.length > 0 && (
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                             <Sparkles className="w-5 h-5 text-primary" /> خدمات إضافية
                         </h3>
@@ -296,7 +296,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                 {/* Packages Card (Moved Down & Styled as Grid Cards) */}
                 {item.packages && item.packages.length > 0 && (
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Package className="w-5 h-5 text-gray-400" /> باقات الحجز</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {item.packages.map((pkg, i) => (
@@ -337,7 +337,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                 {/* Portfolio / Previous Work Gallery */}
                 {allImages.length > 1 && (
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                             <ImageIcon className="w-5 h-5 text-primary" /> معرض الصور
                         </h3>
@@ -367,7 +367,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack }) 
 
                     <div className="space-y-4">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">اختر التاريخ</label>
-                        <div className="bg-gray-50 p-2 rounded-[2rem] border border-gray-100">
+                        <div className="bg-gray-50 p-4 rounded-[2rem] border border-gray-100">
                             <Calendar 
                                 mode="single" selected={bookingDate} onSelect={setBookingDate}
                                 disabled={(date) => isBefore(date, startOfDay(new Date())) || blockedDates.some(d => isSameDay(d, date))}

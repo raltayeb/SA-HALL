@@ -140,9 +140,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900">
       
-      {/* 1. Hero Section */}
+      {/* 1. Hero Section - Full Width */}
       <section className="relative w-full pt-28 pb-8 flex justify-center">
-        <div className="w-[95%] h-[600px] md:h-[750px] relative rounded-[3rem] overflow-hidden shadow-2xl group ring-1 ring-black/5 bg-gray-900">
+        <div className="w-[98%] max-w-[1920px] h-[600px] md:h-[750px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
           
           {/* Background Images with Fade Transition */}
           {HERO_IMAGES.map((img, index) => (
@@ -163,7 +163,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           <div className="relative z-10 h-full flex items-center justify-start px-8 md:px-24 text-right font-tajawal">
             <div className="max-w-3xl space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
               
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white shadow-lg w-fit">
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white w-fit">
                 <Sparkles className="w-4 h-4 text-[#D4AF37]" />
                 <span className="text-xs md:text-sm font-bold tracking-wide">الوجهة الأولى للمناسبات الفاخرة</span>
               </div>
@@ -178,7 +178,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 <div className="w-32 h-2 bg-gradient-to-l from-primary to-transparent rounded-full opacity-80"></div>
               </div>
               
-              <p className="text-gray-200 text-lg md:text-2xl font-medium leading-relaxed max-w-2xl drop-shadow-md border-r-4 border-white/20 pr-6">
+              <p className="text-gray-200 text-lg md:text-2xl font-medium leading-relaxed max-w-2xl border-r-4 border-white/20 pr-6">
                 نجمع لك أرقى القاعات وأفخم الخدمات في منصة واحدة، لتكون مناسبتك ذكرى لا تُنسى بكل معاني الفخامة.
               </p>
             </div>
@@ -199,8 +199,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         </div>
       </section>
 
-      {/* 2. Main Sections */}
-      <section className="py-24 px-6 lg:px-20 max-w-7xl mx-auto space-y-32">
+      {/* 2. Main Sections - Full Width Container */}
+      <section className="py-24 px-6 lg:px-12 w-full max-w-[1920px] mx-auto space-y-32">
           
           {/* Halls */}
           <div className="space-y-12">
@@ -267,9 +267,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           )}
       </section>
 
-      {/* 3. Stats Section */}
-      <section className="py-32 px-6 lg:px-20 bg-white">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      {/* 3. Stats Section - Full Width */}
+      <section className="py-32 px-6 lg:px-12 bg-white">
+        <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8 text-right order-2 lg:order-1">
                 <div className="space-y-4">
                     <span className="text-primary font-black text-sm uppercase tracking-widest">لماذا القاعة؟</span>
@@ -302,7 +302,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                         alt="Atmosphere" 
                     />
                 </div>
-                <div className="absolute -bottom-8 -left-8 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl hidden md:block max-w-[200px] text-center">
+                <div className="absolute -bottom-8 -left-8 bg-white p-8 rounded-[2rem] border border-gray-100 hidden md:block max-w-[200px] text-center">
                     <div className="flex justify-center gap-1 text-yellow-500 mb-2"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></div>
                     <p className="text-xs font-black text-gray-900">أعلى تصنيف رضا عملاء في المملكة</p>
                 </div>

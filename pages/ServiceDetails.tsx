@@ -160,7 +160,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
     <div className="min-h-screen bg-[#F8F9FC] pb-20 font-tajawal text-right" dir="rtl">
       
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
              <button onClick={onBack} className="flex items-center gap-2 text-gray-500 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
                <ArrowRight className="w-5 h-5" /> رجوع
@@ -181,13 +181,13 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
             
             <div className="lg:col-span-2 space-y-8">
                 {/* Hero Card */}
-                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100">
-                    <div className="h-[400px] rounded-[2rem] overflow-hidden mb-6 relative group">
+                <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100">
+                    <div className="h-[400px] md:h-[500px] rounded-[2rem] overflow-hidden mb-6 relative group">
                         <img src={allImages[0] || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={item.name} />
                         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-4 py-1.5 rounded-full font-black text-xs flex items-center gap-1 text-orange-600">
                             <Sparkles className="w-4 h-4" /> خدمة مناسبات
@@ -208,7 +208,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
                     </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Info className="w-5 h-5 text-gray-400" /> تفاصيل الخدمة</h3>
                     <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
                     
@@ -224,7 +224,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
 
                 {/* Portfolio / Previous Work Gallery */}
                 {allImages.length > 1 && (
-                    <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-6">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                         <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
                             <ImageIcon className="w-5 h-5 text-primary" /> معرض الأعمال
                         </h3>
@@ -254,7 +254,7 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({ item, user, onBa
 
                     <div className="space-y-4">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">تاريخ المناسبة</label>
-                        <div className="bg-gray-50 p-2 rounded-[2rem] border border-gray-100">
+                        <div className="bg-gray-50 p-4 rounded-[2rem] border border-gray-100">
                             <Calendar 
                                 mode="single" selected={bookingDate} onSelect={setBookingDate}
                                 disabled={(date) => isBefore(date, startOfDay(new Date()))}
