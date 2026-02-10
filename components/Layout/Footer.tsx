@@ -107,7 +107,6 @@ export const Footer: React.FC = () => {
             <div className="max-w-[1400px] mx-auto px-6 lg:px-8">
                 {/* Fixed Flex Alignment: items-stretch to ensure image covers height */}
                 <div className="bg-gray-900 rounded-[3rem] relative overflow-hidden flex flex-col md:flex-row items-stretch min-h-[550px]">
-                    <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] -mr-40 -mt-40 pointer-events-none"></div>
                     
                     {/* Image Container: Relative with absolute image to cover area */}
                     <div className="w-full md:w-1/2 relative order-2 md:order-1 min-h-[300px] md:min-h-auto">
@@ -116,7 +115,6 @@ export const Footer: React.FC = () => {
                             className="absolute inset-0 w-full h-full object-cover" 
                             alt="App Screen" 
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent md:bg-gradient-to-r md:from-gray-900 md:via-gray-900/20 md:to-transparent"></div>
                     </div>
                     
                     {/* Content Container */}
