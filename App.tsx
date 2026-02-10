@@ -359,9 +359,13 @@ const App: React.FC = () => {
   }, [activeTab, selectedEntity]);
 
   const isPublicPage = ['home', 'browse', 'halls_page', 'chalets_page', 'services_page', 'store_page', 'hall_details', 'login', 'register', 'guest_login'].includes(activeTab);
+  const isGuestPortal = activeTab === 'guest_dashboard';
   const isLocked = userProfile?.role === 'vendor' && userProfile?.payment_status !== 'paid' && activeTab === 'register';
   const isAuthPage = ['login', 'register', 'guest_login'].includes(activeTab);
-  const showNavbar = isPublicPage && !isAuthPage;
+  const showNavbar = isPublicPage && !isAuthPage && !isGuestPortal;
+
+  // Logic to show sidebar: Must be authenticated, NOT a public page, NOT locked, and NOT the guest portal
+  const showSidebar = !isPublicPage && !isGuestPortal && userProfile && !isLocked;
 
   const renderContent = () => {
     if (loading) return (
@@ -549,6 +553,10 @@ const App: React.FC = () => {
         return <HallDetails item={selectedEntity.item} user={userProfile} type={selectedEntity.type} onBack={handleBack} />;
     }
 
+    if (activeTab === 'guest_dashboard' && userProfile) {
+        return <GuestPortal user={userProfile} onLogout={handleLogout} />;
+    }
+
     if (!isLocked && userProfile) {
         return (
             <div className="mx-auto w-full max-w-[1600px] lg:pr-[320px] pt-4 lg:pt-8 px-4 lg:px-8">
@@ -563,7 +571,6 @@ const App: React.FC = () => {
                 {activeTab === 'brand_settings' && <VendorBrandSettings user={userProfile} onUpdate={() => fetchProfile(userProfile.id)} />}
                 {activeTab === 'my_favorites' && <Favorites user={userProfile} />}
                 {activeTab === 'my_bookings' && <Bookings user={userProfile} />}
-                {activeTab === 'guest_dashboard' && <GuestPortal user={userProfile} />}
                 {activeTab === 'admin_dashboard' && userProfile.role === 'super_admin' && <AdminDashboard />}
                 {activeTab === 'admin_users' && userProfile.role === 'super_admin' && <UsersManagement />}
                 {activeTab === 'admin_requests' && userProfile.role === 'super_admin' && <AdminRequests />}
@@ -596,7 +603,7 @@ const App: React.FC = () => {
             />
         )}
 
-        {!isPublicPage && userProfile && !isLocked && (
+        {showSidebar && (
           <Sidebar 
             user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} 
             onLogout={handleLogout} isOpen={false} setIsOpen={() => {}}

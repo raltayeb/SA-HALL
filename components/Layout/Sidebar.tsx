@@ -90,17 +90,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       }
     ];
   } else {
-    // GUEST / USER VIEW - UPDATED
-    menuGroups = [
-      {
-        title: "حسابي",
-        items: [
-          { id: 'guest_dashboard', label: 'لوحة التحكم', icon: <LayoutGrid className="w-5 h-5" /> },
-          { id: 'browse', label: 'تصفح الخدمات', icon: <Search className="w-5 h-5" /> },
-          { id: 'store_page', label: 'المتجر', icon: <Store className="w-5 h-5" /> },
-        ]
-      }
-    ];
+    // Guest has no sidebar items as requested
+    return null; 
   }
 
   return (
@@ -120,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
             <div className="flex flex-col">
               <h1 className="text-xl font-ruqaa text-primary leading-none mt-1">القاعة</h1>
               <span className="text-[10px] font-bold text-gray-400 mt-1">
-                {user.role === 'super_admin' ? 'الإدارة العليا' : user.role === 'vendor' ? 'شريك أعمال' : 'منصة الزوار'}
+                {user.role === 'super_admin' ? 'الإدارة العليا' : user.role === 'vendor' ? 'شريك أعمال' : ''}
               </span>
             </div>
             <Button variant="ghost" size="icon" className="mr-auto lg:hidden text-gray-400" onClick={() => setIsOpen(false)}><X className="w-5 h-5" /></Button>
