@@ -1,10 +1,12 @@
 
 import React from "react";
-import { DayPicker } from "react-day-picker";
+import { DayPicker, DayProps } from "react-day-picker";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { arSA, enUS } from "date-fns/locale";
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  renderDayContent?: (day: Date) => React.ReactNode;
+};
 
 function Calendar({
   className,
@@ -12,6 +14,7 @@ function Calendar({
   showOutsideDays = true,
   dir = 'rtl', 
   locale,
+  renderDayContent,
   ...props
 }: CalendarProps) {
   
@@ -36,8 +39,8 @@ function Calendar({
         head_row: "flex mb-2",
         head_cell: "text-gray-400 rounded-xl w-full font-bold text-[10px] uppercase tracking-wider h-9 flex items-center justify-center",
         row: "flex w-full mt-1 gap-1",
-        cell: "h-10 w-full text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
-        day: "h-10 w-full p-0 font-bold text-sm hover:bg-gray-100 rounded-xl transition-all text-gray-700 flex items-center justify-center border border-transparent",
+        cell: "h-14 w-full text-center text-sm p-0 relative focus-within:relative focus-within:z-20", // Increased height for price
+        day: "h-14 w-full p-0 font-bold text-sm hover:bg-gray-100 rounded-xl transition-all text-gray-700 flex flex-col items-center justify-center border border-transparent",
         day_range_end: "day-range-end",
         day_selected: "bg-primary text-white hover:bg-primary hover:text-white border-primary",
         day_today: "bg-gray-50 text-primary font-black border-primary/20",
@@ -50,6 +53,12 @@ function Calendar({
       components={{
         IconLeft: ({ ...props }) => dir === 'ltr' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />, 
         IconRight: ({ ...props }) => dir === 'ltr' ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />, 
+        DayContent: (dayProps) => (
+            <div className="flex flex-col items-center justify-center h-full w-full">
+                <span>{dayProps.date.getDate()}</span>
+                {renderDayContent && renderDayContent(dayProps.date)}
+            </div>
+        )
       }}
       {...props}
     />

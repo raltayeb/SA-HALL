@@ -55,6 +55,13 @@ export interface FAQItem {
   answer: string;
 }
 
+export interface BookingConfig {
+  deposit_fixed: number;
+  deposit_percent: number;
+  hold_price: number;
+  consultation_price: number;
+}
+
 export interface FooterConfig {
   app_section: {
     show: boolean;
@@ -110,13 +117,14 @@ export interface SystemSettings {
   hall_listing_fee: number;
   service_listing_fee: number;
   footer_config: FooterConfig;
+  booking_config: BookingConfig; // NEW
   payment_gateways: {
     visa_enabled: boolean;
     cash_enabled: boolean;
     hyperpay_enabled: boolean;
     hyperpay_entity_id: string;
     hyperpay_access_token: string;
-    hyperpay_base_url: string; // Added Base URL
+    hyperpay_base_url: string; 
     hyperpay_mode: 'test' | 'live';
   };
 }
@@ -130,8 +138,20 @@ export interface HallAddon {
 export interface HallPackage {
   name: string;
   price: number;
+  min_men: number;
+  max_men: number;
+  min_women: number;
+  max_women: number;
+  is_default: boolean;
   description?: string;
-  items?: string[]; // List of items in the package
+  items?: string[]; 
+}
+
+export interface SeasonalPrice {
+  name: string;
+  start_date: string;
+  end_date: string;
+  increase_percentage: number;
 }
 
 export interface Hall {
@@ -147,7 +167,7 @@ export interface Hall {
   capacity: number;
   capacity_men?: number;
   capacity_women?: number;
-  price_per_night: number;
+  price_per_night: number; // Used as base or fallback
   price_per_adult?: number;
   price_per_child?: number;
   description: string;
@@ -158,11 +178,11 @@ export interface Hall {
   amenities: string[];
   addons?: HallAddon[]; 
   packages?: HallPackage[]; 
+  seasonal_prices?: SeasonalPrice[]; // NEW
   is_active: boolean;
   created_at?: string;
 }
 
-// NEW CHALET INTERFACE
 export interface Chalet {
   id: string;
   vendor_id: string;
@@ -208,7 +228,7 @@ export interface BookingItem {
 export interface Booking {
   id: string;
   hall_id?: string;
-  chalet_id?: string; // ADDED
+  chalet_id?: string;
   service_id?: string;
   user_id: string | null; 
   vendor_id: string;
@@ -219,14 +239,16 @@ export interface Booking {
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   booking_type?: 'booking' | 'consultation'; 
   booking_method?: 'full' | 'deposit' | 'hold'; 
+  booking_option?: 'deposit' | 'hold_48h' | 'consultation' | 'full_payment'; // NEW
   package_name?: string; 
+  package_details?: HallPackage; // NEW
   items?: BookingItem[]; 
   total_amount: number;
   paid_amount?: number; 
   vat_amount: number;
   discount_amount?: number;
   applied_coupon?: string;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold'; 
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'on_hold' | 'blocked'; 
   guest_name?: string;
   guest_phone?: string;
   guest_email?: string; 
@@ -235,7 +257,7 @@ export interface Booking {
   notes?: string;
   created_at?: string;
   halls?: Hall;
-  chalets?: Chalet; // ADDED
+  chalets?: Chalet; 
   profiles?: UserProfile;
   services?: Service;
   client?: UserProfile;
@@ -243,6 +265,7 @@ export interface Booking {
   is_read?: boolean;
 }
 
+// ... (Other existing types remain unchanged: PaymentLog, Expense, ExternalInvoice, Notification, POSItem, Coupon, StoreOrder, etc.)
 export interface PaymentLog {
   id: string;
   booking_id: string;
@@ -324,9 +347,9 @@ export interface Coupon {
 
 export interface StoreOrder {
   id: string;
-  vendor_id?: string; // Optional if guest
-  user_id?: string;   // Optional if guest
-  guest_info?: {      // Guest details
+  vendor_id?: string;
+  user_id?: string;
+  guest_info?: {
     name: string;
     phone: string;
     address: string;
