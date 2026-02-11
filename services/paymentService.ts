@@ -15,7 +15,6 @@ const getPaymentConfig = async (): Promise<PaymentConfig | null> => {
   const gw = data.value.payment_gateways;
   const isTest = gw.hyperpay_mode === 'test';
   
-  // Base URL defaults if not set
   const baseUrl = gw.hyperpay_base_url || (isTest ? 'https://eu-test.oppwa.com' : 'https://oppwa.com');
 
   return {
@@ -26,19 +25,41 @@ const getPaymentConfig = async (): Promise<PaymentConfig | null> => {
   };
 };
 
-export const prepareCheckout = async (amount: number): Promise<{ checkoutId: string, url: string } | null> => {
+export interface CheckoutParams {
+  amount: number;
+  merchantTransactionId?: string;
+  customerEmail?: string;
+  billingStreet1?: string;
+  billingCity?: string;
+  billingPostcode?: string;
+  billingCountry?: string;
+  givenName?: string;
+  surname?: string;
+}
+
+export const prepareCheckout = async (params: CheckoutParams): Promise<{ checkoutId: string, url: string } | null> => {
   try {
     const config = await getPaymentConfig();
     if (!config) throw new Error('Payment gateway not configured');
 
     const path = '/v1/checkouts';
-    const params = new URLSearchParams();
-    params.append('entityId', config.entityId);
-    params.append('amount', amount.toFixed(2));
-    params.append('currency', config.currency);
-    params.append('paymentType', 'DB'); // Debit/Credit
-    // Note: 'integrity' parameter logic requires handling secrets, often handled by server. 
-    // For SAQ-A copyandpay simple integration, we proceed with basic setup.
+    const bodyParams = new URLSearchParams();
+    
+    // Mandatory Parameters
+    bodyParams.append('entityId', config.entityId);
+    bodyParams.append('amount', params.amount.toFixed(2));
+    bodyParams.append('currency', config.currency);
+    bodyParams.append('paymentType', 'DB'); // Debit (Immediate Charge)
+
+    // Optional / Fraud Protection Parameters (As per HyperPay Docs)
+    if (params.merchantTransactionId) bodyParams.append('merchantTransactionId', params.merchantTransactionId);
+    if (params.customerEmail) bodyParams.append('customer.email', params.customerEmail);
+    if (params.givenName) bodyParams.append('customer.givenName', params.givenName);
+    if (params.surname) bodyParams.append('customer.surname', params.surname);
+    if (params.billingStreet1) bodyParams.append('billing.street1', params.billingStreet1);
+    if (params.billingCity) bodyParams.append('billing.city', params.billingCity);
+    if (params.billingPostcode) bodyParams.append('billing.postcode', params.billingPostcode);
+    if (params.billingCountry) bodyParams.append('billing.country', params.billingCountry || 'SA');
 
     const response = await fetch(`${config.baseUrl}${path}`, {
       method: 'POST',
@@ -46,7 +67,7 @@ export const prepareCheckout = async (amount: number): Promise<{ checkoutId: str
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': `Bearer ${config.accessToken}`
       },
-      body: params
+      body: bodyParams
     });
 
     const data = await response.json();
@@ -62,12 +83,11 @@ export const prepareCheckout = async (amount: number): Promise<{ checkoutId: str
   }
 };
 
-export const verifyPaymentStatus = async (resourcePath: string): Promise<boolean> => {
+export const verifyPaymentStatus = async (resourcePath: string): Promise<{ success: boolean, id?: string }> => {
   try {
     const config = await getPaymentConfig();
-    if (!config) return false;
+    if (!config) return { success: false };
 
-    // resourcePath usually comes as "/v1/checkouts/{id}/payment"
     const url = `${config.baseUrl}${resourcePath}`;
     const urlWithEntity = `${url}?entityId=${config.entityId}`;
 
@@ -79,11 +99,14 @@ export const verifyPaymentStatus = async (resourcePath: string): Promise<boolean
     });
 
     const data = await response.json();
-    // Codes starting with 000.000. or 000.100. are successful
+    // Codes starting with 000.000. or 000.100. are successful transactions
+    // Regex covers success codes based on Oppwa docs
     const code = data.result.code;
-    return /^(000\.000\.|000\.100\.1|000\.[36])/.test(code);
+    const isSuccess = /^(000\.000\.|000\.100\.1|000\.[36])/.test(code);
+    
+    return { success: isSuccess, id: data.id };
   } catch (error) {
     console.error('Payment Verification Failed:', error);
-    return false;
+    return { success: false };
   }
 };
