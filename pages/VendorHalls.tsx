@@ -29,7 +29,9 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [newPackage, setNewPackage] = useState<HallPackage>({ 
       name: '', price: 0, min_men: 0, max_men: 100, min_women: 0, max_women: 100, is_default: false, items: [] 
   });
-  const [tempPackageItem, setTempPackageItem] = useState('');
+
+  // Addon State
+  const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0, description: '' });
 
   // Seasonal State
   const [newSeason, setNewSeason] = useState<SeasonalPrice>({ name: '', start_date: '', end_date: '', increase_percentage: 0 });
@@ -65,14 +67,13 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setCurrentHall(hall);
       setIsEditing(true);
       setActiveTab('info');
-      // Fetch blocked dates
       const { data } = await supabase.from('bookings').select('booking_date').eq('hall_id', hall.id).eq('status', 'blocked');
       setBlockedDates(data?.map(b => b.booking_date) || []);
   };
 
   const addPackage = () => {
       if (!newPackage.name || newPackage.price <= 0) {
-          toast({ title: 'تنبيه', description: 'يرجى إدخال اسم الباقة والسعر.', variant: 'destructive' });
+          toast({ title: 'تنبيه', description: 'يرجى إدخال اسم الباقة وسعر الفرد.', variant: 'destructive' });
           return;
       }
       
@@ -86,6 +87,12 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setNewPackage({ name: '', price: 0, min_men: 0, max_men: 100, min_women: 0, max_women: 100, is_default: false, items: [] });
   };
 
+  const addAddon = () => {
+      if (!newAddon.name || newAddon.price < 0) return;
+      setCurrentHall(prev => ({ ...prev, addons: [...(prev.addons || []), newAddon] }));
+      setNewAddon({ name: '', price: 0, description: '' });
+  };
+
   const addSeason = () => {
       if (!newSeason.name || !newSeason.start_date || !newSeason.end_date || newSeason.increase_percentage <= 0) return;
       setCurrentHall(prev => ({ ...prev, seasonal_prices: [...(prev.seasonal_prices || []), newSeason] }));
@@ -97,11 +104,9 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       const dateStr = format(date, 'yyyy-MM-dd');
       
       if (blockedDates.includes(dateStr)) {
-          // Unblock
           await supabase.from('bookings').delete().eq('hall_id', currentHall.id).eq('booking_date', dateStr).eq('status', 'blocked');
           setBlockedDates(prev => prev.filter(d => d !== dateStr));
       } else {
-          // Block
           await supabase.from('bookings').insert([{
               hall_id: currentHall.id,
               vendor_id: user.id,
@@ -113,26 +118,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
           }]);
           setBlockedDates(prev => [...prev, dateStr]);
       }
-  };
-
-  const getPriceForDate = (date: Date) => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      let basePrice = currentHall.price_per_night || 0; // Use base price or lowest package price
-      if (currentHall.packages && currentHall.packages.length > 0) {
-          // Find default or lowest
-          const def = currentHall.packages.find(p => p.is_default);
-          basePrice = def ? def.price : Math.min(...currentHall.packages.map(p => p.price));
-      }
-
-      // Check seasonality
-      const season = currentHall.seasonal_prices?.find(s => {
-          return dateStr >= s.start_date && dateStr <= s.end_date;
-      });
-
-      if (season) {
-          basePrice = basePrice + (basePrice * (season.increase_percentage / 100));
-      }
-      return basePrice;
   };
 
   const handleSave = async () => {
@@ -192,7 +177,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               
               <div className="flex bg-gray-50 p-2 gap-2 overflow-x-auto no-scrollbar border-b border-gray-200">
                   <button onClick={() => setActiveTab('info')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'info' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>البيانات الأساسية</button>
-                  <button onClick={() => setActiveTab('packages')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'packages' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>الباقات والأسعار</button>
+                  <button onClick={() => setActiveTab('packages')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'packages' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>الباقات والخدمات</button>
                   <button onClick={() => setActiveTab('policies')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'policies' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>الشروط والأحكام</button>
                   {currentHall.id && <button onClick={() => setActiveTab('calendar')} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeTab === 'calendar' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}>التقويم والحجب</button>}
               </div>
@@ -215,18 +200,42 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                 <label className="text-xs font-bold text-gray-500">الوصف</label>
                                 <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
                             </div>
+                            
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-black text-primary mb-4">المرافق والمميزات</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {HALL_AMENITIES.map(amenity => (
+                                        <label key={amenity} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${currentHall.amenities?.includes(amenity) ? 'bg-primary/5 border-primary text-primary' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
+                                            <input 
+                                                type="checkbox" 
+                                                checked={currentHall.amenities?.includes(amenity)} 
+                                                onChange={() => {
+                                                    const newAmenities = currentHall.amenities?.includes(amenity) 
+                                                        ? currentHall.amenities.filter(a => a !== amenity) 
+                                                        : [...(currentHall.amenities || []), amenity];
+                                                    setCurrentHall({...currentHall, amenities: newAmenities});
+                                                }} 
+                                                className="hidden" 
+                                            />
+                                            <CheckSquare className="w-4 h-4" />
+                                            <span className="text-xs font-bold">{amenity}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                      </div>
                  )}
 
                  {activeTab === 'packages' && (
                      <div className="space-y-6">
+                        {/* Packages */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-                            <h3 className="text-sm font-black text-primary mb-4">باقات الحجز</h3>
+                            <h3 className="text-sm font-black text-primary mb-4">باقات الحجز (التسعير بالفرد)</h3>
                             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <Input placeholder="اسم الباقة" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-11 bg-white" />
-                                    <Input placeholder="السعر" type="number" value={newPackage.price || ''} onChange={e => setNewPackage({...newPackage, price: Number(e.target.value)})} className="h-11 bg-white" />
+                                    <Input placeholder="اسم الباقة (مثال: الباقة الملكية)" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-11 bg-white" />
+                                    <Input placeholder="سعر الفرد (ر.س)" type="number" value={newPackage.price || ''} onChange={e => setNewPackage({...newPackage, price: Number(e.target.value)})} className="h-11 bg-white" />
                                 </div>
                                 <div className="grid grid-cols-4 gap-2">
                                     <Input label="أقل رجال" type="number" value={newPackage.min_men} onChange={e => setNewPackage({...newPackage, min_men: Number(e.target.value)})} className="h-10 bg-white" />
@@ -256,13 +265,35 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                             </div>
                         </div>
 
+                        {/* Addons */}
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-black text-primary mb-4">الخدمات الإضافية (Addons)</h3>
+                            <div className="flex gap-2 mb-4">
+                                <Button onClick={addAddon} className="h-11 w-11 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-5 h-5" /></Button>
+                                <Input placeholder="السعر" type="number" value={newAddon.price || ''} onChange={e => setNewAddon({...newAddon, price: Number(e.target.value)})} className="h-11 w-32 bg-gray-50" />
+                                <Input placeholder="اسم الخدمة (مثال: صبابات)" value={newAddon.name} onChange={e => setNewAddon({...newAddon, name: e.target.value})} className="h-11 flex-1 bg-gray-50" />
+                            </div>
+                            <div className="space-y-2">
+                                {currentHall.addons?.map((addon, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                        <button onClick={() => setCurrentHall(prev => ({...prev, addons: prev.addons?.filter((_, i) => i !== idx)}))} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Minus className="w-4 h-4" /></button>
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-bold text-gray-900">{addon.name}</span>
+                                            <span className="font-mono text-primary font-bold">{addon.price} SAR</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Seasonality */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                             <h3 className="text-sm font-black text-primary mb-4">التسعير الموسمي</h3>
                             <div className="flex gap-2">
-                                <Input placeholder="اسم الموسم (مثال: العيد)" value={newSeason.name} onChange={e => setNewSeason({...newSeason, name: e.target.value})} className="h-11 flex-1" />
+                                <Input placeholder="الموسم" value={newSeason.name} onChange={e => setNewSeason({...newSeason, name: e.target.value})} className="h-11 flex-1" />
                                 <Input type="date" value={newSeason.start_date} onChange={e => setNewSeason({...newSeason, start_date: e.target.value})} className="h-11 w-32" />
                                 <Input type="date" value={newSeason.end_date} onChange={e => setNewSeason({...newSeason, end_date: e.target.value})} className="h-11 w-32" />
-                                <Input placeholder="زيادة %" type="number" value={newSeason.increase_percentage || ''} onChange={e => setNewSeason({...newSeason, increase_percentage: Number(e.target.value)})} className="h-11 w-20" />
+                                <Input placeholder="+%" type="number" value={newSeason.increase_percentage || ''} onChange={e => setNewSeason({...newSeason, increase_percentage: Number(e.target.value)})} className="h-11 w-20" />
                                 <Button onClick={addSeason} className="h-11 w-11 p-0 rounded-xl"><Plus className="w-5 h-5" /></Button>
                             </div>
                             <div className="space-y-2">
@@ -298,23 +329,9 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                     mode="single"
                                     selected={calendarDate}
                                     onSelect={(d) => { setCalendarDate(d); if(d) toggleBlockDate(d); }}
-                                    renderDayContent={(day) => {
-                                        const dateStr = format(day, 'yyyy-MM-dd');
-                                        const isBlocked = blockedDates.includes(dateStr);
-                                        const price = getPriceForDate(day);
-                                        return (
-                                            <div className="flex flex-col items-center">
-                                                {isBlocked && <div className="absolute inset-0 bg-red-500/20 rounded-xl z-0 pointer-events-none"></div>}
-                                                <span className={`text-[10px] font-black mt-1 ${isBlocked ? 'text-red-500' : 'text-green-600'}`}>
-                                                    {isBlocked ? 'مغلق' : price.toLocaleString()}
-                                                </span>
-                                            </div>
-                                        );
-                                    }}
                                     className="w-full"
                                 />
                             </div>
-                            <p className="text-[10px] text-gray-400 font-bold mt-4">اضغط على أي يوم لتبديل حالته بين (متاح/مغلق). الأيام المغلقة لا تظهر للعملاء.</p>
                         </div>
                      </div>
                  )}
