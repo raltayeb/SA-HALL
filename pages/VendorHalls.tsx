@@ -5,7 +5,7 @@ import { UserProfile, Hall, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus, Lock, CreditCard, CalendarDays, FileText } from 'lucide-react';
+import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus, Lock, CreditCard, CalendarDays, FileText, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 import { Calendar } from '../components/ui/Calendar';
@@ -20,6 +20,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'packages' | 'calendar' | 'policies'>('info');
+  const [uploading, setUploading] = useState(false);
   
   const [currentHall, setCurrentHall] = useState<Partial<Hall>>({ 
       images: [], amenities: [], city: SAUDI_CITIES[0], addons: [], packages: [], seasonal_prices: []
@@ -69,6 +70,26 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setActiveTab('info');
       const { data } = await supabase.from('bookings').select('booking_date').eq('hall_id', hall.id).eq('status', 'blocked');
       setBlockedDates(data?.map(b => b.booking_date) || []);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const file = files[0];
+      const fileName = `${user.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('hall-images').upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from('hall-images').getPublicUrl(fileName);
+      const newImages = [...(currentHall.images || []), publicUrl];
+      setCurrentHall(prev => ({ ...prev, images: newImages, image_url: newImages[0] }));
+      toast({ title: 'تم الرفع', variant: 'success' });
+    } catch (error: any) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const addPackage = () => {
@@ -201,6 +222,28 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                 <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
                             </div>
                             
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-black text-primary mb-4 flex items-center justify-between">
+                                    <span>صور القاعة</span>
+                                    <span className="text-[10px] text-gray-400 font-normal">ينصح باستخدام صور عالية الجودة</span>
+                                </h3>
+                                <div className="flex flex-wrap gap-4">
+                                    <div onClick={() => fileInputRef.current?.click()} className="w-32 h-32 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/20 transition-all text-gray-400 hover:text-primary">
+                                        {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Plus className="w-8 h-8 mb-2" />}
+                                        <span className="text-[10px] font-bold">رفع صورة</span>
+                                    </div>
+                                    <input type="file" hidden ref={fileInputRef} accept="image/*" onChange={handleFileUpload} />
+                                    {currentHall.images?.map((img, i) => (
+                                        <div key={i} className="w-32 h-32 rounded-2xl overflow-hidden relative group border border-gray-200">
+                                            <img src={img} className="w-full h-full object-cover" />
+                                            <button onClick={() => setCurrentHall({...currentHall, images: currentHall.images?.filter((_, idx) => idx !== i)})} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all shadow-md">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="pt-4 border-t border-gray-100">
                                 <h3 className="text-sm font-black text-primary mb-4">المرافق والمميزات</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus
+  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus, CreditCard
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -205,7 +205,52 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* Amenities Section */}
+                {/* 1. Description Section */}
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
+                        <Info className="w-6 h-6 text-primary" /> وصف القاعة
+                    </h3>
+                    <div className="text-sm font-medium text-gray-600 leading-loose">
+                        {item.description || 'لا يوجد وصف متاح.'}
+                    </div>
+                </div>
+
+                {/* 2. Packages Section */}
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                        <Package className="w-6 h-6 text-primary" /> باقات الحجز
+                    </h3>
+                    <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 no-scrollbar">
+                        {item.packages?.map((pkg, idx) => (
+                            <div 
+                                key={idx} 
+                                onClick={() => { setSelectedPackage(pkg); setGuestCounts({ men: pkg.min_men, women: pkg.min_women }); }}
+                                className={`cursor-pointer border-2 rounded-[2rem] p-6 transition-all relative overflow-hidden min-w-[280px] flex-1 ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <h4 className="font-black text-lg">{pkg.name}</h4>
+                                    {selectedPackage?.name === pkg.name && <CheckCircle2 className="w-6 h-6 text-primary" />}
+                                </div>
+                                <div className="space-y-2 text-xs font-bold text-gray-500 mb-4">
+                                    <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
+                                        <span>رجال</span>
+                                        <span>{pkg.min_men} - {pkg.max_men}</span>
+                                    </div>
+                                    <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
+                                        <span>نساء</span>
+                                        <span>{pkg.min_women} - {pkg.max_women}</span>
+                                    </div>
+                                </div>
+                                <div className="flex items-end gap-1">
+                                    <PriceTag amount={pkg.price} className="text-xl font-black text-primary block text-left" />
+                                    <span className="text-[10px] text-gray-400 font-bold mb-1">/ للفرد</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 3. Amenities Section */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
@@ -220,7 +265,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* Policies */}
+                {/* 4. Policies */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
                         <FileText className="w-6 h-6 text-gray-400" /> الشروط والأحكام
@@ -233,7 +278,8 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
 
             {/* Booking Sidebar - New Order */}
             <div className="relative">
-                <div className="sticky top-28 bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-xl space-y-6">
+                {/* Removed Shadow as requested */}
+                <div className="sticky top-28 bg-white border border-gray-200 rounded-[2.5rem] p-6 space-y-6">
                     
                     {/* 1. Calendar */}
                     <div className="space-y-2">
@@ -243,24 +289,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     </div>
 
-                    {/* 2. Package & Guests */}
-                    <div className="space-y-4 border-t border-gray-50 pt-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">اختيار الباقة</label>
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                            {item.packages?.map((pkg, idx) => (
-                                <button 
-                                    key={idx} 
-                                    onClick={() => { setSelectedPackage(pkg); setGuestCounts({ men: pkg.min_men, women: pkg.min_women }); }}
-                                    className={`flex-1 min-w-[140px] p-3 rounded-2xl border-2 text-right transition-all ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
-                                >
-                                    <div className="font-bold text-xs mb-1">{pkg.name}</div>
-                                    <PriceTag amount={pkg.price} className="text-primary font-black" />
-                                    <div className="text-[9px] text-gray-400 mt-1">سعر الفرد</div>
-                                </button>
-                            ))}
-                        </div>
-
-                        {selectedPackage && (
+                    {/* 2. Package Summary & Guest Count */}
+                    {selectedPackage && (
+                        <div className="space-y-4 border-t border-gray-50 pt-4">
+                            <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">الباقة المختارة</label>
+                                <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-lg">{selectedPackage.name}</span>
+                            </div>
                             <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100">
                                 <div>
                                     <label className="text-[9px] font-bold text-gray-400 mb-1 block">رجال ({selectedPackage.min_men}-{selectedPackage.max_men})</label>
@@ -279,8 +314,8 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                     </div>
                                 </div>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
                     {/* 3. Addons */}
                     {item.addons && item.addons.length > 0 && (
@@ -353,7 +388,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </button>
                     </div>
 
-                    {/* 8. Payment Methods (Direct Trigger) */}
+                    {/* 8. Payment Methods (Official Logos) */}
                     {isProcessing ? (
                         <div className="w-full h-14 bg-gray-100 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold">
                             <Loader2 className="animate-spin" /> جاري التوجيه...
@@ -362,9 +397,16 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         <div className="space-y-2 pt-2">
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">اضغط للدفع والتأكيد</label>
                             <div className="grid grid-cols-3 gap-2">
-                                <button onClick={() => handlePaymentClick('apple')} className="h-12 rounded-xl bg-black text-white flex items-center justify-center hover:opacity-80 transition-opacity font-bold text-sm">Apple Pay</button>
-                                <button onClick={() => handlePaymentClick('stc')} className="h-12 rounded-xl bg-purple-600 text-white flex items-center justify-center hover:opacity-80 transition-opacity font-bold text-sm">STC Pay</button>
-                                <button onClick={() => handlePaymentClick('card')} className="h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:opacity-80 transition-opacity font-bold text-sm">Visa/Master</button>
+                                <button onClick={() => handlePaymentClick('apple')} className="h-12 rounded-xl bg-black flex items-center justify-center hover:opacity-80 transition-opacity border border-black overflow-hidden relative">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" alt="Apple Pay" className="h-5 w-auto invert" />
+                                </button>
+                                <button onClick={() => handlePaymentClick('stc')} className="h-12 rounded-xl bg-[#4F008C] flex items-center justify-center hover:opacity-80 transition-opacity border border-[#4F008C] overflow-hidden relative">
+                                    <span className="text-white font-black text-sm">stc pay</span>
+                                </button>
+                                <button onClick={() => handlePaymentClick('card')} className="h-12 rounded-xl bg-white flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200 overflow-hidden relative gap-1 px-1">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-3 w-auto" />
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-5 w-auto" />
+                                </button>
                             </div>
                         </div>
                     )}
