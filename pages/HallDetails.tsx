@@ -8,7 +8,7 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
 import { 
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus, CreditCard
+  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus, CreditCard, ShoppingBag
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -20,9 +20,10 @@ interface HallDetailsProps {
   user: UserProfile | null;
   onBack: () => void;
   onPay?: (amount: number, context: 'booking', refId: string, customerData: any) => Promise<void>;
+  onNavigate?: (tab: string) => void;
 }
 
-export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, onPay }) => {
+export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, onPay, onNavigate }) => {
   const [selectedPackage, setSelectedPackage] = useState<HallPackage | null>(null);
   const [bookingDate, setBookingDate] = useState<Date | undefined>(undefined);
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
@@ -250,7 +251,33 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 3. Amenities Section */}
+                {/* 3. Additional Services (Addons) Section */}
+                {item.addons && item.addons.length > 0 && (
+                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                        <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                            <Sparkles className="w-6 h-6 text-primary" /> خدمات إضافية
+                        </h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {item.addons.map((addon, i) => (
+                                <div 
+                                    key={i} 
+                                    onClick={() => toggleAddon(addon)}
+                                    className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${selectedAddons.some(a => a.name === addon.name) ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedAddons.some(a => a.name === addon.name) ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}>
+                                            {selectedAddons.some(a => a.name === addon.name) && <Check className="w-3 h-3" />}
+                                        </div>
+                                        <span className="font-bold text-gray-900 text-sm">{addon.name}</span>
+                                    </div>
+                                    <PriceTag amount={addon.price} className="text-sm font-black text-primary" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. Amenities Section */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
@@ -265,7 +292,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 4. Policies */}
+                {/* 5. Policies */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
                         <FileText className="w-6 h-6 text-gray-400" /> الشروط والأحكام
@@ -273,6 +300,37 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     <div className="text-sm font-medium text-gray-600 leading-loose bg-gray-50 p-6 rounded-2xl border border-gray-100">
                         {item.policies || 'لا توجد شروط خاصة محددة من قبل القاعة.'}
                     </div>
+                </div>
+
+                {/* Store CTA */}
+                <div className="bg-gradient-to-r from-gray-900 to-primary rounded-[2.5rem] p-8 text-white relative overflow-hidden mt-10 shadow-xl">
+                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="space-y-4 text-center md:text-right flex-1">
+                            <h3 className="text-2xl font-black leading-tight flex items-center justify-center md:justify-start gap-2">
+                                <ShoppingBag className="w-6 h-6" />
+                                هل ترغب في تنسيق زهور أو ضيافة؟
+                            </h3>
+                            <p className="text-white/80 font-medium text-sm leading-relaxed">
+                                أكمل مناسبتك بأجمل باقات الورد والضيافة الفاخرة، وتجهيزات الحفلات من متجرنا المعتمد.
+                            </p>
+                            <Button 
+                                onClick={() => onNavigate && onNavigate('store_page')} 
+                                className="bg-white text-primary hover:bg-gray-100 font-black px-8 h-12 rounded-xl border-none w-full md:w-auto mt-2"
+                            >
+                                تصفح المتجر الآن
+                            </Button>
+                        </div>
+                        <div className="hidden md:block w-32 h-32 rounded-2xl overflow-hidden border-4 border-white/20 shadow-2xl rotate-3">
+                            <img 
+                                src="https://images.unsplash.com/photo-1561181286-d3fee7d55364?auto=format&fit=crop&q=80&w=300" 
+                                className="w-full h-full object-cover" 
+                                alt="Flowers" 
+                            />
+                        </div>
+                    </div>
+                    {/* Decor circles */}
+                    <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                 </div>
             </div>
 
@@ -317,25 +375,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     )}
 
-                    {/* 3. Addons */}
-                    {item.addons && item.addons.length > 0 && (
-                        <div className="space-y-2 border-t border-gray-50 pt-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">خدمات إضافية</label>
-                            <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-                                {item.addons.map((addon, i) => (
-                                    <div key={i} onClick={() => toggleAddon(addon)} className={`flex justify-between items-center p-2 rounded-xl border cursor-pointer ${selectedAddons.some(a => a.name === addon.name) ? 'bg-primary/5 border-primary' : 'bg-white border-gray-100'}`}>
-                                        <div className="flex items-center gap-2">
-                                            {selectedAddons.some(a => a.name === addon.name) && <CheckCircle2 className="w-3 h-3 text-primary" />}
-                                            <span className="text-xs font-bold">{addon.name}</span>
-                                        </div>
-                                        <span className="text-xs font-black text-gray-600">{addon.price} ر.س</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 4. Financials */}
+                    {/* 3. Financials */}
                     <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-bold text-gray-500">
                         <div className="flex justify-between">
                             <span>سعر الباقة ({guestCounts.men + guestCounts.women} فرد)</span>
@@ -359,20 +399,20 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     </div>
 
-                    {/* 5. Total */}
+                    {/* 4. Total */}
                     <div className="text-center">
                         <p className="text-[10px] font-bold text-gray-400 mb-1">الإجمالي شامل الضريبة</p>
                         <PriceTag amount={priceDetails.total * 1.15} className="text-3xl font-black text-primary justify-center" />
                     </div>
 
-                    {/* 6. Guest Data */}
+                    {/* 5. Guest Data */}
                     <div className="space-y-3 pt-2 border-t border-gray-50">
                         <Input placeholder="الاسم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
                         <Input placeholder="الجوال" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
                         <Input placeholder="البريد" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
                     </div>
 
-                    {/* 7. Booking Option */}
+                    {/* 6. Booking Option */}
                     <div className="grid grid-cols-3 gap-2">
                         <button onClick={() => setPaymentOption('deposit')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'deposit' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>
                             <span className="text-[10px] font-black mb-1">عربون</span>
@@ -388,7 +428,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </button>
                     </div>
 
-                    {/* 8. Payment Methods (Official Logos) */}
+                    {/* 7. Payment Methods (Official Logos) */}
                     {isProcessing ? (
                         <div className="w-full h-14 bg-gray-100 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold">
                             <Loader2 className="animate-spin" /> جاري التوجيه...

@@ -646,7 +646,8 @@ const App: React.FC = () => {
         if (selectedEntity.type === 'service') {
             return <ServiceDetails {...detailsProps} />;
         }
-        return <HallDetails {...detailsProps} />;
+        // Pass onNavigate to HallDetails for the store CTA
+        return <HallDetails {...detailsProps} onNavigate={setActiveTab} />;
     }
 
     if (activeTab === 'store_page') return <PublicStore {...paymentProps} />; // Pass payment handler
