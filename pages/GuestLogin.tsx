@@ -40,17 +40,16 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             .limit(1)
             .maybeSingle();
 
-        if (lookupError || !data?.guest_email) {
-            toast({ title: 'غير مسجل', description: 'لم نجد أي حجوزات مرتبطة برقم الجوال هذا.', variant: 'destructive' });
-            setLoading(false);
-            return;
+        if (lookupError) throw lookupError;
+        
+        if (!data?.guest_email) {
+            throw new Error('لم نجد أي حجوزات مرتبطة برقم الجوال هذا.');
         }
 
         const foundEmail = data.guest_email;
         setEmail(foundEmail); 
 
         const { error: authError } = await supabase.auth.signInWithOtp({ email: foundEmail });
-        
         if (authError) throw authError;
 
         toast({ title: 'تم الإرسال', description: `تم إرسال رمز الدخول إلى بريدك الإلكتروني المرتبط (${foundEmail.slice(0, 3)}***).`, variant: 'success' });
@@ -58,7 +57,7 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     } catch (err: any) {
         console.error(err);
-        toast({ title: 'خطأ', description: 'حدث خطأ أثناء محاولة الدخول.', variant: 'destructive' });
+        toast({ title: 'خطأ', description: err.message || 'حدث خطأ أثناء محاولة الدخول.', variant: 'destructive' });
     } finally {
         setLoading(false);
     }
@@ -68,17 +67,18 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!otp || !email) return;
     setLoading(true);
     
-    const { error } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'magiclink' });
-    
-    if (error) {
-        const { error: signupError } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'signup' });
-        if(signupError) {
-            toast({ title: 'رمز خاطئ', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
-            setLoading(false);
-            return;
+    try {
+        const { error } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'magiclink' });
+        
+        if (error) {
+            const { error: signupError } = await supabase.auth.verifyOtp({ email, token: normalizeNumbers(otp), type: 'signup' });
+            if(signupError) throw signupError;
         }
+    } catch (err: any) {
+        toast({ title: 'رمز خاطئ', description: 'تأكد من الرمز وحاول مرة أخرى.', variant: 'destructive' });
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
