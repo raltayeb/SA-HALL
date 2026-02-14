@@ -34,6 +34,9 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   // Addon State
   const [newAddon, setNewAddon] = useState<HallAddon>({ name: '', price: 0, description: '' });
 
+  // Amenity State
+  const [newAmenity, setNewAmenity] = useState('');
+
   // Seasonal State
   const [newSeason, setNewSeason] = useState<SeasonalPrice>({ name: '', start_date: '', end_date: '', increase_percentage: 0 });
 
@@ -112,6 +115,20 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       if (!newAddon.name || newAddon.price < 0) return;
       setCurrentHall(prev => ({ ...prev, addons: [...(prev.addons || []), newAddon] }));
       setNewAddon({ name: '', price: 0, description: '' });
+  };
+
+  const handleAddAmenity = () => {
+      if (!newAmenity.trim()) return;
+      if (currentHall.amenities?.includes(newAmenity.trim())) {
+          toast({ title: 'تنبيه', description: 'هذه الميزة مضافة بالفعل.', variant: 'warning' });
+          return;
+      }
+      setCurrentHall(prev => ({ ...prev, amenities: [...(prev.amenities || []), newAmenity.trim()] }));
+      setNewAmenity('');
+  };
+
+  const removeAmenity = (index: number) => {
+      setCurrentHall(prev => ({ ...prev, amenities: prev.amenities?.filter((_, i) => i !== index) }));
   };
 
   const addSeason = () => {
@@ -244,26 +261,34 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                 </div>
                             </div>
 
+                            {/* Amenities - Custom Input */}
                             <div className="pt-4 border-t border-gray-100">
                                 <h3 className="text-sm font-black text-primary mb-4">المرافق والمميزات</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {HALL_AMENITIES.map(amenity => (
-                                        <label key={amenity} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${currentHall.amenities?.includes(amenity) ? 'bg-primary/5 border-primary text-primary' : 'bg-gray-50 border-gray-100 text-gray-500'}`}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={currentHall.amenities?.includes(amenity)} 
-                                                onChange={() => {
-                                                    const newAmenities = currentHall.amenities?.includes(amenity) 
-                                                        ? currentHall.amenities.filter(a => a !== amenity) 
-                                                        : [...(currentHall.amenities || []), amenity];
-                                                    setCurrentHall({...currentHall, amenities: newAmenities});
-                                                }} 
-                                                className="hidden" 
-                                            />
-                                            <CheckSquare className="w-4 h-4" />
-                                            <span className="text-xs font-bold">{amenity}</span>
-                                        </label>
+                                
+                                <div className="flex gap-2 mb-4">
+                                    <Button onClick={handleAddAmenity} className="h-11 w-11 rounded-xl bg-primary text-white p-0 flex items-center justify-center"><Plus className="w-5 h-5" /></Button>
+                                    <Input 
+                                        placeholder="اكتب الميزة هنا (مثال: موقف خاص، غرفة عروس...)" 
+                                        value={newAmenity} 
+                                        onChange={e => setNewAmenity(e.target.value)} 
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddAmenity()}
+                                        className="h-11 flex-1 bg-gray-50" 
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {currentHall.amenities?.map((amenity, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl border border-gray-200 transition-all hover:border-primary/50 group">
+                                            <CheckSquare className="w-4 h-4 text-primary" />
+                                            <span className="text-xs font-bold text-gray-700">{amenity}</span>
+                                            <button onClick={() => removeAmenity(idx)} className="text-gray-400 hover:text-red-500 transition-colors mr-2">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     ))}
+                                    {(!currentHall.amenities || currentHall.amenities.length === 0) && (
+                                        <p className="text-xs text-gray-400 font-bold py-2">لا توجد مميزات مضافة بعد.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>
