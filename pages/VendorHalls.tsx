@@ -9,7 +9,7 @@ import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPl
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 import { Calendar } from '../components/ui/Calendar';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, isSameDay, parseISO, eachDayOfInterval, getDay, startOfDay } from 'date-fns';
 
 interface VendorHallsProps {
   user: UserProfile;
@@ -41,8 +41,13 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   const [newSeason, setNewSeason] = useState<SeasonalPrice>({ name: '', start_date: '', end_date: '', increase_percentage: 0 });
 
   // Calendar State
-  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
+  
+  // Bulk Blocking State
+  const [bulkStart, setBulkStart] = useState('');
+  const [bulkEnd, setBulkEnd] = useState('');
+  const [bulkDay, setBulkDay] = useState<string>(''); // 0 = Sunday, 1 = Monday...
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -71,8 +76,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setCurrentHall(hall);
       setIsEditing(true);
       setActiveTab('info');
+      // Fetch blocked dates
       const { data } = await supabase.from('bookings').select('booking_date').eq('hall_id', hall.id).eq('status', 'blocked');
-      setBlockedDates(data?.map(b => b.booking_date) || []);
+      if (data) {
+          setBlockedDates(data.map(d => parseISO(d.booking_date)));
+      }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,13 +145,17 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       setNewSeason({ name: '', start_date: '', end_date: '', increase_percentage: 0 });
   };
 
+  // Toggle single date blocking
   const toggleBlockDate = async (date: Date) => {
       if (!currentHall.id) return;
       const dateStr = format(date, 'yyyy-MM-dd');
       
-      if (blockedDates.includes(dateStr)) {
+      // Check if blocked
+      const isBlocked = blockedDates.some(d => isSameDay(d, date));
+      
+      if (isBlocked) {
           await supabase.from('bookings').delete().eq('hall_id', currentHall.id).eq('booking_date', dateStr).eq('status', 'blocked');
-          setBlockedDates(prev => prev.filter(d => d !== dateStr));
+          setBlockedDates(prev => prev.filter(d => !isSameDay(d, date)));
       } else {
           await supabase.from('bookings').insert([{
               hall_id: currentHall.id,
@@ -154,7 +166,61 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               vat_amount: 0,
               notes: 'Blocked by Vendor'
           }]);
-          setBlockedDates(prev => [...prev, dateStr]);
+          setBlockedDates(prev => [...prev, date]);
+      }
+  };
+
+  // Bulk Block Logic
+  const handleBulkBlock = async () => {
+      if (!bulkStart || !bulkEnd || bulkDay === '') {
+          toast({ title: 'ناقص البيانات', description: 'يرجى تحديد التاريخ واليوم.', variant: 'destructive' });
+          return;
+      }
+      if (!currentHall.id) return;
+
+      const start = parseISO(bulkStart);
+      const end = parseISO(bulkEnd);
+      const targetDay = parseInt(bulkDay);
+
+      const daysToBlock: string[] = [];
+      const interval = eachDayOfInterval({ start, end });
+
+      interval.forEach(day => {
+          if (getDay(day) === targetDay) {
+              const str = format(day, 'yyyy-MM-dd');
+              // Avoid duplicates in local check (DB constraint will handle real dups if any, but clean inputs are better)
+              if (!blockedDates.some(d => isSameDay(d, day))) {
+                  daysToBlock.push(str);
+              }
+          }
+      });
+
+      if (daysToBlock.length === 0) {
+          toast({ title: 'لا يوجد أيام', description: 'لم يتم العثور على أيام مطابقة في هذه الفترة.', variant: 'warning' });
+          return;
+      }
+
+      const payloads = daysToBlock.map(dateStr => ({
+          hall_id: currentHall.id,
+          vendor_id: user.id,
+          booking_date: dateStr,
+          status: 'blocked',
+          total_amount: 0,
+          vat_amount: 0,
+          notes: 'Bulk Blocked'
+      }));
+
+      const { error } = await supabase.from('bookings').insert(payloads);
+      
+      if (error) {
+          toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+      } else {
+          toast({ title: 'تم الحجب', description: `تم إغلاق ${daysToBlock.length} يوم بنجاح.`, variant: 'success' });
+          setBlockedDates(prev => [...prev, ...daysToBlock.map(d => parseISO(d))]);
+          // Reset
+          setBulkStart('');
+          setBulkEnd('');
+          setBulkDay('');
       }
   };
 
@@ -184,6 +250,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
   return (
     <div className="space-y-8 pb-10">
+      {/* ... (Existing Header and Grid View remains same) ... */}
       <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-200">
         <div><h2 className="text-3xl font-black text-primary">إدارة القاعات</h2></div>
         <Button onClick={handleAddNew} className="rounded-xl h-12 px-8 font-black gap-2 shadow"><Plus className="w-4 h-4" /> إضافة قاعة</Button>
@@ -208,6 +275,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       {isEditing && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="w-full md:max-w-5xl h-full bg-white border-l border-gray-200 overflow-hidden flex flex-col animate-in slide-in-from-right duration-300">
+              {/* ... (Modal Header & Tabs) ... */}
               <div className="flex justify-between items-center p-6 border-b border-gray-100 bg-white z-10">
                 <button onClick={() => setIsEditing(false)} className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center"><X className="w-5 h-5" /></button>
                 <div className="text-right"><h3 className="font-black text-2xl text-primary">{currentHall.id ? 'تعديل القاعة' : 'إضافة قاعة جديدة'}</h3></div>
@@ -221,8 +289,10 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 custom-scrollbar text-right">
+                 {/* ... (Other Tabs remain the same) ... */}
                  {activeTab === 'info' && (
                      <div className="space-y-6">
+                        {/* Copy existing info tab content here or keep component clean */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
                             <h3 className="text-sm font-black text-primary mb-4">البيانات الأساسية</h3>
                             <div className="grid grid-cols-2 gap-4">
@@ -234,6 +304,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                     </select>
                                 </div>
                             </div>
+                            {/* ... Rest of info fields ... */}
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-500">الوصف</label>
                                 <textarea className="w-full h-32 border border-gray-200 rounded-xl p-3 bg-white outline-none resize-none font-bold text-sm" value={currentHall.description || ''} onChange={e => setCurrentHall({...currentHall, description: e.target.value})} />
@@ -286,9 +357,6 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                             </button>
                                         </div>
                                     ))}
-                                    {(!currentHall.amenities || currentHall.amenities.length === 0) && (
-                                        <p className="text-xs text-gray-400 font-bold py-2">لا توجد مميزات مضافة بعد.</p>
-                                    )}
                                 </div>
                             </div>
                         </div>
@@ -390,14 +458,49 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
                  {activeTab === 'calendar' && (
                      <div className="space-y-6">
+                        {/* Bulk Blocking Form */}
+                        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6">
+                            <h3 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2">
+                                <Lock className="w-4 h-4 text-red-500" /> إغلاق أيام محددة (حجب جماعي)
+                            </h3>
+                            <div className="grid grid-cols-4 gap-3 items-end">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-400">من تاريخ</label>
+                                    <Input type="date" value={bulkStart} onChange={e => setBulkStart(e.target.value)} className="h-10 bg-white" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-400">إلى تاريخ</label>
+                                    <Input type="date" value={bulkEnd} onChange={e => setBulkEnd(e.target.value)} className="h-10 bg-white" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-400">اليوم</label>
+                                    <select className="w-full h-10 border rounded-xl px-3 text-xs font-bold bg-white" value={bulkDay} onChange={e => setBulkDay(e.target.value)}>
+                                        <option value="">اختر اليوم...</option>
+                                        <option value="0">الأحد</option>
+                                        <option value="1">الاثنين</option>
+                                        <option value="2">الثلاثاء</option>
+                                        <option value="3">الأربعاء</option>
+                                        <option value="4">الخميس</option>
+                                        <option value="5">الجمعة</option>
+                                        <option value="6">السبت</option>
+                                    </select>
+                                </div>
+                                <Button onClick={handleBulkBlock} variant="destructive" className="h-10 rounded-xl font-bold text-xs">إغلاق الأيام</Button>
+                            </div>
+                        </div>
+
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
-                            <h3 className="text-sm font-black text-gray-900 mb-6">إدارة التقويم والحجب</h3>
+                            <h3 className="text-sm font-black text-gray-900 mb-6">التقويم (اضغط على اليوم لإغلاقه/فتحه)</h3>
                             <div className="max-w-md mx-auto">
                                 <Calendar 
                                     mode="single"
                                     selected={calendarDate}
                                     onSelect={(d) => { setCalendarDate(d); if(d) toggleBlockDate(d); }}
                                     className="w-full"
+                                    modifiers={{ blocked: blockedDates }}
+                                    modifiersClassNames={{
+                                        blocked: "bg-gray-900 text-white hover:bg-black font-black hover:text-white"
+                                    }}
                                 />
                             </div>
                         </div>
