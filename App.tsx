@@ -41,10 +41,11 @@ import { prepareCheckout, verifyPaymentStatus } from './services/paymentService'
 import { HyperPayForm } from './components/Payment/HyperPayForm';
 import { 
   Loader2, CheckCircle2, Mail, ArrowLeft,
-  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { checkPasswordStrength, isValidSaudiPhone, normalizeNumbers } from './utils/helpers';
 
 type RegStep = 0 | 1 | 2 | 3 | 4;
 
@@ -70,6 +71,7 @@ const App: React.FC = () => {
   });
   const [otpCode, setOtpCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordCriteria, setPasswordCriteria] = useState({ length: false, hasNumber: false, hasSpecial: false, hasLetter: false });
   
   const [selectedType, setSelectedType] = useState<'hall' | 'chalet' | 'service' | null>(null);
   const [assetData, setAssetData] = useState({
@@ -93,11 +95,14 @@ const App: React.FC = () => {
 
   const { toast } = useToast();
 
-  const passValidations = {
-    length: regData.password.length >= 8,
-    match: regData.password && regData.password === regData.confirmPassword,
-    filled: regData.password.length > 0
-  };
+  const isPasswordValid = useMemo(() => {
+      const criteria = checkPasswordStrength(regData.password);
+      return criteria.length && criteria.hasNumber && criteria.hasLetter && regData.password === regData.confirmPassword;
+  }, [regData.password, regData.confirmPassword]);
+
+  useEffect(() => {
+      setPasswordCriteria(checkPasswordStrength(regData.password));
+  }, [regData.password]);
 
   useEffect(() => { 
       activeTabRef.current = activeTab; 
@@ -307,16 +312,36 @@ const App: React.FC = () => {
       }
   };
 
-  // ... (SendOtp, VerifyOtp, SetPassword functions same as before)
+  // ... (SendOtp, VerifyOtp, SetPassword functions)
   const sendOtp = async () => {
     if (!regData.fullName || !regData.email || !regData.phone) {
         toast({ title: 'بيانات ناقصة', description: 'يرجى تعبئة جميع الحقول.', variant: 'destructive' });
         return;
     }
+
+    if (!isValidSaudiPhone(regData.phone)) {
+        toast({ title: 'رقم هاتف غير صالح', description: 'يجب أن يبدأ الرقم بـ 05 ويتكون من 10 أرقام.', variant: 'destructive' });
+        return;
+    }
+
     setAuthLoading(true);
+    
+    // Check if email or phone exists in profiles
+    const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id, email, phone_number')
+        .or(`email.eq.${regData.email},phone_number.eq.${normalizeNumbers(regData.phone)}`)
+        .maybeSingle();
+
+    if (existingUser) {
+        toast({ title: 'حساب مسجل مسبقاً', description: 'البريد الإلكتروني أو رقم الهاتف مستخدم بالفعل.', variant: 'destructive' });
+        setAuthLoading(false);
+        return;
+    }
+
     const { error } = await supabase.auth.signInWithOtp({ 
         email: regData.email,
-        options: { data: { full_name: regData.fullName, phone: regData.phone, role: 'vendor' } }
+        options: { data: { full_name: regData.fullName, phone: normalizeNumbers(regData.phone), role: 'vendor' } }
     });
     if (error) {
         toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
@@ -344,8 +369,8 @@ const App: React.FC = () => {
   };
 
   const setPassword = async () => {
-    if (!passValidations.match || !passValidations.length) {
-        toast({ title: 'خطأ', description: 'كلمة المرور غير مطابقة للشروط.', variant: 'destructive' });
+    if (!isPasswordValid) {
+        toast({ title: 'كلمة المرور غير قوية', description: 'يرجى الالتزام بمتطلبات كلمة المرور.', variant: 'destructive' });
         return;
     }
     setAuthLoading(true);
@@ -359,8 +384,8 @@ const App: React.FC = () => {
                 id: user.id,
                 email: regData.email,
                 full_name: regData.fullName,
-                business_name: regData.fullName,
-                phone_number: regData.phone,
+                business_name: regData.fullName, // Initial default
+                phone_number: normalizeNumbers(regData.phone),
                 role: 'vendor',
                 status: 'pending'
             });
@@ -563,13 +588,12 @@ const App: React.FC = () => {
         <div className="min-h-screen flex flex-col lg:flex-row bg-white">
             {regStep < 3 ? (
                 <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-24">
-                    {/* ... (Register Steps 0, 1, 2 from previous code) */}
                     <div className="w-full max-w-md space-y-8">
                         <div className="text-center lg:text-right"><h2 className="text-3xl font-black">انضم كشريك نجاح</h2></div>
                         {regStep === 0 && (
                             <div className="space-y-4">
                                 <Input placeholder="الاسم" value={regData.fullName} onChange={e => setRegData({...regData, fullName: e.target.value})} className="h-16" />
-                                <Input placeholder="الجوال" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} className="h-16" />
+                                <Input placeholder="الجوال (يبدأ بـ 05)" value={regData.phone} onChange={e => setRegData({...regData, phone: normalizeNumbers(e.target.value)})} className="h-16" />
                                 <Input type="email" placeholder="البريد" value={regData.email} onChange={e => setRegData({...regData, email: e.target.value})} className="h-16" />
                                 <Button onClick={sendOtp} disabled={authLoading} className="w-full h-16 rounded-2xl font-black text-xl">{authLoading ? <Loader2 className="animate-spin" /> : 'تسجيل'}</Button>
                                 <div className="text-center"><button onClick={() => setActiveTab('login')} className="text-xs font-bold text-primary">لديك حساب؟</button></div>
@@ -583,32 +607,108 @@ const App: React.FC = () => {
                         )}
                         {regStep === 2 && (
                             <div className="space-y-6">
-                                <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-16" />
-                                <Input type="password" placeholder="تأكيد" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-16" />
-                                <Button onClick={setPassword} disabled={authLoading} className="w-full h-16 rounded-2xl font-black">إنشاء الحساب</Button>
+                                <div className="space-y-2">
+                                    <Input type="password" placeholder="كلمة المرور" value={regData.password} onChange={e => setRegData({...regData, password: e.target.value})} className="h-16" />
+                                    {/* Password Criteria Checklist */}
+                                    <div className="grid grid-cols-2 gap-2 text-[10px] font-bold px-2">
+                                        <span className={`flex items-center gap-1 ${passwordCriteria.length ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {passwordCriteria.length ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-gray-300"></div>} 8 أحرف على الأقل
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${passwordCriteria.hasLetter ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {passwordCriteria.hasLetter ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-gray-300"></div>} حرف واحد على الأقل
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${passwordCriteria.hasNumber ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {passwordCriteria.hasNumber ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-gray-300"></div>} رقم واحد على الأقل
+                                        </span>
+                                        <span className={`flex items-center gap-1 ${passwordCriteria.hasSpecial ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {passwordCriteria.hasSpecial ? <CheckCircle2 className="w-3 h-3" /> : <div className="w-3 h-3 rounded-full border border-gray-300"></div>} رمز خاص (!@#$)
+                                        </span>
+                                    </div>
+                                </div>
+                                <Input type="password" placeholder="تأكيد كلمة المرور" value={regData.confirmPassword} onChange={e => setRegData({...regData, confirmPassword: e.target.value})} className="h-16" />
+                                <Button onClick={setPassword} disabled={authLoading || !isPasswordValid} className="w-full h-16 rounded-2xl font-black">إنشاء الحساب</Button>
                             </div>
                         )}
                     </div>
                 </div>
             ) : regStep === 3 ? (
-                // ... (Step 3: Choose Type - same as before)
-                <div className="w-full flex flex-col items-center justify-center p-8 min-h-screen">
-                    <h1 className="text-4xl font-ruqaa mb-8">اختر نوع نشاطك</h1>
-                    <div className="grid md:grid-cols-3 gap-8">
-                        <button onClick={() => { setSelectedType('hall'); setRegStep(4); }} className="p-8 border-2 rounded-[3rem] hover:border-primary">قاعة</button>
-                        <button onClick={() => { setSelectedType('chalet'); setRegStep(4); }} className="p-8 border-2 rounded-[3rem] hover:border-primary">شاليه</button>
-                        <button onClick={() => { setSelectedType('service'); setRegStep(4); }} className="p-8 border-2 rounded-[3rem] hover:border-primary">خدمة</button>
+                // Step 3: Choose Type (Restored Original Look)
+                <div className="w-full flex flex-col items-center justify-center p-8 min-h-screen bg-gray-50/50">
+                    <div className="text-center mb-12 space-y-3">
+                        <h1 className="text-4xl font-black text-primary">مرحباً، {regData.fullName}</h1>
+                        <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
+                    </div>
+                    <div className="grid md:grid-cols-3 gap-8 w-full max-w-5xl">
+                        <button 
+                            onClick={() => { setSelectedType('hall'); setRegStep(4); }} 
+                            className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-primary/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6"
+                        >
+                            <div className="w-24 h-24 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 group-hover:bg-primary group-hover:text-white transition-colors">
+                                <Building2 className="w-10 h-10" />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-2xl font-black text-gray-900 mb-2">قاعة أفراح</h3>
+                                <p className="text-sm font-bold text-gray-400">للمناسبات الكبيرة والزواجات</p>
+                            </div>
+                        </button>
+
+                        <button 
+                            onClick={() => { setSelectedType('chalet'); setRegStep(4); }} 
+                            className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-blue-500/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6"
+                        >
+                            <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                <Palmtree className="w-10 h-10" />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-2xl font-black text-gray-900 mb-2">شاليه / منتجع</h3>
+                                <p className="text-sm font-bold text-gray-400">للاستجمام والمناسبات الصغيرة</p>
+                            </div>
+                        </button>
+
+                        <button 
+                            onClick={() => { setSelectedType('service'); setRegStep(4); }} 
+                            className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-orange-500/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6"
+                        >
+                            <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                                <Sparkles className="w-10 h-10" />
+                            </div>
+                            <div className="text-center">
+                                <h3 className="text-2xl font-black text-gray-900 mb-2">مزود خدمة</h3>
+                                <p className="text-sm font-bold text-gray-400">ضيافة، تصوير، كوش، وغيرها</p>
+                            </div>
+                        </button>
                     </div>
                 </div>
             ) : (
-                // ... (Step 4: Details & Payment - same as before but using handleAssetSetupAndPay)
-                <div className="w-full flex items-center justify-center p-8">
-                    <div className="max-w-md w-full space-y-6">
-                        <h2 className="text-2xl font-black">تفاصيل المنشأة</h2>
-                        <Input label="الاسم" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-16" />
-                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading} className="w-full h-16 rounded-2xl font-black text-xl">
+                // Step 4: Details & Payment
+                <div className="w-full flex items-center justify-center p-8 bg-gray-50 min-h-screen">
+                    <div className="bg-white max-w-lg w-full p-8 rounded-[2.5rem] shadow-xl border border-gray-100 space-y-8 text-right">
+                        <div className="text-center">
+                            <h2 className="text-2xl font-black text-gray-900">تفاصيل {selectedType === 'hall' ? 'القاعة' : selectedType === 'chalet' ? 'الشاليه' : 'الخدمة'}</h2>
+                            <p className="text-gray-400 font-bold text-sm mt-2">يرجى إدخال البيانات الأساسية لإتمام التسجيل</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <Input label="الاسم التجاري" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-14 rounded-2xl font-bold" />
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-500">المدينة</label>
+                                <select 
+                                    className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10"
+                                    value={assetData.city}
+                                    onChange={e => setAssetData({...assetData, city: e.target.value})}
+                                >
+                                    {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        <Button onClick={handleAssetSetupAndPay} disabled={authLoading} className="w-full h-16 rounded-2xl font-black text-lg bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20">
                             {authLoading ? <Loader2 className="animate-spin" /> : 'الدفع وتفعيل الحساب'}
                         </Button>
+                        
+                        <button onClick={() => setRegStep(3)} className="w-full text-center text-sm font-bold text-gray-400 hover:text-gray-600">
+                            العودة للاختيار
+                        </button>
                     </div>
                 </div>
             )}

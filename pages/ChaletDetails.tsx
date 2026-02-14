@@ -13,7 +13,7 @@ import {
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
 import { format, isBefore, startOfDay, parse, isSameDay } from 'date-fns';
-import { normalizeNumbers } from '../utils/helpers';
+import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
 
 interface ChaletDetailsProps {
   item: Chalet & { vendor?: UserProfile };
@@ -128,9 +128,14 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
     if (!bookingDate) { toast({ title: 'تنبيه', description: 'الرجاء اختيار تاريخ الحجز', variant: 'destructive' }); return; }
     if (!guestData.name || !guestData.phone || !guestData.email) { toast({ title: 'تنبيه', description: 'الرجاء إكمال كافة بيانات التواصل بما فيها البريد الإلكتروني لاستلام الفاتورة.', variant: 'destructive' }); return; }
 
+    const normalizedPhone = normalizeNumbers(guestData.phone);
+    if (!isValidSaudiPhone(normalizedPhone)) {
+        toast({ title: 'رقم غير صالح', description: 'يرجى إدخال رقم هاتف سعودي صحيح (يبدأ بـ 05).', variant: 'destructive' });
+        return;
+    }
+
     setIsBooking(true);
     try {
-      const normalizedPhone = normalizeNumbers(guestData.phone);
       const status = paymentMethod === 'hold' ? 'on_hold' : 'pending';
       const paymentStatus = paymentMethod === 'full' ? 'paid' : paymentMethod === 'deposit' ? 'partial' : 'unpaid';
       const paidAmount = paymentMethod === 'full' ? grandTotal : paymentMethod === 'deposit' ? depositAmount : 0;
@@ -185,14 +190,13 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
 
   return (
     <div className="min-h-screen bg-[#F8F9FC] pb-20 font-tajawal text-right" dir="rtl">
-      
+      {/* Same as previous ChaletDetails content, just using updated handleBooking */}
       <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 py-4 shadow-sm">
         <div className="w-full max-w-[1920px] mx-auto px-6 lg:px-12 flex justify-between items-center">
           <div className="flex items-center gap-4">
              <button onClick={onBack} className="flex items-center gap-2 text-gray-500 font-bold hover:bg-gray-100 px-4 py-2 rounded-full transition-all">
                <ArrowRight className="w-5 h-5" /> رجوع
              </button>
-             {/* Breadcrumbs */}
              <nav className="hidden md:flex text-xs font-bold text-gray-400 items-center">
                 <span>الرئيسية</span>
                 <ChevronLeft className="w-4 h-4 mx-1" />
@@ -210,7 +214,6 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
 
       <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
-            
             <div className="lg:col-span-2 space-y-8">
                 <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100">
                     <div className="h-[400px] md:h-[500px] rounded-[2rem] overflow-hidden mb-6 relative group">
@@ -234,6 +237,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                     </div>
                 </div>
 
+                {/* Info & Amenities Sections same as before */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6">
                     <h3 className="text-xl font-black text-gray-900 flex items-center gap-2"><Info className="w-5 h-5 text-gray-400" /> تفاصيل المكان</h3>
                     <p className="text-gray-600 leading-loose font-medium text-base">{item.description}</p>
@@ -284,6 +288,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
                 )}
             </div>
 
+            {/* Sidebar with Booking Form */}
             <div className="relative">
                 <div className="sticky top-28 bg-white border border-gray-100 rounded-[2.5rem] p-6 shadow-xl space-y-6">
                     <div className="text-center pb-2 border-b border-gray-50">
@@ -304,7 +309,7 @@ export const ChaletDetails: React.FC<ChaletDetailsProps> = ({ item, user, onBack
 
                     <div className="space-y-3">
                         <Input placeholder="الاسم الكريم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-12 rounded-xl bg-white border-gray-200" />
-                        <Input placeholder="رقم الجوال" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: normalizeNumbers(e.target.value)})} className="h-12 rounded-xl bg-white border-gray-200" />
+                        <Input placeholder="رقم الجوال (يبدأ بـ 05)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: normalizeNumbers(e.target.value)})} className="h-12 rounded-xl bg-white border-gray-200" />
                         <div className="relative">
                             <Input 
                                 placeholder="البريد الإلكتروني" 

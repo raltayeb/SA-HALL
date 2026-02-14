@@ -13,7 +13,7 @@ import {
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
 import { format, isBefore, startOfDay, parseISO, isSameDay } from 'date-fns';
-import { normalizeNumbers } from '../utils/helpers';
+import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
 
 interface HallDetailsProps {
   item: Hall & { vendor?: UserProfile };
@@ -57,7 +57,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
     };
     fetchAvailability();
 
-    // 3. Fetch Booking Config
+    // 3. Fetch Config
     const fetchConfig = async () => {
         const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
         if (data?.value?.booking_config) {
@@ -121,6 +121,12 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
           return;
       }
 
+      const normalizedPhone = normalizeNumbers(guestData.phone);
+      if(!isValidSaudiPhone(normalizedPhone)) {
+          toast({ title: 'رقم غير صالح', description: 'يرجى إدخال رقم هاتف سعودي صحيح.', variant: 'destructive' });
+          return;
+      }
+
       // Validation
       if(selectedPackage) {
           if (guestCounts.men < selectedPackage.min_men || guestCounts.men > selectedPackage.max_men) {
@@ -151,13 +157,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
               booking_option: paymentOption,
               package_details: selectedPackage,
               guest_name: guestData.name,
-              guest_phone: normalizeNumbers(guestData.phone),
+              guest_phone: normalizedPhone,
               guest_email: guestData.email,
               user_id: user?.id || null,
               status: 'pending',
               payment_status: 'unpaid',
-              guests_adults: guestCounts.men, // Using this for Men
-              guests_children: guestCounts.women, // Using this for Women (schema reuse)
+              guests_adults: guestCounts.men,
+              guests_children: guestCounts.women,
               items: [
                   ...(selectedPackage ? [{ name: `باقة: ${selectedPackage.name}`, price: selectedPackage.price, qty: (guestCounts.men + guestCounts.women), type: 'package' }] : []),
                   ...selectedAddons.map(addon => ({ name: addon.name, price: addon.price, qty: 1, type: 'addon' }))
@@ -197,8 +203,8 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
         </nav>
 
         <div className="max-w-[1600px] mx-auto px-6 py-8 grid lg:grid-cols-3 gap-8">
+            {/* Same layout as before */}
             <div className="lg:col-span-2 space-y-8">
-                {/* Images */}
                 <div className="h-[400px] rounded-[2.5rem] overflow-hidden relative">
                     <img src={allImages[0]} className="w-full h-full object-cover" />
                     <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-4 py-2 rounded-2xl font-black text-sm flex items-center gap-2">
@@ -206,7 +212,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 1. Description Section */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
                         <Info className="w-6 h-6 text-primary" /> وصف القاعة
@@ -216,7 +221,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 2. Packages Section */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <Package className="w-6 h-6 text-primary" /> باقات الحجز
@@ -251,7 +255,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 3. Additional Services (Addons) Section */}
                 {item.addons && item.addons.length > 0 && (
                     <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                         <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
@@ -277,7 +280,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 )}
 
-                {/* 4. Amenities Section */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
@@ -292,7 +294,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 5. Policies */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
                         <FileText className="w-6 h-6 text-gray-400" /> الشروط والأحكام
@@ -302,7 +303,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* Store CTA */}
                 <div className="bg-gradient-to-r from-gray-900 to-primary rounded-[2.5rem] p-8 text-white relative overflow-hidden mt-10 shadow-xl">
                     <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="space-y-4 text-center md:text-right flex-1">
@@ -328,18 +328,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                             />
                         </div>
                     </div>
-                    {/* Decor circles */}
                     <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                     <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                 </div>
             </div>
 
-            {/* Booking Sidebar - New Order */}
             <div className="relative">
-                {/* Removed Shadow as requested */}
                 <div className="sticky top-28 bg-white border border-gray-200 rounded-[2.5rem] p-6 space-y-6">
-                    
-                    {/* 1. Calendar */}
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">تاريخ الحجز</label>
                         <div className="bg-gray-50 p-4 rounded-[2rem] border border-gray-100">
@@ -347,7 +342,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     </div>
 
-                    {/* 2. Package Summary & Guest Count */}
                     {selectedPackage && (
                         <div className="space-y-4 border-t border-gray-50 pt-4">
                             <div className="flex justify-between items-center">
@@ -375,7 +369,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     )}
 
-                    {/* 3. Financials */}
                     <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-bold text-gray-500">
                         <div className="flex justify-between">
                             <span>سعر الباقة ({guestCounts.men + guestCounts.women} فرد)</span>
@@ -399,20 +392,17 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     </div>
 
-                    {/* 4. Total */}
                     <div className="text-center">
                         <p className="text-[10px] font-bold text-gray-400 mb-1">الإجمالي شامل الضريبة</p>
                         <PriceTag amount={priceDetails.total * 1.15} className="text-3xl font-black text-primary justify-center" />
                     </div>
 
-                    {/* 5. Guest Data */}
                     <div className="space-y-3 pt-2 border-t border-gray-50">
                         <Input placeholder="الاسم" value={guestData.name} onChange={e => setGuestData({...guestData, name: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
-                        <Input placeholder="الجوال" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
+                        <Input placeholder="الجوال (يبدأ بـ 05)" value={guestData.phone} onChange={e => setGuestData({...guestData, phone: normalizeNumbers(e.target.value)})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
                         <Input placeholder="البريد" value={guestData.email} onChange={e => setGuestData({...guestData, email: e.target.value})} className="h-11 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary" />
                     </div>
 
-                    {/* 6. Booking Option */}
                     <div className="grid grid-cols-3 gap-2">
                         <button onClick={() => setPaymentOption('deposit')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'deposit' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>
                             <span className="text-[10px] font-black mb-1">عربون</span>
@@ -428,7 +418,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </button>
                     </div>
 
-                    {/* 7. Payment Methods (Official Logos) */}
                     {isProcessing ? (
                         <div className="w-full h-14 bg-gray-100 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold">
                             <Loader2 className="animate-spin" /> جاري التوجيه...

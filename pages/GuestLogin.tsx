@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Loader2, ArrowRight, Smartphone, KeyRound } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
-import { normalizeNumbers } from '../utils/helpers';
+import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
 
 export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep] = useState(1);
@@ -16,11 +16,18 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { toast } = useToast();
 
   const handleLookupAndSendOtp = async () => {
-    if (!phone) {
+    const normalizedPhone = normalizeNumbers(phone);
+    
+    if (!normalizedPhone) {
         toast({ title: 'رقم الجوال مطلوب', description: 'يرجى إدخال رقم الجوال المسجل في الحجوزات.', variant: 'destructive' });
         return;
     }
-    const normalizedPhone = normalizeNumbers(phone);
+
+    if (!isValidSaudiPhone(normalizedPhone)) {
+        toast({ title: 'رقم غير صالح', description: 'يرجى إدخال رقم سعودي صحيح (يبدأ بـ 05).', variant: 'destructive' });
+        return;
+    }
+
     setLoading(true);
     
     try {

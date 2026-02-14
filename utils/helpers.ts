@@ -15,3 +15,20 @@ export const formatPhoneNumber = (phone: string): string => {
   if (cleaned.startsWith('5') && cleaned.length === 9) return '0' + cleaned;
   return cleaned; 
 };
+
+export const isValidSaudiPhone = (phone: string): boolean => {
+  const cleaned = normalizeNumbers(phone).replace(/\D/g, '');
+  // Regex for Saudi Mobile: Starts with 05, followed by 8 digits. Total 10.
+  // Or starts with 5, followed by 8 digits. Total 9.
+  const regex = /^(05|5)(5|0|3|6|4|9|1|8|7)([0-9]{7})$/;
+  return regex.test(cleaned);
+};
+
+export const checkPasswordStrength = (password: string) => {
+  return {
+    length: password.length >= 8,
+    hasNumber: /\d/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    hasLetter: /[a-zA-Z\u0600-\u06FF]/.test(password) // English or Arabic letters
+  };
+};
