@@ -85,7 +85,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
     <div 
         key={item.id} 
         onClick={() => onNavigate('hall_details', { item, type })} 
-        className="group relative cursor-pointer text-right transition-all duration-300 border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white hover:border-primary/20"
+        className="group relative cursor-pointer text-right transition-all duration-300 border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white hover:border-primary/20 hover:shadow-xl hover:-translate-y-1"
     >
         <div className="relative aspect-[4/3] overflow-hidden">
             <img 
@@ -122,7 +122,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       
       {/* 1. Hero Section */}
       <section className="relative w-full pt-28 pb-8 flex justify-center">
-        <div className="w-[98%] max-w-[1920px] h-[700px] md:h-[800px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
+        <div className="w-[98%] max-w-[1920px] h-[750px] md:h-[850px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
           
           {/* Background Images */}
           {HERO_IMAGES.map((img, index) => (
@@ -140,103 +140,103 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           ))}
 
           {/* Content Container */}
-          <div className="relative z-10 h-full flex flex-col justify-center px-8 md:px-24 text-right font-tajawal">
-            <div className="max-w-4xl space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-              
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white w-fit">
-                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-                <span className="text-xs md:text-sm font-bold tracking-wide">الوجهة الأولى للمناسبات الفاخرة</span>
-              </div>
+          <div className="relative z-10 h-full flex flex-col justify-center items-center px-4 md:px-8 text-center font-tajawal">
+            
+            {/* Unified Glass Card */}
+            <div className="w-full max-w-5xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000">
+                
+                {/* Decorative Gradients inside card */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-              <div className="space-y-4">
-                <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-white leading-[1.1] tracking-tight drop-shadow-xl">
-                  حيث تكتمل <br /> 
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
-                    لحظات الفرح
-                  </span>
-                </h1>
-                <div className="w-32 h-2 bg-gradient-to-l from-primary to-transparent rounded-full opacity-80"></div>
-              </div>
-              
-              {/* Search Bar - Integrated into Hero */}
-              <div className="pt-6">
-                <form 
-                    onSubmit={handleHeroSearch}
-                    className="bg-white/95 backdrop-blur shadow-2xl rounded-[2.5rem] p-3 flex flex-col md:flex-row items-center gap-2 max-w-full lg:max-w-fit"
-                >
-                    {/* Region */}
-                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[140px] w-full md:w-auto">
-                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> المنطقة</label>
-                        <select 
-                            value={searchFilters.city}
-                            onChange={(e) => setSearchFilters({...searchFilters, city: e.target.value})}
-                            className="bg-transparent text-sm font-black text-gray-900 outline-none cursor-pointer appearance-none"
-                        >
-                            <option value="all">كل المدن</option>
-                            {SAUDI_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
-                        </select>
+                <div className="relative z-10 flex flex-col items-center">
+                    
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/10 text-white w-fit mb-6">
+                        <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                        <span className="text-xs font-bold tracking-wide">الوجهة الأولى للمناسبات الفاخرة</span>
                     </div>
 
-                    {/* Date */}
-                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[140px] w-full md:w-auto">
-                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> اليوم</label>
-                        <input 
-                            type="date"
-                            value={searchFilters.date}
-                            onChange={(e) => setSearchFilters({...searchFilters, date: e.target.value})}
-                            className="bg-transparent text-sm font-black text-gray-900 outline-none cursor-pointer"
-                        />
-                    </div>
+                    {/* Titles */}
+                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight drop-shadow-xl mb-4">
+                      حيث تكتمل <br /> 
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
+                        لحظات الفرح
+                      </span>
+                    </h1>
+                    
+                    <p className="text-white/80 font-bold text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+                        اكتشف أفخم القاعات، الشاليهات، وخدمات الضيافة في مكان واحد. 
+                        نحول مناسبتك إلى ذكرى لا تُنسى.
+                    </p>
 
-                    {/* Attendance */}
-                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[160px] w-full md:w-auto">
-                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Users className="w-3 h-3" /> الحضور (رجال/نساء)</label>
-                        <div className="flex items-center gap-2">
+                    {/* Search Form Grid */}
+                    <form onSubmit={handleHeroSearch} className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 bg-white/90 backdrop-blur-md p-3 rounded-[2rem] shadow-lg">
+                        
+                        {/* Region */}
+                        <div className="lg:col-span-3 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors group/input relative h-16 flex flex-col justify-center px-4">
+                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><MapPin className="w-3 h-3 text-primary" /> المنطقة</label>
+                            <select 
+                                value={searchFilters.city}
+                                onChange={(e) => setSearchFilters({...searchFilters, city: e.target.value})}
+                                className="w-full bg-transparent font-black text-gray-900 outline-none cursor-pointer appearance-none z-10 relative text-sm"
+                            >
+                                <option value="all">كل المدن</option>
+                                {SAUDI_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Date */}
+                        <div className="lg:col-span-3 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors h-16 flex flex-col justify-center px-4">
+                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><Calendar className="w-3 h-3 text-primary" /> التاريخ</label>
                             <input 
-                                type="number"
-                                placeholder="رجال"
-                                value={searchFilters.menCount}
-                                onChange={(e) => setSearchFilters({...searchFilters, menCount: e.target.value})}
-                                className="w-12 bg-transparent text-sm font-black text-gray-900 outline-none border-b border-gray-100"
-                            />
-                            <span className="text-gray-300">/</span>
-                            <input 
-                                type="number"
-                                placeholder="نساء"
-                                value={searchFilters.womenCount}
-                                onChange={(e) => setSearchFilters({...searchFilters, womenCount: e.target.value})}
-                                className="w-12 bg-transparent text-sm font-black text-gray-900 outline-none border-b border-gray-100"
+                                type="date"
+                                value={searchFilters.date}
+                                onChange={(e) => setSearchFilters({...searchFilters, date: e.target.value})}
+                                className="w-full bg-transparent font-black text-gray-900 outline-none cursor-pointer text-sm"
                             />
                         </div>
-                    </div>
 
-                    {/* Price Per Person */}
-                    <div className="flex flex-col gap-1 px-4 py-2 min-w-[140px] w-full md:w-auto">
-                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Coins className="w-3 h-3" /> ميزانية الفرد</label>
-                        <input 
-                            type="number"
-                            placeholder="ر.س"
-                            value={searchFilters.pricePerPerson}
-                            onChange={(e) => setSearchFilters({...searchFilters, pricePerPerson: e.target.value})}
-                            className="bg-transparent text-sm font-black text-gray-900 outline-none placeholder:text-gray-300"
-                        />
-                    </div>
+                        {/* Attendance */}
+                        <div className="lg:col-span-4 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors h-16 flex flex-col justify-center px-4">
+                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><Users className="w-3 h-3 text-primary" /> الحضور (رجال/نساء)</label>
+                            <div className="flex gap-2 items-center">
+                                <input 
+                                    type="number"
+                                    placeholder="رجال"
+                                    value={searchFilters.menCount}
+                                    onChange={(e) => setSearchFilters({...searchFilters, menCount: e.target.value})}
+                                    className="w-full bg-transparent font-black text-gray-900 outline-none border-b border-gray-200 text-center focus:border-primary text-sm"
+                                />
+                                <span className="text-gray-300 text-xs">|</span>
+                                <input 
+                                    type="number"
+                                    placeholder="نساء"
+                                    value={searchFilters.womenCount}
+                                    onChange={(e) => setSearchFilters({...searchFilters, womenCount: e.target.value})}
+                                    className="w-full bg-transparent font-black text-gray-900 outline-none border-b border-gray-200 text-center focus:border-primary text-sm"
+                                />
+                            </div>
+                        </div>
 
-                    {/* Search Button */}
-                    <Button 
-                        type="submit"
-                        className="h-14 w-full md:w-14 rounded-full bg-primary text-white p-0 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20"
-                    >
-                        <Search className="w-6 h-6" />
-                    </Button>
-                </form>
-              </div>
+                        {/* Button */}
+                        <div className="lg:col-span-2">
+                            <Button 
+                                type="submit"
+                                className="w-full h-16 rounded-[1.5rem] bg-primary text-white font-black text-base hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
+                            >
+                                <Search className="w-5 h-5" /> بحث
+                            </Button>
+                        </div>
+                    </form>
 
+                </div>
             </div>
+
           </div>
 
           {/* Bottom Indicators */}
-          <div className="absolute bottom-12 left-12 flex items-center gap-6 z-20">
+          <div className="absolute bottom-12 left-12 flex items-center gap-6 z-20 hidden md:flex">
               <div className="flex gap-3">
                  {HERO_IMAGES.map((_, i) => (
                     <button 
@@ -256,18 +256,38 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           {/* Halls */}
           <div className="space-y-12">
             <SectionHeader title="أفخم القاعات" icon={Sparkles} subtitle="مساحات ملكية" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
+            
+            {/* View All Halls Button -> browse_halls */}
+            <div className="flex justify-center pt-8">
+                <Button 
+                    onClick={() => onNavigate('browse_halls')} 
+                    variant="outline" 
+                    className="h-14 px-10 rounded-2xl font-black text-base border-2 border-gray-100 hover:border-primary hover:text-primary gap-2 transition-all hover:scale-105"
+                >
+                    عرض جميع القاعات <ArrowLeft className="w-5 h-5" />
+                </Button>
+            </div>
           </div>
-
-          {/* Chalets Section Removed */}
 
           {/* Services */}
           <div className="space-y-12">
             <SectionHeader title="خدمات المناسبات" icon={Zap} subtitle="تجهيز احترافي" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
+            </div>
+
+            {/* View All Services Button -> browse_services */}
+            <div className="flex justify-center pt-8">
+                <Button 
+                    onClick={() => onNavigate('browse_services')} 
+                    variant="outline" 
+                    className="h-14 px-10 rounded-2xl font-black text-base border-2 border-gray-100 hover:border-orange-500 hover:text-orange-600 gap-2 transition-all hover:scale-105"
+                >
+                    عرض جميع الخدمات <ArrowLeft className="w-5 h-5" />
+                </Button>
             </div>
           </div>
 
@@ -283,7 +303,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
               </div>
 
               <div className="relative z-10 w-full md:w-1/2 p-8 md:p-12 md:mr-12 lg:mr-24">
-                 <div className="bg-white/95 backdrop-blur-md p-10 md:p-14 rounded-[2.5rem] border border-white/50 text-right space-y-6">
+                 <div className="bg-white/95 backdrop-blur-md p-10 md:p-14 rounded-[2.5rem] border border-white/50 text-right space-y-6 shadow-2xl">
                     <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-purple-50 border border-purple-100 text-primary">
                         <Store className="w-4 h-4" />
                         <span className="text-[10px] font-black uppercase tracking-widest">متجر القاعة</span>

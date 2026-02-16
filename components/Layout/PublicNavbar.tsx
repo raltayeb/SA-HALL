@@ -36,7 +36,6 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: <Home className="w-4 h-4" /> },
     { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" /> },
-    // Chalets removed
     { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" /> },
     { id: 'store_page', label: 'المتجر', icon: <ShoppingBag className="w-4 h-4" /> },
   ];
@@ -80,15 +79,15 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
               {!user ? (
                 <div className="flex items-center gap-3">
                   <Button 
-                    onClick={() => onNavigate('register')} 
-                    className="rounded-2xl px-6 h-12 text-sm font-black bg-gray-900 text-white hover:bg-black transition-all border-none gap-2 shadow-lg hidden md:flex"
+                    onClick={onRegisterClick} 
+                    className="rounded-2xl px-6 h-12 text-sm font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 shadow-lg shadow-primary/20 hidden md:flex"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>انضم إلينا</span>
                   </Button>
                   <button 
-                    onClick={() => onNavigate('login')} 
-                    className="h-12 px-6 text-sm font-bold text-gray-900 hover:text-primary hover:bg-gray-50 rounded-2xl border-2 border-gray-100 transition-all flex items-center gap-2"
+                    onClick={onLoginClick} 
+                    className="h-12 px-6 text-sm font-bold text-gray-900 hover:text-primary hover:bg-gray-50 rounded-2xl border-2 border-gray-100 transition-all flex items-center gap-2 hidden md:flex"
                   >
                     <LogIn className="w-4 h-4" />
                     <span>دخول</span>
@@ -147,7 +146,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
         {/* Mobile Menu Overlay */}
         {isMobileMenuOpen && (
-            <div className="lg:hidden bg-white border-t border-gray-100 py-4 px-4 animate-in slide-in-from-top-5 shadow-2xl absolute w-full">
+            <div className="lg:hidden bg-white border-t border-gray-100 py-6 px-6 animate-in slide-in-from-top-5 shadow-2xl absolute w-full left-0 right-0 top-24 z-[90]">
                 <nav className="flex flex-col gap-2">
                     {navItems.map(item => (
                         <button 
@@ -160,16 +159,16 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                         </button>
                     ))}
                     {!user && (
-                        <div className="pt-4 mt-2 border-t border-gray-100 space-y-3">
+                        <div className="pt-6 mt-2 border-t border-gray-100 space-y-3">
                            <Button 
-                                onClick={() => { onNavigate('register'); setIsMobileMenuOpen(false); }} 
-                                className="w-full rounded-xl h-12 font-black bg-gray-900 text-white"
+                                onClick={() => { onRegisterClick(); setIsMobileMenuOpen(false); }} 
+                                className="w-full rounded-2xl h-14 font-black bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
                             >
                                 انضم إلينا
                             </Button>
                             <button 
-                                onClick={() => { onNavigate('login'); setIsMobileMenuOpen(false); }} 
-                                className="w-full h-12 rounded-xl font-bold border-2 border-gray-100 text-gray-900 flex items-center justify-center gap-2"
+                                onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }} 
+                                className="w-full h-14 rounded-2xl font-bold border-2 border-gray-100 text-gray-900 flex items-center justify-center gap-2 hover:bg-gray-50"
                             >
                                 تسجيل الدخول
                             </button>

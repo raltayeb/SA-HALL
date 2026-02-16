@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { 
-  Loader2, Mail, Lock, Building2, User, ArrowRight, ShieldCheck, Zap
+  Loader2, Mail, Lock, User, Phone, ArrowRight, Eye, EyeOff
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -19,14 +19,17 @@ interface VendorAuthProps {
 export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegister, onLogin, onDataChange, onBack }) => {
   const [mode, setMode] = useState<'login' | 'register'>(isLogin ? 'login' : 'register');
   const [loading, setLoading] = useState(false);
+  const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     fullName: '',
-    businessName: '',
+    phone: '',
   });
+
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
       setMode(isLogin ? 'login' : 'register');
@@ -38,6 +41,17 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
       }
   }, [formData, onDataChange]);
 
+  // Fetch System Logo
+  useEffect(() => {
+      const fetchLogo = async () => {
+          const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+          if (data?.value?.platform_logo_url) {
+              setSystemLogo(data.value.platform_logo_url);
+          }
+      };
+      fetchLogo();
+  }, []);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -48,11 +62,7 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
             throw new Error('يرجى تعبئة كافة الحقول المطلوبة');
         }
         
-        // Check if user already exists (optional, mostly handled by auth provider)
-        // If successful, trigger onRegister to move to next step in parent
         if (onRegister) {
-            // Note: Actual signup happens in later steps or here depending on flow. 
-            // Based on App.tsx, we just collect info here and move to step 3.
             onRegister();
         } 
 
@@ -77,123 +87,130 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row font-tajawal text-right overflow-hidden bg-white" dir="rtl">
         
-        {/* Right Column: Auth Form */}
-        <div className="w-full md:w-1/2 flex flex-col justify-center px-8 md:px-20 py-12 relative bg-white">
-            {onBack && (
-                <button 
-                    onClick={onBack} 
-                    className="absolute top-8 right-8 text-gray-400 hover:text-primary flex items-center gap-2 font-bold text-xs transition-colors"
-                >
-                    <ArrowRight className="w-4 h-4" /> العودة
-                </button>
-            )}
-
-            <div className="max-w-md w-full mx-auto space-y-10">
-                <div className="space-y-3">
-                    <h3 className="text-4xl font-black text-gray-900 tracking-tight">
-                        {mode === 'login' ? 'تسجيل الدخول' : 'شريك جديد'}
-                    </h3>
-                    <p className="text-gray-400 font-bold text-sm">
-                        {mode === 'login' ? 'مرحباً بك مجدداً في منصة القاعة.' : 'سجل بياناتك الأولية للبدء في إعداد حسابك.'}
-                    </p>
+        {/* Right Column: Auth Form (White Background) */}
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 sm:px-12 lg:px-24 py-12 bg-white relative">
+            <div className="w-full max-w-md space-y-8">
+                
+                {/* Header */}
+                <div className="text-right space-y-2 mb-10">
+                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">
+                        {mode === 'login' ? 'تسجيل الدخول' : 'انضم كشريك نجاح'}
+                    </h2>
                 </div>
 
+                {/* Form */}
                 <form onSubmit={handleAuth} className="space-y-5">
                     {mode === 'register' && (
                         <>
-                            <Input 
-                                label="الاسم الكامل" 
-                                value={formData.fullName} 
-                                onChange={e => setFormData({...formData, fullName: e.target.value})} 
-                                icon={<User className="w-4 h-4" />}
-                                className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white focus:ring-primary/20"
-                                required
-                            />
-                            <Input 
-                                label="اسم المنشأة (مبدئي)" 
-                                value={formData.businessName} 
-                                onChange={e => setFormData({...formData, businessName: e.target.value})} 
-                                icon={<Building2 className="w-4 h-4" />}
-                                className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white focus:ring-primary/20"
-                            />
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500">الاسم</label>
+                                <Input 
+                                    value={formData.fullName} 
+                                    onChange={e => setFormData({...formData, fullName: e.target.value})} 
+                                    className="h-12 rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-500">الجوال (يبدأ بـ 05)</label>
+                                <Input 
+                                    value={formData.phone} 
+                                    onChange={e => setFormData({...formData, phone: e.target.value})} 
+                                    className="h-12 rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-left"
+                                    placeholder="05xxxxxxxx"
+                                    dir="ltr"
+                                />
+                            </div>
                         </>
                     )}
 
-                    <Input 
-                        label="البريد الإلكتروني" 
-                        type="email"
-                        value={formData.email} 
-                        onChange={e => setFormData({...formData, email: e.target.value})} 
-                        icon={<Mail className="w-4 h-4" />}
-                        className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white focus:ring-primary/20"
-                        required
-                    />
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
+                        <Input 
+                            type="email"
+                            value={formData.email} 
+                            onChange={e => setFormData({...formData, email: e.target.value})} 
+                            className="h-12 rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20 text-left"
+                            dir="ltr"
+                            required
+                        />
+                    </div>
 
-                    <Input 
-                        label="كلمة المرور" 
-                        type="password"
-                        value={formData.password} 
-                        onChange={e => setFormData({...formData, password: e.target.value})} 
-                        icon={<Lock className="w-4 h-4" />}
-                        className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white focus:ring-primary/20"
-                        required
-                    />
+                    <div className="space-y-1 relative">
+                        <label className="text-xs font-bold text-gray-500">كلمة المرور</label>
+                        <div className="relative">
+                            <Input 
+                                type={showPassword ? "text" : "password"}
+                                value={formData.password} 
+                                onChange={e => setFormData({...formData, password: e.target.value})} 
+                                className="h-12 rounded-lg border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary/20"
+                                required
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
+                    </div>
 
-                    <Button 
-                        disabled={loading} 
-                        className="w-full h-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/10 mt-4 bg-primary text-white hover:opacity-90 transition-all active:scale-95"
-                    >
-                        {loading ? <Loader2 className="animate-spin" /> : (mode === 'login' ? 'دخول' : 'متابعة التسجيل')}
-                    </Button>
+                    <div className="pt-4">
+                        <Button 
+                            disabled={loading} 
+                            className="w-full h-12 rounded-lg font-black text-base bg-primary text-white hover:bg-primary/90 transition-all shadow-none"
+                        >
+                            {loading ? <Loader2 className="animate-spin" /> : (mode === 'login' ? 'دخول للمنصة' : 'تسجيل')}
+                        </Button>
+                    </div>
                 </form>
 
-                <div className="text-center pt-6 border-t border-gray-50">
-                    <p className="text-gray-500 font-bold text-sm">
-                        {mode === 'login' ? 'ليس لديك حساب بائع؟' : 'لديك حساب بائع بالفعل؟'}
-                        <button 
-                            onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                            className="text-primary mr-2 font-black hover:underline"
-                        >
-                            {mode === 'login' ? 'سجل الآن' : 'سجل دخولك هنا'}
+                {/* Footer Links */}
+                <div className="space-y-4 pt-4 text-center">
+                    {mode === 'login' ? (
+                        <>
+                            <div className="flex flex-col gap-2 text-sm font-bold text-primary">
+                                <a href="/guest-login" onClick={(e) => { e.preventDefault(); /* Navigate to guest login */ }} className="hover:underline">دخول الضيوف</a>
+                                <button onClick={() => setMode('register')} className="hover:underline">انضم كشريك الآن</button>
+                            </div>
+                        </>
+                    ) : (
+                        <p className="text-sm font-bold text-gray-500">
+                            لديك حساب؟ <button onClick={() => setMode('login')} className="text-primary hover:underline">تسجيل الدخول</button>
+                        </p>
+                    )}
+                    
+                    <div className="pt-8">
+                        <button onClick={onBack} className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors">
+                            العودة للرئيسية
                         </button>
-                    </p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        {/* Left Column: Branding */}
-        <div className="hidden md:flex md:w-1/2 bg-primary relative items-center justify-center p-12 overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-full">
-                <div className="absolute top-[-10%] left-[-10%] w-80 h-80 bg-white/10 rounded-full blur-[100px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-80 h-80 bg-black/10 rounded-full blur-[100px]"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full opacity-5 pointer-events-none">
-                     <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
-                </div>
+        {/* Left Column: Branding (Solid Purple) */}
+        <div className="hidden md:flex md:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
+            {/* Background Pattern (Optional subtle texture) */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" 
+                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}>
             </div>
 
-            <div className="relative z-10 text-center space-y-8 max-w-sm">
-                <div className="bg-white/10 backdrop-blur-md p-8 rounded-[3rem] border border-white/20 shadow-2xl">
-                    <img src="https://dash.hall.sa/logo.svg" className="h-24 w-auto mx-auto mb-6 invert brightness-0" alt="Logo" />
-                    <h1 className="text-4xl font-ruqaa text-white mb-2">القاعة</h1>
-                    <div className="h-1 w-12 bg-white/30 mx-auto rounded-full"></div>
-                </div>
+            <div className="relative z-10 text-center">
+                <img 
+                    src={systemLogo} 
+                    className="h-32 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl" 
+                    alt="Logo" 
+                />
+                <h1 className="text-5xl font-ruqaa text-white mb-2 drop-shadow-md tracking-wide">القاعة</h1>
+                <p className="text-white/80 text-[10px] uppercase tracking-[0.3em] font-sans">Wedding Hall Saudi Arabia</p>
                 
-                <div className="space-y-4">
-                    <h2 className="text-2xl font-black text-white">شريكك في إدارة المناسبات</h2>
-                    <p className="text-white/70 font-medium leading-relaxed">
-                        نظام متكامل لإدارة الحجوزات، الفوترة الإلكترونية، والمخزون في مكان واحد.
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-8">
-                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm text-center">
-                        <ShieldCheck className="w-6 h-6 text-white/80 mx-auto mb-2" />
-                        <p className="text-[10px] font-black text-white uppercase tracking-widest">فوترة معتمدة</p>
-                    </div>
-                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm text-center">
-                        <Zap className="w-6 h-6 text-white/80 mx-auto mb-2" />
-                        <p className="text-[10px] font-black text-white uppercase tracking-widest">تحديث لحظي</p>
-                    </div>
+                {/* Decorative Dots/Elements similar to screenshot */}
+                <div className="flex flex-col items-center gap-1 mt-4 opacity-50">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                    <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                 </div>
             </div>
         </div>

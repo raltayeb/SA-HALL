@@ -144,7 +144,7 @@ const App: React.FC = () => {
       }, 2000);
   };
 
-  const isPublicPage = ['home', 'login', 'register', 'vendor_login', 'vendor_register', 'browse_halls', 'hall_details', 'store_page', 'guest_login'].includes(activeTab);
+  const isPublicPage = ['home', 'login', 'register', 'vendor_login', 'vendor_register', 'browse_halls', 'browse_services', 'hall_details', 'store_page', 'guest_login'].includes(activeTab);
 
   const renderContent = () => {
     if (activeTab === 'vendor_register') {
@@ -290,6 +290,7 @@ const App: React.FC = () => {
       case 'subscriptions': return <VendorSubscriptions />;
       case 'hall_bookings': return userProfile ? <Bookings user={userProfile} /> : null;
       case 'browse_halls': return <BrowseHalls user={userProfile} entityType="hall" onBack={() => setActiveTab('home')} onNavigate={handleNavigate} initialFilters={browseFilters} />;
+      case 'browse_services': return <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={handleNavigate} initialFilters={browseFilters} />;
       case 'halls_page': return <PublicListing type="hall" title="قاعات الأفراح" subtitle="اختر من بين أفخم القاعات لليلة العمر" onNavigate={handleNavigate} />;
       case 'services_page': return <PublicListing type="service" title="خدمات المناسبات" subtitle="كل ما تحتاجه لإكمال فرحتك" onNavigate={handleNavigate} />;
       case 'hall_details': return detailItem ? (
@@ -320,8 +321,6 @@ const App: React.FC = () => {
 
   // Main Return
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
-
-  // Removed early return for Home page here to ensure layout is applied
 
   return (
     <NotificationProvider userId={userProfile?.id}>
