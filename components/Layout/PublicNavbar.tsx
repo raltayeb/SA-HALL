@@ -41,7 +41,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 shadow-sm h-24">
+    <header className="fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-100 shadow-sm h-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
           <div className="flex items-center justify-between h-full">
             
@@ -51,8 +51,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                 className="flex items-center cursor-pointer shrink-0" 
                 onClick={() => onNavigate('home')}
               >
-                <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-10 w-auto object-contain transition-transform hover:scale-105" />
-                <span className="mr-3 text-2xl font-ruqaa text-primary hidden sm:block">القاعة</span>
+                <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto object-contain transition-transform hover:scale-105" />
               </div>
 
               <nav className="hidden lg:flex items-center gap-1">

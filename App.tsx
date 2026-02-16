@@ -276,8 +276,6 @@ const App: React.FC = () => {
   // Helper for Hall Form Rendering
   const renderHallForm = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        {/* ... (Same Hall Form Content as previous step) ... */}
-        {/* Keeping existing form code structure for brevity, assuming it's retained from previous prompt */}
         <div>
             <h3 className="text-lg font-black text-primary mb-4 text-right">معلومات المالك</h3>
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
@@ -285,7 +283,6 @@ const App: React.FC = () => {
                     <Input label="رقم الجوال" value={regData.phone} readOnly className="bg-gray-50 border-transparent" />
                     <Input label="البريد الإلكتروني" value={regData.email} readOnly className="bg-gray-50 border-transparent text-left" dir="ltr" />
                 </div>
-                {/* ... rest of inputs ... */}
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500">مدينة القاعة</label>
                     <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none focus:border-primary" value={hallFormData.city} onChange={e => setHallFormData({...hallFormData, city: e.target.value})}>
@@ -342,7 +339,11 @@ const App: React.FC = () => {
         if (regStep === 3) {
             return (
                 <div className="w-full flex flex-col items-center justify-center p-8 min-h-screen bg-gray-50/50">
-                    <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-32 w-auto mb-8 object-contain" />
+                    <img 
+                        src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} 
+                        alt="Logo" 
+                        className="h-64 w-auto mb-8 object-contain" 
+                    />
                     <div className="text-center mb-12 space-y-3">
                         <h1 className="text-4xl font-black text-primary">مرحباً، {regData.fullName}</h1>
                         <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
@@ -350,11 +351,11 @@ const App: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">
                         <button onClick={() => { setSelectedType('hall'); setRegStep(4); }} className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-primary/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6">
                             <div className="w-24 h-24 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 group-hover:bg-primary group-hover:text-white transition-colors"><Building2 className="w-10 h-10" /></div>
-                            <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">قاعة أفراح</h3><p className="text-sm font-bold text-gray-400">للمناسبات الكبيرة والزواجات</p></div>
+                            <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">القاعات</h3><p className="text-sm font-bold text-gray-400">للمناسبات الكبيرة والزواجات</p></div>
                         </button>
                         <button onClick={() => { setSelectedType('service'); setRegStep(4); }} className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-orange-500/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6">
                             <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-colors"><Sparkles className="w-10 h-10" /></div>
-                            <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">مزود خدمة</h3><p className="text-sm font-bold text-gray-400">ضيافة، تصوير، كوش، وغيرها</p></div>
+                            <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">الخدمات الإضافية</h3><p className="text-sm font-bold text-gray-400">ضيافة، تصوير، كوش، وغيرها</p></div>
                         </button>
                     </div>
                 </div>
