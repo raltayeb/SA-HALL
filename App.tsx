@@ -219,6 +219,11 @@ const App: React.FC = () => {
         if (regStep === 3) {
             return (
                 <div className="w-full flex flex-col items-center justify-center p-8 min-h-screen bg-gray-50/50">
+                    <img 
+                        src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} 
+                        alt="Logo" 
+                        className="h-32 w-auto mb-8 object-contain"
+                    />
                     <div className="text-center mb-12 space-y-3">
                         <h1 className="text-4xl font-black text-primary">مرحباً، {regData.fullName}</h1>
                         <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
@@ -240,7 +245,11 @@ const App: React.FC = () => {
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 font-tajawal" dir="rtl">
                     <div className="text-center mb-10 space-y-4">
-                        <img src="https://dash.hall.sa/logo.svg" alt="Logo" className="h-16 w-auto mx-auto" />
+                        <img 
+                            src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} 
+                            alt="Logo" 
+                            className="h-24 w-auto mx-auto object-contain" 
+                        />
                         <div className="space-y-2">
                             <h1 className="text-3xl font-black text-primary">مرحباً ألف، {regData.fullName}</h1>
                             <p className="text-gray-500 font-bold">يرجى إكمال بيانات {selectedType === 'hall' ? 'القاعة' : 'الخدمة'} لإتمام التسجيل</p>

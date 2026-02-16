@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { 
-  Loader2, Mail, Lock, User, Phone, ArrowRight, Eye, EyeOff
+  Loader2, Eye, EyeOff
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -200,11 +200,9 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
             <div className="relative z-10 text-center">
                 <img 
                     src={systemLogo} 
-                    className="h-32 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl" 
+                    className="h-64 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl object-contain" 
                     alt="Logo" 
                 />
-                <h1 className="text-5xl font-ruqaa text-white mb-2 drop-shadow-md tracking-wide">القاعة</h1>
-                <p className="text-white/80 text-[10px] uppercase tracking-[0.3em] font-sans">Wedding Hall Saudi Arabia</p>
                 
                 {/* Decorative Dots/Elements similar to screenshot */}
                 <div className="flex flex-col items-center gap-1 mt-4 opacity-50">
