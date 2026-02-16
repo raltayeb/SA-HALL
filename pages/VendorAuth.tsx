@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { 
-  Loader2, Eye, EyeOff, Mail, Lock, Check, X, ShieldCheck
+  Loader2, Eye, EyeOff, Mail, Lock, Check, ShieldCheck
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
@@ -27,7 +27,7 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '', // Added confirm password
+    confirmPassword: '', 
     fullName: '',
     phone: '',
     otp: ''
@@ -55,7 +55,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
       }
   }, [formData, onDataChange]);
 
-  // Fetch System Logo
   useEffect(() => {
       const fetchLogo = async () => {
           const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
@@ -99,14 +98,13 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
 
       setLoading(true);
       try {
-          // Send OTP
           const { error } = await supabase.auth.signInWithOtp({
               email: formData.email,
               options: {
                   data: {
                       full_name: formData.fullName,
                       phone_number: normalizedPhone,
-                      role: 'vendor' // Will be pending until paid/approved
+                      role: 'vendor'
                   }
               }
           });
@@ -144,7 +142,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   const handleRegisterStep3 = async (e: React.FormEvent) => {
       e.preventDefault();
       
-      // Validate Requirements
       const allValid = passwordRequirements.every(r => r.valid);
       if (!allValid) {
           toast({ title: 'كلمة المرور غير قوية', description: 'يرجى تحقيق كافة شروط كلمة المرور.', variant: 'warning' });
@@ -153,13 +150,11 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
 
       setLoading(true);
       try {
-          // Update user with password
           const { error } = await supabase.auth.updateUser({ password: formData.password });
           if (error) throw error;
 
           toast({ title: 'تم إنشاء الحساب', description: 'جاري توجيهك لاختيار نوع النشاط...', variant: 'success' });
           
-          // Trigger parent callback to move to Selection Screen
           if (onRegister) onRegister();
       } catch (err: any) {
           toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
@@ -170,48 +165,26 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
 
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row font-tajawal text-right overflow-hidden bg-white" dir="rtl">
-        
-        {/* Right Column: Auth Form */}
         <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 sm:px-12 lg:px-24 py-12 bg-white relative">
             <div className="w-full max-w-md space-y-8">
                 
-                {/* Header */}
                 <div className="text-right space-y-2 mb-10">
                     <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">
                         {mode === 'login' ? 'تسجيل الدخول' : regStep === 1 ? 'انضم كشريك نجاح' : regStep === 2 ? 'تفعيل الحساب' : 'تأمين الحساب'}
                     </h2>
-                    {/* Removed Progress Bar as requested */}
                 </div>
 
-                {/* Login Form */}
                 {mode === 'login' && (
                     <form onSubmit={handleLogin} className="space-y-5">
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
-                            <Input 
-                                type="email"
-                                value={formData.email} 
-                                onChange={e => setFormData({...formData, email: e.target.value})} 
-                                className="h-12 rounded-lg border-gray-200 focus:border-primary text-left"
-                                dir="ltr"
-                                required
-                            />
+                            <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary text-left" dir="ltr" required />
                         </div>
                         <div className="space-y-1 relative">
                             <label className="text-xs font-bold text-gray-500">كلمة المرور</label>
                             <div className="relative">
-                                <Input 
-                                    type={showPassword ? "text" : "password"}
-                                    value={formData.password} 
-                                    onChange={e => setFormData({...formData, password: e.target.value})} 
-                                    className="h-12 rounded-lg border-gray-200 focus:border-primary"
-                                    required
-                                />
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
+                                <Input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary" required />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
@@ -224,7 +197,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                     </form>
                 )}
 
-                {/* Register Step 1: Info */}
                 {mode === 'register' && regStep === 1 && (
                     <form onSubmit={handleRegisterStep1} className="space-y-5">
                         <div className="space-y-1">
@@ -247,20 +219,13 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                     </form>
                 )}
 
-                {/* Register Step 2: OTP */}
                 {mode === 'register' && regStep === 2 && (
                     <form onSubmit={handleRegisterStep2} className="space-y-6 text-center">
                         <div className="flex flex-col items-center justify-center space-y-4">
                             <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Mail className="w-8 h-8" /></div>
                             <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{formData.email}</b></p>
                         </div>
-                        <Input 
-                            value={formData.otp} 
-                            onChange={e => setFormData({...formData, otp: normalizeNumbers(e.target.value)})} 
-                            className="h-14 text-center text-2xl font-black tracking-widest rounded-xl border-2 focus:border-primary" 
-                            placeholder="------" 
-                            maxLength={6}
-                        />
+                        <Input value={formData.otp} onChange={e => setFormData({...formData, otp: normalizeNumbers(e.target.value)})} className="h-14 text-center text-2xl font-black tracking-widest rounded-xl border-2 focus:border-primary" placeholder="------" maxLength={6} />
                         <Button disabled={loading} className="w-full h-12 rounded-lg font-black text-base bg-primary text-white hover:bg-primary/90">
                             {loading ? <Loader2 className="animate-spin" /> : 'تحقق'}
                         </Button>
@@ -268,7 +233,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                     </form>
                 )}
 
-                {/* Register Step 3: Password & Confirmation */}
                 {mode === 'register' && regStep === 3 && (
                     <form onSubmit={handleRegisterStep3} className="space-y-6">
                         <div className="text-center mb-6">
@@ -277,36 +241,20 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                         </div>
                         
                         <div className="space-y-4">
-                            {/* Password Field */}
                             <div className="space-y-1 relative">
                                 <label className="text-xs font-bold text-gray-500">كلمة المرور الجديدة</label>
                                 <div className="relative">
-                                    <Input 
-                                        type={showPassword ? "text" : "password"}
-                                        value={formData.password} 
-                                        onChange={e => setFormData({...formData, password: e.target.value})} 
-                                        className="h-12 rounded-lg border-gray-200 focus:border-primary pr-10"
-                                        placeholder="••••••••"
-                                        required
-                                    />
+                                    <Input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary pr-10" placeholder="••••••••" required />
                                     <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Confirm Password Field */}
                             <div className="space-y-1 relative">
                                 <label className="text-xs font-bold text-gray-500">تأكيد كلمة المرور</label>
                                 <div className="relative">
-                                    <Input 
-                                        type={showConfirmPassword ? "text" : "password"}
-                                        value={formData.confirmPassword} 
-                                        onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
-                                        className="h-12 rounded-lg border-gray-200 focus:border-primary pr-10"
-                                        placeholder="••••••••"
-                                        required
-                                    />
+                                    <Input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={e => setFormData({...formData, confirmPassword: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary pr-10" placeholder="••••••••" required />
                                     <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                         {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
@@ -314,7 +262,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                             </div>
                         </div>
 
-                        {/* Interactive Requirements List */}
                         <div className="bg-gray-50 p-4 rounded-xl space-y-2">
                             <p className="text-[10px] font-black text-gray-400 uppercase mb-2">متطلبات الأمان:</p>
                             {passwordRequirements.map((req) => (
@@ -333,7 +280,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                     </form>
                 )}
 
-                {/* Footer Links */}
                 <div className="space-y-4 pt-4 text-center">
                     {mode === 'login' ? (
                         <>
@@ -347,7 +293,6 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                             لديك حساب؟ <button onClick={() => setMode('login')} className="text-primary hover:underline">تسجيل الدخول</button>
                         </p>
                     )}
-                    
                     <div className="pt-8">
                         <button onClick={onBack} className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors">
                             العودة للرئيسية
@@ -357,11 +302,8 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
             </div>
         </div>
 
-        {/* Left Column: Branding */}
         <div className="hidden md:flex md:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
-            <div className="absolute inset-0 opacity-10 pointer-events-none" 
-                 style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}>
-            </div>
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
             <div className="relative z-10 text-center">
                 <img src={systemLogo} className="h-64 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl object-contain" alt="Logo" />
                 <div className="flex flex-col items-center gap-1 mt-4 opacity-50">

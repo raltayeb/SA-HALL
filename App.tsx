@@ -160,6 +160,51 @@ const App: React.FC = () => {
       else setActiveTab(tab);
   };
 
+  // --- SMART LOGIN REDIRECT LOGIC ---
+  const handleLoginSuccess = async () => {
+      setAuthLoading(true);
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+          
+          if (profile) {
+              setUserProfile(profile as UserProfile);
+
+              if (profile.role === 'vendor') {
+                  // Check if vendor has ANY assets (Halls or Services)
+                  const [halls, services] = await Promise.all([
+                      supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', user.id),
+                      supabase.from('services').select('id', { count: 'exact', head: true }).eq('vendor_id', user.id)
+                  ]);
+
+                  const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
+
+                  if (hasAssets) {
+                      // Has assets -> Go to Dashboard
+                      setActiveTab('dashboard');
+                  } else {
+                      // No assets -> Go to Selection Screen (Step 3)
+                      setRegData(prev => ({ ...prev, fullName: profile.full_name || 'الشريك', email: profile.email }));
+                      setRegStep(3); 
+                      setActiveTab('vendor_register');
+                  }
+              } else if (profile.role === 'super_admin') {
+                  setActiveTab('admin_dashboard');
+              } else {
+                  // Normal User
+                  setActiveTab('home');
+              }
+          }
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء التوجيه', variant: 'destructive' });
+      } finally {
+          setAuthLoading(false);
+      }
+  };
+
   const handleRegistrationPayClick = async (method: string) => {
       setAuthLoading(true);
       try {
@@ -180,15 +225,13 @@ const App: React.FC = () => {
                   capacity: (Number(hallFormData.capacity_men) || 0) + (Number(hallFormData.capacity_women) || 0),
                   capacity_men: Number(hallFormData.capacity_men) || 0,
                   capacity_women: Number(hallFormData.capacity_women) || 0,
-                  price_per_night: 5000, // Default price, meant to be edited or added to form
+                  price_per_night: 5000, 
                   description: hallFormData.description_ar,
                   description_en: hallFormData.description_en,
                   type: 'hall',
                   is_active: true
-                  // Note: Images/Media handling would typically upload to storage here, simplified for this snippet
               };
               
-              // Update profile with extra info if needed
               await supabase.from('profiles').update({
                   phone_number: regData.phone
               }).eq('id', currentUser.id);
@@ -233,8 +276,8 @@ const App: React.FC = () => {
   // Helper for Hall Form Rendering
   const renderHallForm = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-        
-        {/* Section 1: Owner Info */}
+        {/* ... (Same Hall Form Content as previous step) ... */}
+        {/* Keeping existing form code structure for brevity, assuming it's retained from previous prompt */}
         <div>
             <h3 className="text-lg font-black text-primary mb-4 text-right">معلومات المالك</h3>
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
@@ -242,13 +285,10 @@ const App: React.FC = () => {
                     <Input label="رقم الجوال" value={regData.phone} readOnly className="bg-gray-50 border-transparent" />
                     <Input label="البريد الإلكتروني" value={regData.email} readOnly className="bg-gray-50 border-transparent text-left" dir="ltr" />
                 </div>
+                {/* ... rest of inputs ... */}
                 <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-500">مدينة القاعة</label>
-                    <select 
-                        className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none focus:border-primary"
-                        value={hallFormData.city}
-                        onChange={e => setHallFormData({...hallFormData, city: e.target.value})}
-                    >
+                    <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none focus:border-primary" value={hallFormData.city} onChange={e => setHallFormData({...hallFormData, city: e.target.value})}>
                         {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
@@ -258,8 +298,6 @@ const App: React.FC = () => {
                 </div>
             </div>
         </div>
-
-        {/* Section 2: Basic Hall Info */}
         <div>
             <h3 className="text-lg font-black text-primary mb-4 text-right">معلومات القاعة الأساسية</h3>
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6">
@@ -283,33 +321,19 @@ const App: React.FC = () => {
                 </div>
             </div>
         </div>
-
-        {/* Section 3: Media & Attachments */}
         <div>
             <h3 className="text-lg font-black text-primary mb-4 text-right">المرفقات والوسائط</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'صور القاعة من الامام', id: 'front' },
-                    { label: 'صور القاعة من الخلف', id: 'back' },
-                    { label: 'صور القاعة', id: 'gen1' },
-                    { label: 'صور القاعة', id: 'gen2' },
-                    { label: 'فيديو تور للقاعة', id: 'video' },
-                    { label: 'فيديو تعريفي (اختياري)', id: 'video2' },
-                    { label: 'كتالوج PDF للباقات', id: 'pdf' },
-                    { label: 'اللوجو', id: 'logo' },
-                ].map((item, idx) => (
+                {[{ label: 'صور القاعة من الامام', id: 'front' }, { label: 'صور القاعة من الخلف', id: 'back' }, { label: 'صور القاعة', id: 'gen1' }, { label: 'صور القاعة', id: 'gen2' }, { label: 'فيديو تور للقاعة', id: 'video' }, { label: 'فيديو تعريفي (اختياري)', id: 'video2' }, { label: 'كتالوج PDF للباقات', id: 'pdf' }, { label: 'اللوجو', id: 'logo' }].map((item, idx) => (
                     <div key={idx} className="flex flex-col gap-2">
                         <span className="text-xs font-bold text-gray-500 text-center">{item.label}</span>
                         <div className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all group">
-                            <div className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                                <Plus className="w-6 h-6" />
-                            </div>
+                            <div className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"><Plus className="w-6 h-6" /></div>
                         </div>
                     </div>
                 ))}
             </div>
         </div>
-
     </div>
   );
 
@@ -318,11 +342,7 @@ const App: React.FC = () => {
         if (regStep === 3) {
             return (
                 <div className="w-full flex flex-col items-center justify-center p-8 min-h-screen bg-gray-50/50">
-                    <img 
-                        src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} 
-                        alt="Logo" 
-                        className="h-32 w-auto mb-8 object-contain"
-                    />
+                    <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-32 w-auto mb-8 object-contain" />
                     <div className="text-center mb-12 space-y-3">
                         <h1 className="text-4xl font-black text-primary">مرحباً، {regData.fullName}</h1>
                         <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
@@ -332,7 +352,6 @@ const App: React.FC = () => {
                             <div className="w-24 h-24 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 group-hover:bg-primary group-hover:text-white transition-colors"><Building2 className="w-10 h-10" /></div>
                             <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">قاعة أفراح</h3><p className="text-sm font-bold text-gray-400">للمناسبات الكبيرة والزواجات</p></div>
                         </button>
-                        
                         <button onClick={() => { setSelectedType('service'); setRegStep(4); }} className="group p-10 bg-white border-2 border-gray-100 rounded-[3rem] hover:border-orange-500/50 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 flex flex-col items-center gap-6">
                             <div className="w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-colors"><Sparkles className="w-10 h-10" /></div>
                             <div className="text-center"><h3 className="text-2xl font-black text-gray-900 mb-2">مزود خدمة</h3><p className="text-sm font-bold text-gray-400">ضيافة، تصوير، كوش، وغيرها</p></div>
@@ -344,21 +363,14 @@ const App: React.FC = () => {
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-tajawal" dir="rtl">
                     <div className="text-center mb-8 space-y-4">
-                        <img 
-                            src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} 
-                            alt="Logo" 
-                            className="h-20 w-auto mx-auto object-contain" 
-                        />
+                        <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
                         <div className="space-y-1">
                             <h1 className="text-2xl font-black text-primary">إضافة قاعة جديدة</h1>
                             <p className="text-gray-500 font-bold text-sm">أكمل البيانات أدناه لإدراج قاعتك في المنصة</p>
                         </div>
                     </div>
-
                     <div className="w-full max-w-5xl">
-                        {/* Registration Step 4 Form content */}
                         {selectedType === 'hall' ? renderHallForm() : (
-                            // Service Form (Simplified Fallback)
                             <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
                                 <h3 className="text-lg font-black text-primary mb-4 border-b border-gray-100 pb-4">بيانات الخدمة</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -379,15 +391,12 @@ const App: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
-                        {/* Payment / Action Card */}
                         <div className="bg-gray-900 rounded-[2rem] p-8 mt-8 text-white shadow-2xl">
                             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                                 <div>
                                     <h3 className="text-xl font-black mb-1 flex items-center gap-2"><CreditCard className="w-6 h-6 text-primary" /> الاشتراك والتفعيل</h3>
                                     <p className="text-white/60 text-sm font-bold">رسوم الاشتراك السنوي: <span className="text-white font-black text-lg">{selectedType === 'hall' ? '500' : '200'} ر.س</span></p>
                                 </div>
-                                
                                 {isPaymentModalOpen ? (
                                     <div className="text-center bg-white/10 p-4 rounded-xl border border-white/20">
                                         <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
@@ -405,10 +414,7 @@ const App: React.FC = () => {
                                 )}
                             </div>
                         </div>
-                        
-                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-12">
-                            العودة وتغيير النشاط
-                        </button>
+                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-12">العودة وتغيير النشاط</button>
                     </div>
                 </div>
             );
@@ -417,12 +423,11 @@ const App: React.FC = () => {
         }
     }
 
-    // ... (Rest of switch cases same as before) ...
     if (activeTab === 'vendor_login') {
-        return <VendorAuth isLogin onRegister={() => setActiveTab('vendor_register')} onLogin={() => { setActiveTab('dashboard'); fetchProfile(supabase.auth.getUser().then(u => u.data.user!.id) as any); }} onBack={() => setActiveTab('home')} />;
+        // Use smart handleLoginSuccess
+        return <VendorAuth isLogin onRegister={() => setActiveTab('vendor_register')} onLogin={handleLoginSuccess} onBack={() => setActiveTab('home')} />;
     }
 
-    // Other pages
     switch (activeTab) {
       case 'dashboard': return userProfile ? <Dashboard user={userProfile} /> : null;
       case 'admin_dashboard': return <AdminDashboard />;
@@ -434,13 +439,7 @@ const App: React.FC = () => {
       case 'browse_services': return <BrowseHalls user={userProfile} entityType="service" onBack={() => setActiveTab('home')} onNavigate={handleNavigate} initialFilters={browseFilters} />;
       case 'halls_page': return <PublicListing type="hall" title="قاعات الأفراح" subtitle="اختر من بين أفخم القاعات لليلة العمر" onNavigate={handleNavigate} />;
       case 'services_page': return <PublicListing type="service" title="خدمات المناسبات" subtitle="كل ما تحتاجه لإكمال فرحتك" onNavigate={handleNavigate} />;
-      case 'hall_details': return detailItem ? (
-          detailType === 'service' 
-          ? <ServiceDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} />
-          : detailType === 'chalet' 
-            ? <ChaletDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} />
-            : <HallDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} />
-      ) : null;
+      case 'hall_details': return detailItem ? (detailType === 'service' ? <ServiceDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} /> : detailType === 'chalet' ? <ChaletDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} /> : <HallDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} />) : null;
       case 'store_page': return <PublicStore />;
       case 'guest_login': return <GuestLogin onBack={() => setActiveTab('home')} />;
       case 'guest_dashboard': return userProfile ? <GuestPortal user={userProfile} onLogout={handleLogout} /> : null;
@@ -460,34 +459,23 @@ const App: React.FC = () => {
     }
   };
 
-  // Main Return
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
 
   return (
     <NotificationProvider userId={userProfile?.id}>
         <div className={`min-h-screen ${userProfile?.role !== 'user' && !isPublicPage && !isAuthPage ? 'bg-gray-50' : 'bg-white'}`}>
-        
-        {/* Render Navbar only if it's a public page AND NOT an auth page */}
         {isPublicPage && !isAuthPage && (
             <PublicNavbar user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onNavigate={handleNavigate} onLogout={handleLogout} activeTab={activeTab} />
         )}
-
         {isPublicPage || isAuthPage ? (
-            <main className={`pt-0 ${isAuthPage ? 'h-full' : ''}`}>
-                {renderContent()}
-            </main>
+            <main className={`pt-0 ${isAuthPage ? 'h-full' : ''}`}>{renderContent()}</main>
         ) : (
             <div className="flex">
             <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isOpen={false} setIsOpen={() => {}} platformLogo={userProfile?.role === 'vendor' ? userProfile?.custom_logo_url : themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} />
-            <main className={`flex-1 p-4 lg:p-8 transition-all duration-300 ${userProfile ? 'lg:mr-72' : ''}`}>
-                {renderContent()}
-            </main>
+            <main className={`flex-1 p-4 lg:p-8 transition-all duration-300 ${userProfile ? 'lg:mr-72' : ''}`}>{renderContent()}</main>
             </div>
         )}
-
-        {/* Render Footer only if it's a public page AND NOT an auth page */}
         {isPublicPage && !isAuthPage && <Footer />}
-        
         </div>
     </NotificationProvider>
   );
