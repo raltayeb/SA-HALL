@@ -10,6 +10,17 @@ export interface POSConfig {
   auto_print: boolean;
 }
 
+export interface ThemeConfig {
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  sidebarColor: string;
+  borderRadius: string;
+  headingFont: string;
+  bodyFont: string;
+  logoUrl?: string;
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -117,7 +128,8 @@ export interface SystemSettings {
   hall_listing_fee: number;
   service_listing_fee: number;
   footer_config: FooterConfig;
-  booking_config: BookingConfig; // NEW
+  booking_config: BookingConfig; 
+  theme_config?: ThemeConfig; // New Theme Config
   payment_gateways: {
     visa_enabled: boolean;
     cash_enabled: boolean;
@@ -167,7 +179,7 @@ export interface Hall {
   capacity: number;
   capacity_men?: number;
   capacity_women?: number;
-  price_per_night: number; // Used as base or fallback
+  price_per_night: number; 
   price_per_adult?: number;
   price_per_child?: number;
   description: string;
@@ -178,7 +190,7 @@ export interface Hall {
   amenities: string[];
   addons?: HallAddon[]; 
   packages?: HallPackage[]; 
-  seasonal_prices?: SeasonalPrice[]; // NEW
+  seasonal_prices?: SeasonalPrice[]; 
   is_active: boolean;
   created_at?: string;
 }
@@ -239,9 +251,9 @@ export interface Booking {
   payment_status?: 'paid' | 'partial' | 'unpaid'; 
   booking_type?: 'booking' | 'consultation'; 
   booking_method?: 'full' | 'deposit' | 'hold'; 
-  booking_option?: 'deposit' | 'hold_48h' | 'consultation' | 'full_payment'; // NEW
+  booking_option?: 'deposit' | 'hold_48h' | 'consultation' | 'full_payment'; 
   package_name?: string; 
-  package_details?: HallPackage; // NEW
+  package_details?: HallPackage; 
   items?: BookingItem[]; 
   total_amount: number;
   paid_amount?: number; 
@@ -265,7 +277,6 @@ export interface Booking {
   is_read?: boolean;
 }
 
-// ... (Other existing types remain unchanged: PaymentLog, Expense, ExternalInvoice, Notification, POSItem, Coupon, StoreOrder, etc.)
 export interface PaymentLog {
   id: string;
   booking_id: string;

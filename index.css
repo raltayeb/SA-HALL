@@ -1,28 +1,38 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.14 0.01 285);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.14 0.01 285);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.14 0.01 285);
+    --background: #ffffff;
+    --foreground: #0f172a;
+    
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    
     --primary: #4B0082;
-    --primary-foreground: oklch(1 0 0);
+    --primary-foreground: #ffffff;
+    
     --secondary: #F3E8FF;
     --secondary-foreground: #4B0082;
-    --muted: oklch(0.97 0.01 285);
-    --muted-foreground: oklch(0.5 0.01 285);
-    --accent: oklch(0.97 0.01 285);
-    --accent-foreground: oklch(0.14 0.01 285);
-    --destructive: oklch(0.6 0.18 25);
-    --destructive-foreground: oklch(1 0 0);
-    --border: oklch(0.92 0.01 285);
-    --input: oklch(0.92 0.01 285);
+    
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    
+    --border: #e2e8f0;
+    --input: #e2e8f0;
     --ring: #4B0082;
+    
     --radius: 1rem;
   }
 }
@@ -48,14 +58,7 @@ body {
   font-family: 'Aref Ruqaa', serif;
 }
 
-.realeast-card {
-  @apply bg-white border border-border rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300;
-}
-
-.realeast-glass {
-  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-2xl;
-}
-
-.text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600;
+/* Custom Utilities for Glassmorphism */
+.glass-panel {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
 }

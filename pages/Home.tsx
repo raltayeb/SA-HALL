@@ -5,7 +5,7 @@ import { Hall, UserProfile, Service, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Coins
+  Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Building2, Palmtree
 } from 'lucide-react';
 
 interface HomeProps {
@@ -40,6 +40,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
+  const [searchTab, setSearchTab] = useState<'halls' | 'services'>('halls');
 
   // Search State
   const [searchFilters, setSearchFilters] = useState({
@@ -62,7 +63,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
     setLoading(true);
     try {
       const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(4);
-      // Removed Chalets fetch
       const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
       
       setHalls(hData || []);
@@ -118,136 +118,145 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   );
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] text-gray-900">
+    <div className="min-h-screen bg-[#F9FAFB] text-gray-900 font-tajawal">
       
-      {/* 1. Hero Section */}
-      <section className="relative w-full pt-28 pb-8 flex justify-center">
-        <div className="w-[98%] max-w-[1920px] h-[750px] md:h-[850px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
+      {/* 1. Hero Section - Redesigned Split */}
+      <section className="relative w-full min-h-[90vh] flex items-center justify-center overflow-hidden bg-gray-900">
           
-          {/* Background Images */}
+          {/* Background Images Layer */}
           {HERO_IMAGES.map((img, index) => (
             <div 
               key={index}
-              className={`absolute inset-0 transition-all duration-[2000ms] ease-in-out transform ${index === currentHeroImage ? 'opacity-100 scale-105' : 'opacity-0 scale-100'}`}
+              className={`absolute inset-0 transition-all duration-[2000ms] ease-in-out transform ${index === currentHeroImage ? 'opacity-50 scale-105' : 'opacity-0 scale-100'}`}
             >
-              <img 
-                src={img} 
-                className="w-full h-full object-cover" 
-                alt={`Luxury Venue ${index + 1}`} 
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
+              <img src={img} className="w-full h-full object-cover" alt={`Hero ${index}`} />
+              <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-gray-900/80 to-gray-900/30"></div>
             </div>
           ))}
 
-          {/* Content Container */}
-          <div className="relative z-10 h-full flex flex-col justify-center items-center px-4 md:px-8 text-center font-tajawal">
-            
-            {/* Unified Glass Card */}
-            <div className="w-full max-w-5xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-12 duration-1000">
-                
-                {/* Decorative Gradients inside card */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-pink-500/20 rounded-full blur-[100px] pointer-events-none"></div>
+          <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center pt-24 pb-12">
+              
+              {/* Right Column: Text & Titles (Starts first in RTL) */}
+              <div className="text-right space-y-8 animate-in slide-in-from-right duration-1000">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white w-fit">
+                      <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                      <span className="text-xs font-bold tracking-wide">المنصة الأولى لحجز المناسبات</span>
+                  </div>
+                  
+                  <h1 className="text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
+                      حيث تكتمل <br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-l from-purple-400 to-pink-300">لحظات الفرح</span>
+                  </h1>
+                  
+                  <p className="text-white/70 font-bold text-lg max-w-lg leading-relaxed">
+                      اكتشف أفخم القاعات، الشاليهات، وخدمات الضيافة في مكان واحد. 
+                      نحول مناسبتك إلى ذكرى لا تُنسى بأسهل الطرق.
+                  </p>
 
-                <div className="relative z-10 flex flex-col items-center">
-                    
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/10 text-white w-fit mb-6">
-                        <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-                        <span className="text-xs font-bold tracking-wide">الوجهة الأولى للمناسبات الفاخرة</span>
-                    </div>
-
-                    {/* Titles */}
-                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight drop-shadow-xl mb-4">
-                      حيث تكتمل <br /> 
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
-                        لحظات الفرح
-                      </span>
-                    </h1>
-                    
-                    <p className="text-white/80 font-bold text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-                        اكتشف أفخم القاعات، الشاليهات، وخدمات الضيافة في مكان واحد. 
-                        نحول مناسبتك إلى ذكرى لا تُنسى.
-                    </p>
-
-                    {/* Search Form Grid */}
-                    <form onSubmit={handleHeroSearch} className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 bg-white/90 backdrop-blur-md p-3 rounded-[2rem] shadow-lg">
-                        
-                        {/* Region */}
-                        <div className="lg:col-span-3 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors group/input relative h-16 flex flex-col justify-center px-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><MapPin className="w-3 h-3 text-primary" /> المنطقة</label>
-                            <select 
-                                value={searchFilters.city}
-                                onChange={(e) => setSearchFilters({...searchFilters, city: e.target.value})}
-                                className="w-full bg-transparent font-black text-gray-900 outline-none cursor-pointer appearance-none z-10 relative text-sm"
-                            >
-                                <option value="all">كل المدن</option>
-                                {SAUDI_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Date */}
-                        <div className="lg:col-span-3 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors h-16 flex flex-col justify-center px-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><Calendar className="w-3 h-3 text-primary" /> التاريخ</label>
-                            <input 
-                                type="date"
-                                value={searchFilters.date}
-                                onChange={(e) => setSearchFilters({...searchFilters, date: e.target.value})}
-                                className="w-full bg-transparent font-black text-gray-900 outline-none cursor-pointer text-sm"
-                            />
-                        </div>
-
-                        {/* Attendance */}
-                        <div className="lg:col-span-4 bg-white p-2 rounded-2xl border border-gray-100 hover:border-primary/30 transition-colors h-16 flex flex-col justify-center px-4">
-                            <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1 mb-1"><Users className="w-3 h-3 text-primary" /> الحضور (رجال/نساء)</label>
-                            <div className="flex gap-2 items-center">
-                                <input 
-                                    type="number"
-                                    placeholder="رجال"
-                                    value={searchFilters.menCount}
-                                    onChange={(e) => setSearchFilters({...searchFilters, menCount: e.target.value})}
-                                    className="w-full bg-transparent font-black text-gray-900 outline-none border-b border-gray-200 text-center focus:border-primary text-sm"
-                                />
-                                <span className="text-gray-300 text-xs">|</span>
-                                <input 
-                                    type="number"
-                                    placeholder="نساء"
-                                    value={searchFilters.womenCount}
-                                    onChange={(e) => setSearchFilters({...searchFilters, womenCount: e.target.value})}
-                                    className="w-full bg-transparent font-black text-gray-900 outline-none border-b border-gray-200 text-center focus:border-primary text-sm"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Button */}
-                        <div className="lg:col-span-2">
-                            <Button 
-                                type="submit"
-                                className="w-full h-16 rounded-[1.5rem] bg-primary text-white font-black text-base hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
-                            >
-                                <Search className="w-5 h-5" /> بحث
-                            </Button>
-                        </div>
-                    </form>
-
-                </div>
-            </div>
-
-          </div>
-
-          {/* Bottom Indicators */}
-          <div className="absolute bottom-12 left-12 flex items-center gap-6 z-20 hidden md:flex">
-              <div className="flex gap-3">
-                 {HERO_IMAGES.map((_, i) => (
-                    <button 
-                        key={i} 
-                        onClick={() => setCurrentHeroImage(i)}
-                        className={`h-1.5 rounded-full transition-all duration-500 shadow-sm ${i === currentHeroImage ? 'w-12 bg-white' : 'w-3 bg-white/30 hover:bg-white/50'}`}
-                    ></button>
-                 ))}
+                  <div className="flex gap-4 pt-4">
+                      <div className="flex -space-x-4 space-x-reverse">
+                          {[1,2,3,4].map(i => (
+                              <div key={i} className="w-12 h-12 rounded-full border-2 border-gray-900 bg-gray-800 flex items-center justify-center text-xs text-white font-bold overflow-hidden">
+                                  <img src={`https://i.pravatar.cc/100?img=${i+10}`} className="w-full h-full object-cover" />
+                              </div>
+                          ))}
+                      </div>
+                      <div className="flex flex-col justify-center">
+                          <div className="flex text-yellow-400 gap-0.5">
+                              {[1,2,3,4,5].map(i => <Star key={i} className="w-4 h-4 fill-current" />)}
+                          </div>
+                          <span className="text-white/60 text-xs font-bold">أكثر من 10,000 عميل سعيد</span>
+                      </div>
+                  </div>
               </div>
+
+              {/* Left Column: Vertical Search Filter Card */}
+              <div className="animate-in slide-in-from-left duration-1000 delay-200">
+                  <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-2 rounded-[3rem] shadow-2xl">
+                      <div className="bg-white rounded-[2.5rem] p-8 shadow-inner">
+                          
+                          {/* Tabs */}
+                          <div className="flex bg-gray-50 p-1.5 rounded-2xl border border-gray-100 mb-6">
+                              <button onClick={() => setSearchTab('halls')} className={`flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${searchTab === 'halls' ? 'bg-white shadow-md text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+                                  <Building2 className="w-4 h-4" /> القاعات
+                              </button>
+                              <button onClick={() => setSearchTab('services')} className={`flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${searchTab === 'services' ? 'bg-white shadow-md text-primary' : 'text-gray-400 hover:text-gray-600'}`}>
+                                  <Sparkles className="w-4 h-4" /> الخدمات
+                              </button>
+                          </div>
+
+                          <form onSubmit={handleHeroSearch} className="space-y-5">
+                              {/* City */}
+                              <div className="space-y-2">
+                                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">المنطقة</label>
+                                  <div className="relative">
+                                      <select 
+                                          value={searchFilters.city}
+                                          onChange={(e) => setSearchFilters({...searchFilters, city: e.target.value})}
+                                          className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all appearance-none text-gray-700 cursor-pointer"
+                                      >
+                                          <option value="all">كل المدن</option>
+                                          {SAUDI_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                                      </select>
+                                      <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+                                  </div>
+                              </div>
+
+                              {/* Date */}
+                              <div className="space-y-2">
+                                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">تاريخ المناسبة</label>
+                                  <div className="relative">
+                                      <input 
+                                          type="date"
+                                          value={searchFilters.date}
+                                          onChange={(e) => setSearchFilters({...searchFilters, date: e.target.value})}
+                                          className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all text-gray-700"
+                                      />
+                                  </div>
+                              </div>
+
+                              {/* Capacity (Only for Halls) */}
+                              {searchTab === 'halls' && (
+                                  <div className="space-y-2">
+                                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">عدد الضيوف المتوقع</label>
+                                      <div className="grid grid-cols-2 gap-3">
+                                          <div className="relative">
+                                              <input 
+                                                  type="number" 
+                                                  placeholder="رجال" 
+                                                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 text-center"
+                                                  value={searchFilters.menCount}
+                                                  onChange={(e) => setSearchFilters({...searchFilters, menCount: e.target.value})}
+                                              />
+                                              <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                          </div>
+                                          <div className="relative">
+                                              <input 
+                                                  type="number" 
+                                                  placeholder="نساء" 
+                                                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/20 text-center"
+                                                  value={searchFilters.womenCount}
+                                                  onChange={(e) => setSearchFilters({...searchFilters, womenCount: e.target.value})}
+                                              />
+                                              <Users className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
+                                          </div>
+                                      </div>
+                                  </div>
+                              )}
+
+                              <Button 
+                                  type="submit" 
+                                  className="w-full h-16 rounded-2xl font-black text-lg bg-gray-900 text-white shadow-xl hover:bg-black hover:scale-[1.02] transition-all flex items-center justify-center gap-3 mt-4"
+                              >
+                                  <Search className="w-5 h-5" />
+                                  <span>ابحث الآن</span>
+                              </Button>
+                          </form>
+                      </div>
+                  </div>
+              </div>
+
           </div>
-        </div>
       </section>
 
       {/* Main Sections */}
@@ -260,7 +269,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
             
-            {/* View All Halls Button -> browse_halls */}
             <div className="flex justify-center pt-8">
                 <Button 
                     onClick={() => onNavigate('browse_halls')} 
@@ -279,7 +287,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
             </div>
 
-            {/* View All Services Button -> browse_services */}
             <div className="flex justify-center pt-8">
                 <Button 
                     onClick={() => onNavigate('browse_services')} 

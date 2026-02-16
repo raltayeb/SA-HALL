@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { UserProfile, VAT_RATE, SAUDI_CITIES, HALL_AMENITIES, SERVICE_CATEGORIES, Hall } from './types';
+import { UserProfile, VAT_RATE, SAUDI_CITIES, HALL_AMENITIES, SERVICE_CATEGORIES, Hall, ThemeConfig } from './types';
 import { Sidebar } from './components/Layout/Sidebar';
 import { PublicNavbar } from './components/Layout/PublicNavbar';
 import { Footer } from './components/Layout/Footer';
@@ -53,6 +53,7 @@ const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<string>('home');
   const [loading, setLoading] = useState(true);
+  const [themeConfig, setThemeConfig] = useState<ThemeConfig | null>(null);
   
   // Registration State
   const [regStep, setRegStep] = useState(1);
@@ -70,8 +71,19 @@ const App: React.FC = () => {
   const { toast } = useToast();
   const platformFees = { hall: 500, service: 200 };
 
-  // Fetch Session
+  // 1. Fetch Session & Theme
   useEffect(() => {
+    // Theme Fetch
+    const fetchTheme = async () => {
+        const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+        if (data?.value?.theme_config) {
+            setThemeConfig(data.value.theme_config);
+            applyTheme(data.value.theme_config);
+        }
+    };
+    fetchTheme();
+
+    // Auth Fetch
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) fetchProfile(session.user.id);
       else {
@@ -91,6 +103,14 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const applyTheme = (config: ThemeConfig) => {
+      const root = document.documentElement;
+      if(config.primaryColor) root.style.setProperty('--primary', config.primaryColor);
+      if(config.secondaryColor) root.style.setProperty('--secondary', config.secondaryColor);
+      if(config.backgroundColor) root.style.setProperty('--background', config.backgroundColor);
+      if(config.borderRadius) root.style.setProperty('--radius', config.borderRadius);
+  };
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -121,30 +141,78 @@ const App: React.FC = () => {
 
   const handleRegistrationPayClick = async (method: string) => {
       setAuthLoading(true);
-      // Simulate payment processing for registration
-      setTimeout(async () => {
-          try {
-              // Create user profile after payment simulation
-              // Note: Actual implementation would verify payment with backend
-              const { error } = await supabase.from('profiles').update({ 
-                  subscription_plan: 'pro',
-                  payment_status: 'paid'
-              }).eq('email', regData.email);
-              
-              if(error) throw error;
-              
+      try {
+          // 1. Create Auth User
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+              email: regData.email,
+              password: regData.password,
+              options: {
+                  data: {
+                      full_name: regData.fullName,
+                      role: 'vendor',
+                      phone_number: regData.phone,
+                      business_name: assetData.name,
+                      payment_status: 'paid' // Will be handled by handle_new_user trigger
+                  }
+              }
+          });
+
+          if (authError) throw authError;
+          if (!authData.user) throw new Error('User creation failed');
+
+          // 2. Create the Asset (Hall/Service)
+          // Profile is created automatically by DB trigger on signUp. We wait a moment or just insert asset using authData.user.id
+          
+          // Small delay to ensure profile trigger finished (optional, but safer)
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const assetPayload = selectedType === 'hall' ? {
+              vendor_id: authData.user.id,
+              name: assetData.name,
+              city: assetData.city,
+              capacity: Number(assetData.capacity) || 0,
+              price_per_night: Number(assetData.price) || 0,
+              description: assetData.description,
+              type: 'hall',
+              is_active: true
+          } : {
+              vendor_id: authData.user.id,
+              name: assetData.name,
+              category: assetData.category,
+              price: Number(assetData.price) || 0,
+              description: assetData.description,
+              is_active: true
+          };
+
+          const table = selectedType === 'hall' ? 'halls' : 'services';
+          const { error: assetError } = await supabase.from(table).insert([assetPayload]);
+          
+          if (assetError) {
+              console.error('Asset creation error:', assetError);
+              // Not throwing here to allow login to proceed, but alerting user
+              toast({ title: 'تنبيه', description: 'تم إنشاء الحساب ولكن حدث خطأ في إضافة النشاط. يرجى إضافته من لوحة التحكم.', variant: 'warning' });
+          } else {
               toast({ title: 'تم الاشتراك بنجاح', variant: 'success' });
-              setActiveTab('dashboard');
-          } catch (err: any) {
-              toast({ title: 'خطأ', description: 'حدث خطأ أثناء التفعيل', variant: 'destructive' });
-          } finally {
-              setAuthLoading(false);
-              setIsPaymentModalOpen(false);
           }
-      }, 2000);
+
+          setIsPaymentModalOpen(false);
+          // Fetch profile to login immediately
+          await fetchProfile(authData.user.id);
+          setActiveTab('dashboard');
+
+      } catch (err: any) {
+          console.error(err);
+          toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+      } finally {
+          setAuthLoading(false);
+      }
   };
 
-  const isPublicPage = ['home', 'login', 'register', 'vendor_login', 'vendor_register', 'browse_halls', 'browse_services', 'hall_details', 'store_page', 'guest_login'].includes(activeTab);
+  // Define Authentication Pages (Hidden Navbar/Footer)
+  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login'].includes(activeTab);
+  
+  // Define Public Pages (Show Navbar/Footer UNLESS it's an Auth page)
+  const isPublicPage = ['home', 'browse_halls', 'browse_services', 'hall_details', 'store_page'].includes(activeTab);
 
   const renderContent = () => {
     if (activeTab === 'vendor_register') {
@@ -180,6 +248,7 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="bg-white w-full max-w-4xl p-8 md:p-12 rounded-[3rem] shadow-xl border border-gray-100 text-right animate-in zoom-in-95 duration-300">
+                        {/* Registration Step 4 Form content */}
                         <div className="space-y-8">
                             <div className="space-y-5">
                                 <h3 className="text-xl font-black text-gray-900 border-b border-gray-100 pb-4">بيانات النشاط</h3>
@@ -244,7 +313,7 @@ const App: React.FC = () => {
                                     </div>
                                 ) : authLoading ? (
                                     <div className="w-full h-14 bg-gray-200 rounded-2xl flex items-center justify-center gap-2 text-gray-500 font-bold">
-                                        <Loader2 className="animate-spin" /> جاري المعالجة...
+                                        <Loader2 className="animate-spin" /> جاري إنشاء الحساب...
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
@@ -324,21 +393,29 @@ const App: React.FC = () => {
 
   return (
     <NotificationProvider userId={userProfile?.id}>
-        <div className={`min-h-screen ${userProfile?.role !== 'user' && !isPublicPage ? 'bg-gray-50' : 'bg-white'}`}>
-        {isPublicPage ? (
-            <>
+        <div className={`min-h-screen ${userProfile?.role !== 'user' && !isPublicPage && !isAuthPage ? 'bg-gray-50' : 'bg-white'}`}>
+        
+        {/* Render Navbar only if it's a public page AND NOT an auth page */}
+        {isPublicPage && !isAuthPage && (
             <PublicNavbar user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onNavigate={handleNavigate} onLogout={handleLogout} activeTab={activeTab} />
-            <main className="pt-0">{renderContent()}</main>
-            <Footer />
-            </>
+        )}
+
+        {isPublicPage || isAuthPage ? (
+            <main className={`pt-0 ${isAuthPage ? 'h-full' : ''}`}>
+                {renderContent()}
+            </main>
         ) : (
             <div className="flex">
-            <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isOpen={false} setIsOpen={() => {}} platformLogo={userProfile?.role === 'vendor' ? userProfile?.custom_logo_url : "https://dash.hall.sa/logo.svg"} />
+            <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isOpen={false} setIsOpen={() => {}} platformLogo={userProfile?.role === 'vendor' ? userProfile?.custom_logo_url : themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} />
             <main className={`flex-1 p-4 lg:p-8 transition-all duration-300 ${userProfile ? 'lg:mr-72' : ''}`}>
                 {renderContent()}
             </main>
             </div>
         )}
+
+        {/* Render Footer only if it's a public page AND NOT an auth page */}
+        {isPublicPage && !isAuthPage && <Footer />}
+        
         </div>
     </NotificationProvider>
   );
