@@ -1,4 +1,5 @@
 
+// ... existing imports ...
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { UserProfile, Booking } from '../types';
@@ -34,22 +35,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [recentBookings, setRecentBookings] = useState<Booking[]>([]);
 
-  // Fetch Assets List
+  // Fetch Assets List (Filtered to only show Halls)
   useEffect(() => {
       const fetchAssets = async () => {
-          const [halls, chalets] = await Promise.all([
+          const [halls] = await Promise.all([
               supabase.from('halls').select('id, name').eq('vendor_id', user.id),
-              supabase.from('chalets').select('id, name').eq('vendor_id', user.id)
+              // Removed Chalets fetch
           ]);
           const combined = [
               ...(halls.data || []).map(h => ({ ...h, type: 'hall' })),
-              ...(chalets.data || []).map(c => ({ ...c, type: 'chalet' }))
           ];
           setAssets(combined);
       };
       fetchAssets();
   }, [user.id]);
 
+  // ... (Rest of logic remains same, just ensuring chalets aren't in assets state)
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
     setLoading(true);
@@ -64,7 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         .order('created_at', { ascending: false });
 
       if (selectedAsset !== 'all') {
-          query = query.or(`hall_id.eq.${selectedAsset},chalet_id.eq.${selectedAsset}`);
+          query = query.eq('hall_id', selectedAsset); // Simplified since only halls
       }
 
       const { data: bookings } = await query;
@@ -129,13 +130,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 value={selectedAsset}
                 onChange={(e) => setSelectedAsset(e.target.value)}
             >
-                <option value="all">كافة الأصول</option>
-                {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.type === 'hall' ? 'قاعة' : 'شاليه'})</option>)}
+                <option value="all">كافة القاعات</option>
+                {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+           {/* ... existing stats cards ... */}
            <div className="bg-emerald-50 px-6 py-6 rounded-[2rem] border border-emerald-100 text-center">
               <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">المبالغ المحصلة</p>
               <PriceTag amount={stats.paidAmount} className="text-2xl font-black text-emerald-700 justify-center" />

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList, 
   CalendarDays, Settings, X, Tag, 
   FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, Store, Palmtree, LogOut
+  Receipt, Store, LogOut
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -75,8 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         title: "إدارة الأصول",
         items: [
           { id: 'my_halls', label: 'القاعات', icon: <Building2 className="w-5 h-5" /> },
-          { id: 'my_chalets', label: 'الشاليهات', icon: <Palmtree className="w-5 h-5" /> },
-          // Removed Services for simplicity as requested by flow, kept logic if needed
+          // Chalets removed
         ]
       },
       {

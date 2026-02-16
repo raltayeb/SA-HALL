@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, Service } from '../types';
+import { Hall, UserProfile, Service, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { 
-  Sparkles, Star, MapPin, Zap, Palmtree, ArrowLeft, ShoppingBag, Store
+  Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Coins
 } from 'lucide-react';
 
 interface HomeProps {
@@ -37,10 +37,18 @@ const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon: a
 
 export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
-  const [resorts, setResorts] = useState<Hall[]>([]); // Using Hall type for Chalet is compatible mostly
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
+
+  // Search State
+  const [searchFilters, setSearchFilters] = useState({
+      city: 'all',
+      date: '',
+      menCount: '',
+      womenCount: '',
+      pricePerPerson: ''
+  });
 
   // Hero Animation
   useEffect(() => {
@@ -53,17 +61,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Get Halls (Limit 4 for new grid)
       const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(4);
-      
-      // 2. Get Chalets (from chalets table)
-      const { data: rData } = await supabase.from('chalets').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
-      
-      // 3. Get Services
+      // Removed Chalets fetch
       const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
       
       setHalls(hData || []);
-      setResorts(rData as any[] || []);
       setServices(sData || []);
     } catch (err) {
       console.error(err);
@@ -74,10 +76,15 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const renderCard = (item: any, type: 'hall' | 'service' | 'chalet', label: string) => (
+  const handleHeroSearch = (e: React.FormEvent) => {
+      e.preventDefault();
+      onBrowseHalls(searchFilters);
+  };
+
+  const renderCard = (item: any, type: 'hall' | 'service', label: string) => (
     <div 
         key={item.id} 
-        onClick={() => onNavigate('hall_details', { item, type: type === 'chalet' ? 'chalet' : type })} 
+        onClick={() => onNavigate('hall_details', { item, type })} 
         className="group relative cursor-pointer text-right transition-all duration-300 border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white hover:border-primary/20"
     >
         <div className="relative aspect-[4/3] overflow-hidden">
@@ -113,11 +120,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-gray-900">
       
-      {/* 1. Hero Section - Full Width */}
+      {/* 1. Hero Section */}
       <section className="relative w-full pt-28 pb-8 flex justify-center">
-        <div className="w-[98%] max-w-[1920px] h-[600px] md:h-[750px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
+        <div className="w-[98%] max-w-[1920px] h-[700px] md:h-[800px] relative rounded-[3rem] overflow-hidden group ring-1 ring-black/5 bg-gray-900">
           
-          {/* Background Images with Fade Transition */}
+          {/* Background Images */}
           {HERO_IMAGES.map((img, index) => (
             <div 
               key={index}
@@ -133,8 +140,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           ))}
 
           {/* Content Container */}
-          <div className="relative z-10 h-full flex items-center justify-start px-8 md:px-24 text-right font-tajawal">
-            <div className="max-w-3xl space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+          <div className="relative z-10 h-full flex flex-col justify-center px-8 md:px-24 text-right font-tajawal">
+            <div className="max-w-4xl space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000">
               
               <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white w-fit">
                 <Sparkles className="w-4 h-4 text-[#D4AF37]" />
@@ -151,9 +158,80 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 <div className="w-32 h-2 bg-gradient-to-l from-primary to-transparent rounded-full opacity-80"></div>
               </div>
               
-              <p className="text-gray-200 text-lg md:text-2xl font-medium leading-relaxed max-w-2xl border-r-4 border-white/20 pr-6">
-                نجمع لك أرقى القاعات وأفخم الخدمات في منصة واحدة، لتكون مناسبتك ذكرى لا تُنسى بكل معاني الفخامة.
-              </p>
+              {/* Search Bar - Integrated into Hero */}
+              <div className="pt-6">
+                <form 
+                    onSubmit={handleHeroSearch}
+                    className="bg-white/95 backdrop-blur shadow-2xl rounded-[2.5rem] p-3 flex flex-col md:flex-row items-center gap-2 max-w-full lg:max-w-fit"
+                >
+                    {/* Region */}
+                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[140px] w-full md:w-auto">
+                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><MapPin className="w-3 h-3" /> المنطقة</label>
+                        <select 
+                            value={searchFilters.city}
+                            onChange={(e) => setSearchFilters({...searchFilters, city: e.target.value})}
+                            className="bg-transparent text-sm font-black text-gray-900 outline-none cursor-pointer appearance-none"
+                        >
+                            <option value="all">كل المدن</option>
+                            {SAUDI_CITIES.map(city => <option key={city} value={city}>{city}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Date */}
+                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[140px] w-full md:w-auto">
+                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> اليوم</label>
+                        <input 
+                            type="date"
+                            value={searchFilters.date}
+                            onChange={(e) => setSearchFilters({...searchFilters, date: e.target.value})}
+                            className="bg-transparent text-sm font-black text-gray-900 outline-none cursor-pointer"
+                        />
+                    </div>
+
+                    {/* Attendance */}
+                    <div className="flex flex-col gap-1 px-4 py-2 border-l border-gray-100 min-w-[160px] w-full md:w-auto">
+                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Users className="w-3 h-3" /> الحضور (رجال/نساء)</label>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="number"
+                                placeholder="رجال"
+                                value={searchFilters.menCount}
+                                onChange={(e) => setSearchFilters({...searchFilters, menCount: e.target.value})}
+                                className="w-12 bg-transparent text-sm font-black text-gray-900 outline-none border-b border-gray-100"
+                            />
+                            <span className="text-gray-300">/</span>
+                            <input 
+                                type="number"
+                                placeholder="نساء"
+                                value={searchFilters.womenCount}
+                                onChange={(e) => setSearchFilters({...searchFilters, womenCount: e.target.value})}
+                                className="w-12 bg-transparent text-sm font-black text-gray-900 outline-none border-b border-gray-100"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Price Per Person */}
+                    <div className="flex flex-col gap-1 px-4 py-2 min-w-[140px] w-full md:w-auto">
+                        <label className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1"><Coins className="w-3 h-3" /> ميزانية الفرد</label>
+                        <input 
+                            type="number"
+                            placeholder="ر.س"
+                            value={searchFilters.pricePerPerson}
+                            onChange={(e) => setSearchFilters({...searchFilters, pricePerPerson: e.target.value})}
+                            className="bg-transparent text-sm font-black text-gray-900 outline-none placeholder:text-gray-300"
+                        />
+                    </div>
+
+                    {/* Search Button */}
+                    <Button 
+                        type="submit"
+                        className="h-14 w-full md:w-14 rounded-full bg-primary text-white p-0 flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20"
+                    >
+                        <Search className="w-6 h-6" />
+                    </Button>
+                </form>
+              </div>
+
             </div>
           </div>
 
@@ -172,7 +250,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         </div>
       </section>
 
-      {/* 2. Main Sections - Full Width Container */}
+      {/* Main Sections */}
       <section className="py-24 px-6 lg:px-12 w-full max-w-[1920px] mx-auto space-y-32">
           
           {/* Halls */}
@@ -181,25 +259,9 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
-            <div className="flex justify-center pt-8">
-                <Button variant="outline" onClick={() => onNavigate('browse_halls')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
-                    عرض جميع القاعات <ArrowLeft className="w-4 h-4" />
-                </Button>
-            </div>
           </div>
 
-          {/* Resorts/Chalets */}
-          <div className="space-y-12">
-            <SectionHeader title="شاليهات ومنتجعات" icon={Palmtree} subtitle="خصوصية وراحة" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : resorts.map(r => renderCard(r, 'chalet', 'شاليه'))}
-            </div>
-            <div className="flex justify-center pt-8">
-                <Button variant="outline" onClick={() => onNavigate('browse_chalets')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
-                    عرض جميع الشاليهات <ArrowLeft className="w-4 h-4" />
-                </Button>
-            </div>
-          </div>
+          {/* Chalets Section Removed */}
 
           {/* Services */}
           <div className="space-y-12">
@@ -207,17 +269,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
             </div>
-            <div className="flex justify-center pt-8">
-                <Button variant="outline" onClick={() => onNavigate('services_page')} className="h-12 px-10 rounded-xl font-bold border-2 border-gray-100 text-gray-500 hover:border-primary hover:text-primary transition-all gap-2">
-                    تصفح كافة الخدمات <ArrowLeft className="w-4 h-4" />
-                </Button>
-            </div>
           </div>
 
-          {/* Store CTA Section (Redesigned: Clean, No Shadow, No Gradient) */}
+          {/* Store CTA Section */}
           <div className="w-full">
             <div className="relative rounded-[3rem] overflow-hidden min-h-[500px] flex items-center group border border-gray-100">
-              {/* Background Image */}
               <div className="absolute inset-0">
                  <img
                    src="https://www.arabiaweddings.com/sites/default/files/styles/max980/public/articles/2019/11/mideaval_wedding_in_saudi_arabia_4.jpg?itok=LQ8x27vo"
@@ -226,25 +282,14 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                  />
               </div>
 
-              {/* Content Panel - Floating Glass/Solid Card */}
               <div className="relative z-10 w-full md:w-1/2 p-8 md:p-12 md:mr-12 lg:mr-24">
                  <div className="bg-white/95 backdrop-blur-md p-10 md:p-14 rounded-[2.5rem] border border-white/50 text-right space-y-6">
                     <div className="inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-purple-50 border border-purple-100 text-primary">
                         <Store className="w-4 h-4" />
                         <span className="text-[10px] font-black uppercase tracking-widest">متجر القاعة</span>
                     </div>
-
-                    <h2 className="text-4xl md:text-6xl font-black text-gray-900 leading-tight">
-                        كل ما تحتاجه <br />
-                        <span className="text-primary">
-                        لإكمال فرحتك
-                        </span>
-                    </h2>
-
-                    <p className="text-lg text-gray-600 font-medium leading-relaxed">
-                        تصفح متجرنا الحصري الذي يوفر لك أرقى التجهيزات، من أثاث فاخر وإضاءة احترافية، لتجعل من مناسبتك حدثاً استثنائياً.
-                    </p>
-
+                    <h2 className="text-4xl md:text-6xl font-black text-gray-900 leading-tight">كل ما تحتاجه <br /> <span className="text-primary">لإكمال فرحتك</span></h2>
+                    <p className="text-lg text-gray-600 font-medium leading-relaxed">تصفح متجرنا الحصري الذي يوفر لك أرقى التجهيزات، من أثاث فاخر وإضاءة احترافية، لتجعل من مناسبتك حدثاً استثنائياً.</p>
                     <div className="pt-4">
                         <Button
                         onClick={() => onNavigate('store_page')}
@@ -257,49 +302,6 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
               </div>
             </div>
           </div>
-      </section>
-
-      {/* 3. Stats Section - Full Width */}
-      <section className="py-32 px-6 lg:px-12 bg-white">
-        <div className="w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8 text-right order-2 lg:order-1">
-                <div className="space-y-4">
-                    <span className="text-primary font-black text-sm uppercase tracking-widest">لماذا القاعة؟</span>
-                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 leading-tight">شريككم الأول في <br/> صناعة الذكريات السعيدة</h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                    <div className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100 space-y-3">
-                        <div className="text-primary text-4xl font-black">+180</div>
-                        <p className="text-sm font-bold text-gray-500">قاعة فاخرة تم تقييمها واعتمادها من قبل خبرائنا.</p>
-                    </div>
-                    <div className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100 space-y-3">
-                        <div className="text-primary text-4xl font-black">+8500</div>
-                        <p className="text-sm font-bold text-gray-500">حجز ناجح تم تنفيذه عبر منصتنا خلال العام الماضي.</p>
-                    </div>
-                    <div className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100 space-y-3">
-                        <div className="text-primary text-4xl font-black">+65</div>
-                        <p className="text-sm font-bold text-gray-500">خدمة احترافية من ضيافة وتصوير وكوشات متميزة.</p>
-                    </div>
-                    <div className="bg-primary text-white p-8 rounded-[2rem] border-none space-y-3 flex flex-col justify-center">
-                        <p className="text-lg font-black leading-tight">انضم إلينا اليوم وابدأ تجربة استثنائية.</p>
-                        <button onClick={() => onNavigate('register')} className="mt-2 flex items-center gap-2 font-bold text-xs hover:gap-4 transition-all">سجل الآن <ArrowLeft className="w-4 h-4" /></button>
-                    </div>
-                </div>
-            </div>
-            <div className="relative order-1 lg:order-2">
-                <div className="aspect-[4/5] rounded-[3rem] overflow-hidden border-8 border-gray-50">
-                    <img 
-                        src="https://i.ytimg.com/vi/fynjsdbrr1s/maxresdefault.jpg" 
-                        className="w-full h-full object-cover" 
-                        alt="Atmosphere" 
-                    />
-                </div>
-                <div className="absolute -bottom-8 -left-8 bg-white p-8 rounded-[2rem] border border-gray-100 hidden md:block max-w-[200px] text-center">
-                    <div className="flex justify-center gap-1 text-yellow-500 mb-2"><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /><Star className="w-4 h-4 fill-current" /></div>
-                    <p className="text-xs font-black text-gray-900">أعلى تصنيف رضا عملاء في المملكة</p>
-                </div>
-            </div>
-        </div>
       </section>
     </div>
   );

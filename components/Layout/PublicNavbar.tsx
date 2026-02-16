@@ -36,7 +36,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: <Home className="w-4 h-4" /> },
     { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'chalets_page', label: 'الشاليهات', icon: <Palmtree className="w-4 h-4" /> },
+    // Chalets removed
     { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" /> },
     { id: 'store_page', label: 'المتجر', icon: <ShoppingBag className="w-4 h-4" /> },
   ];
