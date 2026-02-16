@@ -1,4 +1,5 @@
 
+// ... existing imports ...
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { SystemSettings as ISystemSettings, FAQItem, ThemeConfig } from '../types';
@@ -11,6 +12,7 @@ import {
 import { useToast } from '../context/ToastContext';
 
 export const SystemSettings: React.FC = () => {
+  // ... existing state ...
   const [activeTab, setActiveTab] = useState<'general' | 'booking' | 'footer' | 'payment' | 'theme'>('general');
   const [settings, setSettings] = useState<ISystemSettings>({
     site_name: 'القاعة',
@@ -42,7 +44,7 @@ export const SystemSettings: React.FC = () => {
         description: 'تجربة حجز أسرع وأسهل عبر تطبيق الجوال. متاح الآن لأجهزة الآيفون والأندرويد.',
         apple_store_link: '#',
         google_play_link: '#'
-      },
+    },
       faq_section: {
         show: true,
         title: 'الأسئلة الشائعة',
@@ -79,13 +81,22 @@ export const SystemSettings: React.FC = () => {
   
   const { toast } = useToast();
 
+  // Helper to apply theme to DOM
+  const applyThemeToDOM = (config: ThemeConfig) => {
+      const root = document.documentElement;
+      if(config.primaryColor) root.style.setProperty('--primary', config.primaryColor);
+      if(config.secondaryColor) root.style.setProperty('--secondary', config.secondaryColor);
+      if(config.backgroundColor) root.style.setProperty('--background', config.backgroundColor);
+      if(config.borderRadius) root.style.setProperty('--radius', config.borderRadius);
+      // You can add font logic here if you load fonts dynamically
+  };
+
   const fetchSettings = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
       if (data?.value) {
         const dbSettings = data.value;
-        // Merge DB settings with defaults to ensure all fields exist
         setSettings(prev => ({
           ...prev,
           ...dbSettings,
@@ -97,10 +108,7 @@ export const SystemSettings: React.FC = () => {
         
         // Apply theme immediately on load within settings page
         if(dbSettings.theme_config) {
-            const root = document.documentElement;
-            root.style.setProperty('--primary', dbSettings.theme_config.primaryColor);
-            root.style.setProperty('--secondary', dbSettings.theme_config.secondaryColor);
-            root.style.setProperty('--radius', dbSettings.theme_config.borderRadius);
+            applyThemeToDOM(dbSettings.theme_config);
         }
       }
     } catch (err: any) {
@@ -126,24 +134,20 @@ export const SystemSettings: React.FC = () => {
       
       // Apply theme immediately globally
       if(settings.theme_config) {
-          const root = document.documentElement;
-          root.style.setProperty('--primary', settings.theme_config.primaryColor);
-          root.style.setProperty('--secondary', settings.theme_config.secondaryColor);
-          root.style.setProperty('--background', settings.theme_config.backgroundColor);
-          root.style.setProperty('--radius', settings.theme_config.borderRadius);
+          applyThemeToDOM(settings.theme_config);
       }
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
+  // ... (rest of the component: handleLogoUpload, render logic remains similar to existing but ensure inputs update state correctly) ...
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
       if (!files || files.length === 0) return;
       setUploading(true);
       try {
           const file = files[0];
-          // Use a simple timestamp filename, allow overwriting or unique
           const fileName = `admin-logo-${Date.now()}.${file.name.split('.').pop()}`;
           
           const { error: uploadError } = await supabase.storage.from('vendor-logos').upload(fileName, file, {
@@ -173,6 +177,7 @@ export const SystemSettings: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-10 text-right font-tajawal">
+      {/* ... Header ... */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-3xl font-ruqaa text-primary">إعدادات المنصة</h2>
@@ -317,6 +322,7 @@ export const SystemSettings: React.FC = () => {
           </div>
       )}
 
+      {/* ... Other Tabs (Booking, Payment, Footer) remain same ... */}
       {activeTab === 'booking' && (
         <div className="bg-white border border-gray-100 p-8 rounded-[2rem] shadow-sm space-y-6 animate-in fade-in">
           <h3 className="text-lg font-black flex items-center justify-end gap-2 border-b pb-4">
@@ -344,7 +350,6 @@ export const SystemSettings: React.FC = () => {
         </div>
       )}
 
-      {/* Payment & Footer tabs remain same */}
       {activeTab === 'payment' && (
         <div className="bg-white border border-gray-100 p-8 rounded-[2rem] shadow-sm space-y-6 animate-in fade-in">
            <h3 className="text-lg font-black flex items-center justify-end gap-2 border-b pb-4">

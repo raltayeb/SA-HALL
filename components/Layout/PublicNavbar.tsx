@@ -77,21 +77,21 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             {/* Left side: Profile & Auth & Mobile Toggle (End of RTL flow) */}
             <div className="flex items-center gap-3">
               {!user ? (
-                <div className="flex items-center gap-3">
-                  <Button 
-                    onClick={onRegisterClick} 
-                    className="rounded-2xl px-6 h-12 text-sm font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 shadow-lg shadow-primary/20 hidden md:flex"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    <span>انضم إلينا</span>
-                  </Button>
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={onLoginClick} 
-                    className="h-12 px-6 text-sm font-bold text-gray-900 hover:text-primary hover:bg-gray-50 rounded-2xl border-2 border-gray-100 transition-all flex items-center gap-2 hidden md:flex"
+                    className="px-5 h-11 text-sm font-bold text-gray-500 hover:text-primary hover:bg-gray-50 rounded-xl transition-all flex items-center gap-2 hidden md:flex"
                   >
                     <LogIn className="w-4 h-4" />
                     <span>دخول</span>
                   </button>
+                  <Button 
+                    onClick={onRegisterClick} 
+                    className="rounded-xl px-6 h-11 text-sm font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 hidden md:flex"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>انضم إلينا</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="relative" ref={menuRef}>
@@ -162,7 +162,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                         <div className="pt-6 mt-2 border-t border-gray-100 space-y-3">
                            <Button 
                                 onClick={() => { onRegisterClick(); setIsMobileMenuOpen(false); }} 
-                                className="w-full rounded-2xl h-14 font-black bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
+                                className="w-full rounded-2xl h-14 font-black bg-primary text-white hover:bg-primary/90 shadow-none"
                             >
                                 انضم إلينا
                             </Button>

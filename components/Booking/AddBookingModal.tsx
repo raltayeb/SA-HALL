@@ -5,7 +5,7 @@ import { Hall, Booking, VendorClient } from '../../types';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { Loader2, AlertCircle, UserCheck, CalendarCheck, Coins, CreditCard, User, Phone, FileText } from 'lucide-react';
+import { Loader2, AlertCircle, UserCheck, CalendarCheck, Coins, CreditCard, User, Phone, FileText, Mail } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 
 interface AddBookingModalProps {
@@ -33,6 +33,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [guestEmail, setGuestEmail] = useState(''); // Added Email
 
   useEffect(() => {
     if (isOpen) {
@@ -83,9 +84,11 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
       if (client) {
           setGuestName(client.full_name);
           setGuestPhone(client.phone_number || '');
+          setGuestEmail(client.email || '');
       } else {
           setGuestName('');
           setGuestPhone('');
+          setGuestEmail('');
       }
   };
 
@@ -112,6 +115,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
             vat_amount: (formData.total_amount || 0) * 0.15,
             guest_name: guestName,
             guest_phone: guestPhone,
+            guest_email: guestEmail,
             notes: formData.notes
         };
 
@@ -125,6 +129,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
         // Reset
         setGuestName('');
         setGuestPhone('');
+        setGuestEmail('');
     } catch (err: any) {
         toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally {
@@ -170,6 +175,7 @@ export const AddBookingModal: React.FC<AddBookingModalProps> = ({ isOpen, onClos
                     <Input placeholder="الاسم الكامل" value={guestName} onChange={e => setGuestName(e.target.value)} className="h-12 rounded-xl bg-white" icon={<User className="w-4 h-4" />} />
                     <Input placeholder="رقم الجوال" value={guestPhone} onChange={e => setGuestPhone(e.target.value)} className="h-12 rounded-xl bg-white" icon={<Phone className="w-4 h-4" />} />
                 </div>
+                <Input placeholder="البريد الإلكتروني" value={guestEmail} onChange={e => setGuestEmail(e.target.value)} className="h-12 rounded-xl bg-white" icon={<Mail className="w-4 h-4" />} />
             </div>
 
             {/* 3. Financials */}
