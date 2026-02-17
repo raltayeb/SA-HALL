@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, VAT_RATE, HallPackage, BookingConfig, HallAddon } from '../types';
+import { Hall, UserProfile, VAT_RATE, HallPackage, BookingConfig, HallAddon, HALL_AMENITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
@@ -200,22 +200,34 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
         <div className="max-w-[1600px] mx-auto px-6 py-8 grid lg:grid-cols-3 gap-8">
             {/* Right Column: Details */}
             <div className="lg:col-span-2 space-y-8">
-                <div className="h-[400px] rounded-[2.5rem] overflow-hidden relative">
-                    <img src={allImages[0]} className="w-full h-full object-cover" />
+                {/* Image Gallery */}
+                <div className="h-[400px] rounded-[2.5rem] overflow-hidden relative group">
+                    <img src={allImages[0]} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
                     <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-4 py-2 rounded-2xl font-black text-sm flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-primary" /> {item.city}
                     </div>
+                    {allImages.length > 1 && (
+                        <div className="absolute bottom-6 left-6 flex gap-2">
+                            {allImages.slice(1, 4).map((img, i) => (
+                                <div key={i} className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white shadow-lg cursor-pointer">
+                                    <img src={img} className="w-full h-full object-cover" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
+                {/* 1. Description */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
                         <Info className="w-6 h-6 text-primary" /> وصف القاعة
                     </h3>
-                    <div className="text-sm font-medium text-gray-600 leading-loose">
+                    <div className="text-sm font-medium text-gray-600 leading-loose whitespace-pre-line">
                         {item.description || 'لا يوجد وصف متاح.'}
                     </div>
                 </div>
 
+                {/* 2. Packages */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                         <Package className="w-6 h-6 text-primary" /> باقات الحجز
@@ -250,8 +262,60 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* Additional Info Sections... */}
-                {/* Simplified for brevity in this output, maintaining existing sections... */}
+                {/* 3. Amenities */}
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                        <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {(item.amenities?.length ? item.amenities : HALL_AMENITIES).map((amenity, i) => (
+                            <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 hover:border-primary/30 transition-colors">
+                                <Check className="w-5 h-5 text-green-500 shrink-0" /> {amenity}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 4. Policies */}
+                {item.policies && (
+                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                        <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-primary" /> الشروط والأحكام
+                        </h3>
+                        <p className="text-gray-600 leading-loose font-medium text-sm whitespace-pre-line bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                            {item.policies}
+                        </p>
+                    </div>
+                )}
+
+                {/* 5. Addons / Store */}
+                {item.addons && item.addons.length > 0 && (
+                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                        <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                            <ShoppingBag className="w-6 h-6 text-primary" /> متجر القاعة والإضافات
+                        </h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {item.addons.map((addon, i) => {
+                                const isSelected = selectedAddons.some(a => a.name === addon.name);
+                                return (
+                                    <div 
+                                        key={i} 
+                                        onClick={() => toggleAddon(addon)}
+                                        className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${isSelected ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'bg-primary border-primary text-white' : 'border-gray-300 bg-white'}`}>
+                                                {isSelected && <Check className="w-3 h-3" />}
+                                            </div>
+                                            <span className="font-bold text-gray-900 text-sm">{addon.name}</span>
+                                        </div>
+                                        <PriceTag amount={addon.price} className="text-primary font-black" />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Left Column: Booking Form / Success View */}
@@ -305,7 +369,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                 </div>
                             </div>
 
-                            {/* Guest Counts & Pricing Logic (Same as before) */}
+                            {/* Guest Counts & Pricing Logic */}
                             {selectedPackage && (
                                 <div className="space-y-4 border-t border-gray-50 pt-4">
                                     <div className="flex justify-between items-center">
@@ -336,6 +400,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                             <div className="text-center py-4 border-t border-gray-50">
                                 <p className="text-[10px] font-bold text-gray-400 mb-1">الإجمالي التقريبي</p>
                                 <PriceTag amount={priceDetails.total * 1.15} className="text-3xl font-black text-primary justify-center" />
+                                {selectedAddons.length > 0 && <p className="text-[10px] text-primary mt-1 font-bold">+ {selectedAddons.length} خدمات إضافية</p>}
                             </div>
 
                             <div className="space-y-3">
@@ -344,17 +409,17 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <button onClick={() => setPaymentOption('deposit')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'deposit' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>
-                                    <span className="text-[10px] font-black mb-1">عربون</span>
-                                    <span className="font-black text-[10px]">{paymentAmounts.deposit.toFixed(0)}</span>
+                                <button onClick={() => setPaymentOption('deposit')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'deposit' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                                    <span className="text-lg font-black text-primary mb-1">عربون</span>
+                                    <span className="text-2xl font-black text-primary">{paymentAmounts.deposit.toFixed(0)}</span>
                                 </button>
-                                <button onClick={() => setPaymentOption('hold_48h')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'hold_48h' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>
-                                    <span className="text-[10px] font-black mb-1">حجز 48س</span>
-                                    <span className="font-black text-[10px]">{paymentAmounts.hold}</span>
+                                <button onClick={() => setPaymentOption('hold_48h')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'hold_48h' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                                    <span className="text-lg font-black text-primary mb-1">حجز 48س</span>
+                                    <span className="text-2xl font-black text-primary">{paymentAmounts.hold}</span>
                                 </button>
-                                <button onClick={() => setPaymentOption('consultation')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'consultation' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}>
-                                    <span className="text-[10px] font-black mb-1">استشارة</span>
-                                    <span className="font-black text-[10px]">{paymentAmounts.consultation}</span>
+                                <button onClick={() => setPaymentOption('consultation')} className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all ${paymentOption === 'consultation' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                                    <span className="text-lg font-black text-primary mb-1">استشارة</span>
+                                    <span className="text-2xl font-black text-primary">{paymentAmounts.consultation}</span>
                                 </button>
                             </div>
 
