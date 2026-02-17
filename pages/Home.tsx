@@ -177,6 +177,11 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                   <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-2 rounded-[3rem] shadow-2xl">
                       <div className="bg-white rounded-[2.5rem] p-8 shadow-inner">
                           
+                          {/* LOGO INSERTED HERE */}
+                          <div className="flex justify-center mb-8">
+                              <img src="https://dash.hall.sa/logo.svg" alt="Logo" className="h-32 w-auto object-contain" />
+                          </div>
+
                           {/* Tabs */}
                           <div className="flex bg-gray-50 p-1.5 rounded-2xl border border-gray-100 mb-6">
                               <button onClick={() => setSearchTab('halls')} className={`flex-1 py-3 rounded-xl text-sm font-black transition-all flex items-center justify-center gap-2 ${searchTab === 'halls' ? 'bg-white shadow-md text-primary' : 'text-gray-400 hover:text-gray-600'}`}>

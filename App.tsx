@@ -115,46 +115,21 @@ const App: React.FC = () => {
     };
     fetchTheme();
 
-    // Auth Fetch with Robust Error Handling
-    const initSession = async () => {
-        try {
-            const { data: { session }, error } = await supabase.auth.getSession();
-            if (error) throw error;
+    // Auth Fetch
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) fetchProfile(session.user.id);
+      else {
+          setUserProfile(null);
+          setLoading(false);
+      }
+    });
 
-            if (session) {
-                await fetchProfile(session.user.id);
-            } else {
-                setUserProfile(null);
-                setLoading(false);
-            }
-        } catch (err: any) {
-            console.warn("Session validation error:", err.message);
-            // If refresh token invalid, clear session to prevent infinite loop or stuck state
-            await supabase.auth.signOut();
-            setUserProfile(null);
-            setLoading(false);
-        }
-    };
-    initSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) fetchProfile(session.user.id);
+      else {
           setUserProfile(null);
           setLoading(false);
           setActiveTab('home');
-      } else if (event === 'TOKEN_REFRESH_REVOKED') {
-          // Handle revoked token explicitly
-          await supabase.auth.signOut();
-          setUserProfile(null);
-          setLoading(false);
-      } else if (session) {
-          // Only fetch if user changed or profile not loaded to avoid loops
-          if (!userProfile || userProfile.id !== session.user.id) {
-              await fetchProfile(session.user.id);
-          }
-      } else {
-          setUserProfile(null);
-          setLoading(false);
       }
     });
 
@@ -162,24 +137,9 @@ const App: React.FC = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    try {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-        if (error) throw error;
-        
-        if (data) {
-            setUserProfile(data as UserProfile);
-        } else {
-            // Profile missing but session exists? Clean up
-            console.warn('Profile missing for authenticated user');
-            await supabase.auth.signOut();
-            setUserProfile(null);
-        }
-    } catch (err) {
-        console.error('Error fetching profile:', err);
-        setUserProfile(null);
-    } finally {
-        setLoading(false);
-    }
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    if (data) setUserProfile(data as UserProfile);
+    setLoading(false);
   };
 
   const handleLogout = async () => {
