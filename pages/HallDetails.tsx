@@ -262,37 +262,11 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 3. Amenities */}
-                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                    <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                        <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {(item.amenities?.length ? item.amenities : HALL_AMENITIES).map((amenity, i) => (
-                            <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 hover:border-primary/30 transition-colors">
-                                <Check className="w-5 h-5 text-green-500 shrink-0" /> {amenity}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* 4. Policies */}
-                {item.policies && (
-                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                        <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
-                            <FileText className="w-6 h-6 text-primary" /> الشروط والأحكام
-                        </h3>
-                        <p className="text-gray-600 leading-loose font-medium text-sm whitespace-pre-line bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                            {item.policies}
-                        </p>
-                    </div>
-                )}
-
-                {/* 5. Addons / Store */}
+                {/* 3. Addons / Services - MOVED HERE */}
                 {item.addons && item.addons.length > 0 && (
                     <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                         <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                            <ShoppingBag className="w-6 h-6 text-primary" /> متجر القاعة والإضافات
+                            <Sparkles className="w-6 h-6 text-primary" /> الخدمات الإضافية
                         </h3>
                         <div className="grid md:grid-cols-2 gap-4">
                             {item.addons.map((addon, i) => {
@@ -316,6 +290,63 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                         </div>
                     </div>
                 )}
+
+                {/* 4. Amenities */}
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                    <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+                        <CheckCircle2 className="w-6 h-6 text-primary" /> مميزات القاعة
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {(item.amenities?.length ? item.amenities : HALL_AMENITIES).map((amenity, i) => (
+                            <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 hover:border-primary/30 transition-colors">
+                                <Check className="w-5 h-5 text-green-500 shrink-0" /> {amenity}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 5. Policies */}
+                {item.policies && (
+                    <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
+                        <h3 className="text-xl font-black text-gray-900 mb-4 flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-primary" /> الشروط والأحكام
+                        </h3>
+                        <p className="text-gray-600 leading-loose font-medium text-sm whitespace-pre-line bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                            {item.policies}
+                        </p>
+                    </div>
+                )}
+
+                {/* 6. Store CTA - ADDED AT BOTTOM */}
+                <div 
+                    className="relative rounded-[2.5rem] overflow-hidden min-h-[220px] flex items-center border border-gray-100 group cursor-pointer shadow-sm hover:shadow-lg transition-all"
+                    onClick={() => onNavigate && onNavigate('store_page')}
+                >
+                    <img 
+                        src="https://images.unsplash.com/photo-1478147427282-58a87a120781?auto=format&fit=crop&q=80&w=800" 
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                        alt="Store Background"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
+                    <div className="relative z-10 p-10 text-white w-full">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="space-y-3">
+                                <div className="inline-flex items-center gap-2 text-yellow-400 bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20 backdrop-blur-sm w-fit">
+                                    <ShoppingBag className="w-4 h-4" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest">متجر القاعة</span>
+                                </div>
+                                <h3 className="text-3xl font-black leading-tight">هل تحتاج المزيد من التجهيزات؟</h3>
+                                <p className="text-white/80 font-bold text-sm max-w-md">
+                                    تصفح متجرنا لإضافة الكراسي، الطاولات، أجهزة الإضاءة، وضيافة القهوة والشاي.
+                                </p>
+                            </div>
+                            <div className="bg-white text-primary px-6 py-4 rounded-2xl font-black text-sm flex items-center gap-3 shadow-xl group-hover:scale-105 transition-transform">
+                                <span>تصفح المتجر</span>
+                                <ArrowRight className="w-5 h-5" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Left Column: Booking Form / Success View */}
