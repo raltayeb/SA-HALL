@@ -186,7 +186,13 @@ const App: React.FC = () => {
                       setActiveTab('dashboard');
                   } else {
                       // No assets -> Go to Selection Screen (Step 3)
-                      setRegData(prev => ({ ...prev, fullName: profile.full_name || 'الشريك', email: profile.email }));
+                      // Important: Pre-fill regData so the welcome screen shows the name
+                      setRegData(prev => ({ 
+                          ...prev, 
+                          fullName: profile.full_name || 'الشريك', 
+                          email: profile.email || '',
+                          phone: profile.phone_number || ''
+                      }));
                       setRegStep(3); 
                       setActiveTab('vendor_register');
                   }
@@ -420,7 +426,14 @@ const App: React.FC = () => {
                 </div>
             );
         } else {
-            return <VendorAuth onRegister={() => setRegStep(3)} onLogin={() => {}} onDataChange={setRegData} onBack={() => setActiveTab('home')} />;
+            return (
+                <VendorAuth 
+                    onRegister={() => setRegStep(3)} 
+                    onLogin={handleLoginSuccess} 
+                    onDataChange={setRegData} 
+                    onBack={() => setActiveTab('home')} 
+                />
+            );
         }
     }
 
