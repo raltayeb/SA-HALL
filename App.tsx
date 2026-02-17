@@ -43,7 +43,7 @@ import { prepareCheckout, verifyPaymentStatus } from './services/paymentService'
 import { HyperPayForm } from './components/Payment/HyperPayForm';
 import { 
   Loader2, CheckCircle2, Mail, ArrowLeft,
-  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload, Clock
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload, Clock, Image as ImageIcon, Ticket, ShieldCheck
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -60,6 +60,9 @@ const App: React.FC = () => {
   const [regStep, setRegStep] = useState(1);
   const [regData, setRegData] = useState({ fullName: '', email: '', password: '', phone: '' });
   const [selectedType, setSelectedType] = useState<'hall' | 'service'>('hall');
+  
+  // Registration Payment State
+  const [couponCode, setCouponCode] = useState('');
   
   // Detailed Asset Data for Registration Step 4
   const [hallFormData, setHallFormData] = useState({
@@ -160,6 +163,39 @@ const App: React.FC = () => {
       else setActiveTab(tab);
   };
 
+  const routeUser = async (profile: UserProfile, userId: string) => {
+      if (profile.role === 'vendor') {
+          // Check if vendor has ANY assets (Halls or Services)
+          const [halls, services] = await Promise.all([
+              supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', userId),
+              supabase.from('services').select('id', { count: 'exact', head: true }).eq('vendor_id', userId)
+          ]);
+
+          const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
+
+          if (hasAssets) {
+              if (profile.status === 'approved') {
+                  setActiveTab('dashboard');
+              } else {
+                  setActiveTab('request_pending');
+              }
+          } else {
+              setRegData(prev => ({ 
+                  ...prev, 
+                  fullName: profile.full_name || 'الشريك', 
+                  email: profile.email || '',
+                  phone: profile.phone_number || ''
+              }));
+              setRegStep(3); 
+              setActiveTab('vendor_register');
+          }
+      } else if (profile.role === 'super_admin') {
+          setActiveTab('admin_dashboard');
+      } else {
+          setActiveTab('home');
+      }
+  };
+
   // --- SMART LOGIN REDIRECT LOGIC ---
   const handleLoginSuccess = async () => {
       setAuthLoading(true);
@@ -180,45 +216,31 @@ const App: React.FC = () => {
           
           if (profileData) {
               setUserProfile(profileData as UserProfile);
-
-              if (profileData.role === 'vendor') {
-                  // Check if vendor has ANY assets (Halls or Services)
-                  const [halls, services] = await Promise.all([
-                      supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', user.id),
-                      supabase.from('services').select('id', { count: 'exact', head: true }).eq('vendor_id', user.id)
-                  ]);
-
-                  const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
-
-                  if (hasAssets) {
-                      if (profileData.status === 'approved') {
-                          // 1. Has assets AND Approved -> Dashboard
-                          setActiveTab('dashboard');
-                      } else {
-                          // 2. Has assets BUT Pending -> Request Pending Screen
-                          setActiveTab('request_pending');
-                      }
-                  } else {
-                      // 3. No assets -> Selection Screen (Step 3)
-                      setRegData(prev => ({ 
-                          ...prev, 
-                          fullName: profileData.full_name || 'الشريك', 
-                          email: profileData.email || '',
-                          phone: profileData.phone_number || ''
-                      }));
-                      setRegStep(3); 
-                      setActiveTab('vendor_register');
-                  }
-              } else if (profileData.role === 'super_admin') {
-                  setActiveTab('admin_dashboard');
-              } else {
-                  // Normal User
-                  setActiveTab('home');
-              }
+              await routeUser(profileData as UserProfile, user.id);
           } else {
-              // Profile Missing (Trigger Failed) - Force manual creation for normal users if needed, 
-              // but for now just stay on home or show error.
-              console.error('Profile not found after retries');
+              // Self-healing: Profile Missing (Trigger Failed) - Force manual creation
+              console.warn('Profile not found after retries, attempting manual creation...');
+              const { error: insertError } = await supabase.from('profiles').insert([{
+                  id: user.id,
+                  email: user.email,
+                  full_name: user.user_metadata.full_name || '',
+                  role: user.user_metadata.role || 'user',
+                  status: user.user_metadata.role === 'vendor' ? 'pending' : 'approved',
+                  is_enabled: true,
+                  phone_number: user.user_metadata.phone_number || ''
+              }]);
+
+              if (!insertError) {
+                  // Fetch again
+                  const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+                  if (newProfile) {
+                      setUserProfile(newProfile as UserProfile);
+                      await routeUser(newProfile as UserProfile, user.id);
+                  }
+              } else {
+                  console.error('Manual creation failed', insertError);
+                  toast({ title: 'خطأ', description: 'تعذر الوصول لملف المستخدم.', variant: 'destructive' });
+              }
           }
       } catch (err) {
           console.error(err);
@@ -324,60 +346,73 @@ const App: React.FC = () => {
 
   // Helper for Hall Form Rendering
   const renderHallForm = () => (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
         <div>
-            <h3 className="text-lg font-black text-primary mb-4 text-right">معلومات المالك</h3>
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="رقم الجوال" value={regData.phone} readOnly className="bg-gray-50 border-transparent" />
-                    <Input label="البريد الإلكتروني" value={regData.email} readOnly className="bg-gray-50 border-transparent text-left" dir="ltr" />
+            <h3 className="text-base font-black text-primary mb-3 text-right">معلومات مالك القاعة</h3>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="رقم الجوال" value={regData.phone} readOnly className="bg-gray-50 border-transparent h-11 text-sm font-bold" />
+                    <Input label="البريد الإلكتروني" value={regData.email} readOnly className="bg-gray-50 border-transparent text-left h-11 text-sm font-bold" dir="ltr" />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500">مدينة القاعة</label>
-                    <select className="w-full h-12 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none focus:border-primary" value={hallFormData.city} onChange={e => setHallFormData({...hallFormData, city: e.target.value})}>
+                    <select className="w-full h-11 border border-gray-200 rounded-xl px-4 text-sm font-bold bg-white outline-none focus:border-primary transition-all" value={hallFormData.city} onChange={e => setHallFormData({...hallFormData, city: e.target.value})}>
                         {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="رخصة العمل (اختياري)" value={hallFormData.license_number} onChange={e => setHallFormData({...hallFormData, license_number: e.target.value})} />
-                    <Input label="الرقم الموحد (اختياري)" value={hallFormData.unified_number} onChange={e => setHallFormData({...hallFormData, unified_number: e.target.value})} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="رخصة العمل (اختياري)" value={hallFormData.license_number} onChange={e => setHallFormData({...hallFormData, license_number: e.target.value})} className="h-11 text-sm font-bold" />
+                    <Input label="الرقم الموحد (اختياري)" value={hallFormData.unified_number} onChange={e => setHallFormData({...hallFormData, unified_number: e.target.value})} className="h-11 text-sm font-bold" />
                 </div>
             </div>
         </div>
+        
         <div>
-            <h3 className="text-lg font-black text-primary mb-4 text-right">معلومات القاعة الأساسية</h3>
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="اسم القاعة عربي" value={hallFormData.name_ar} onChange={e => setHallFormData({...hallFormData, name_ar: e.target.value})} />
-                    <Input label="اسم القاعة انجليزي" value={hallFormData.name_en} onChange={e => setHallFormData({...hallFormData, name_en: e.target.value})} className="text-left" dir="ltr" />
+            <h3 className="text-base font-black text-primary mb-3 text-right">معلومات القاعة الأساسية</h3>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="اسم القاعة عربي" value={hallFormData.name_ar} onChange={e => setHallFormData({...hallFormData, name_ar: e.target.value})} className="h-11 text-sm font-bold" />
+                    <Input label="اسم القاعة انجليزي" value={hallFormData.name_en} onChange={e => setHallFormData({...hallFormData, name_en: e.target.value})} className="text-left h-11 text-sm font-bold" dir="ltr" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Input label="عدد الضيوف للرجال" type="number" value={hallFormData.capacity_men} onChange={e => setHallFormData({...hallFormData, capacity_men: e.target.value})} />
-                    <Input label="عدد الضيوف للنساء" type="number" value={hallFormData.capacity_women} onChange={e => setHallFormData({...hallFormData, capacity_women: e.target.value})} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="عدد الضيوف للرجال" type="number" value={hallFormData.capacity_men} onChange={e => setHallFormData({...hallFormData, capacity_men: e.target.value})} className="h-11 text-sm font-bold" />
+                    <Input label="عدد الضيوف للنساء" type="number" value={hallFormData.capacity_women} onChange={e => setHallFormData({...hallFormData, capacity_women: e.target.value})} className="h-11 text-sm font-bold" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500">نبذة عن القاعة بالعربي</label>
-                        <textarea className="w-full h-24 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none focus:border-primary" value={hallFormData.description_ar} onChange={e => setHallFormData({...hallFormData, description_ar: e.target.value})} />
+                        <textarea className="w-full h-20 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none focus:border-primary transition-all" value={hallFormData.description_ar} onChange={e => setHallFormData({...hallFormData, description_ar: e.target.value})} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500">نبذة عن القاعة بالانجليزي</label>
-                        <textarea className="w-full h-24 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none focus:border-primary text-left" dir="ltr" value={hallFormData.description_en} onChange={e => setHallFormData({...hallFormData, description_en: e.target.value})} />
+                        <textarea className="w-full h-20 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none focus:border-primary transition-all text-left" dir="ltr" value={hallFormData.description_en} onChange={e => setHallFormData({...hallFormData, description_en: e.target.value})} />
                     </div>
                 </div>
             </div>
         </div>
+
         <div>
-            <h3 className="text-lg font-black text-primary mb-4 text-right">المرفقات والوسائط</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[{ label: 'صور القاعة من الامام', id: 'front' }, { label: 'صور القاعة من الخلف', id: 'back' }, { label: 'صور القاعة', id: 'gen1' }, { label: 'صور القاعة', id: 'gen2' }, { label: 'فيديو تور للقاعة', id: 'video' }, { label: 'فيديو تعريفي (اختياري)', id: 'video2' }, { label: 'كتالوج PDF للباقات', id: 'pdf' }, { label: 'اللوجو', id: 'logo' }].map((item, idx) => (
-                    <div key={idx} className="flex flex-col gap-2">
-                        <span className="text-xs font-bold text-gray-500 text-center">{item.label}</span>
-                        <div className="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all group">
-                            <div className="w-12 h-12 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform"><Plus className="w-6 h-6" /></div>
+            <h3 className="text-base font-black text-primary mb-3 text-right">المرفقات والوسائط</h3>
+            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Logo Section */}
+                    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer group">
+                        <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
+                            <Upload className="w-8 h-8" />
                         </div>
+                        <p className="text-sm font-bold text-gray-700">شعار القاعة (Logo)</p>
+                        <p className="text-[10px] text-gray-400 mt-1">PNG, JPG حتى 2MB</p>
                     </div>
-                ))}
+
+                    {/* Gallery Section */}
+                    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer group">
+                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-3 group-hover:scale-110 transition-transform">
+                            <ImageIcon className="w-8 h-8" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-700">صور القاعة (المعرض)</p>
+                        <p className="text-[10px] text-gray-400 mt-1">رفع صور متعددة دفعة واحدة</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -429,59 +464,103 @@ const App: React.FC = () => {
         } else if (regStep === 4) {
             return (
                 <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-tajawal" dir="rtl">
-                    <div className="text-center mb-8 space-y-4">
-                        <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
+                    <div className="text-center mb-10 space-y-4">
+                        <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-32 w-auto mx-auto object-contain mb-4" />
                         <div className="space-y-1">
-                            <h1 className="text-2xl font-black text-primary">إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة</h1>
+                            <h1 className="text-3xl font-black text-primary">إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة</h1>
                             <p className="text-gray-500 font-bold text-sm">أكمل البيانات أدناه لإدراج نشاطك في المنصة</p>
                         </div>
                     </div>
-                    <div className="w-full max-w-5xl">
+                    
+                    <div className="w-full max-w-4xl space-y-8">
+                        {/* Form Section */}
                         {selectedType === 'hall' ? renderHallForm() : (
                             <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
                                 <h3 className="text-lg font-black text-primary mb-4 border-b border-gray-100 pb-4">بيانات الخدمة</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <Input label="الاسم التجاري" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-12 rounded-xl" />
-                                    <div className="space-y-2">
+                                    <Input label="الاسم التجاري" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-11 rounded-xl font-bold" />
+                                    <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-500">التصنيف</label>
-                                        <select className="w-full h-12 bg-white border border-gray-200 rounded-xl px-4 text-sm font-bold outline-none" value={assetData.category} onChange={e => setAssetData({...assetData, category: e.target.value})}>
+                                        <select className="w-full h-11 bg-white border border-gray-200 rounded-xl px-4 text-sm font-bold outline-none focus:border-primary" value={assetData.category} onChange={e => setAssetData({...assetData, category: e.target.value})}>
                                             {SERVICE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <Input label="السعر يبدأ من" type="number" value={assetData.price} onChange={e => setAssetData({...assetData, price: e.target.value})} className="h-12 rounded-xl" />
+                                    <Input label="السعر يبدأ من" type="number" value={assetData.price} onChange={e => setAssetData({...assetData, price: e.target.value})} className="h-11 rounded-xl font-bold" />
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-1">
                                     <label className="text-xs font-bold text-gray-500">وصف الخدمة</label>
-                                    <textarea className="w-full h-24 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none" value={assetData.description} onChange={e => setAssetData({...assetData, description: e.target.value})} />
+                                    <textarea className="w-full h-24 border border-gray-200 rounded-xl p-3 text-sm font-bold outline-none resize-none focus:border-primary" value={assetData.description} onChange={e => setAssetData({...assetData, description: e.target.value})} />
                                 </div>
                             </div>
                         )}
-                        <div className="bg-gray-900 rounded-[2rem] p-8 mt-8 text-white shadow-2xl">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                                <div>
-                                    <h3 className="text-xl font-black mb-1 flex items-center gap-2"><CreditCard className="w-6 h-6 text-primary" /> الاشتراك والتفعيل</h3>
-                                    <p className="text-white/60 text-sm font-bold">رسوم الاشتراك السنوي: <span className="text-white font-black text-lg">{selectedType === 'hall' ? '500' : '200'} ر.س</span></p>
-                                </div>
-                                {isPaymentModalOpen ? (
-                                    <div className="text-center bg-white/10 p-4 rounded-xl border border-white/20">
-                                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
-                                        <p className="text-xs font-bold text-white/80">جاري معالجة الدفع...</p>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col gap-3 w-full md:w-auto">
-                                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest text-center">اختر وسيلة الدفع</p>
-                                        <div className="flex gap-3">
-                                            <button onClick={() => handleRegistrationPayClick('apple')} className="h-12 w-20 rounded-xl bg-black border border-white/20 flex items-center justify-center hover:bg-white/10 transition-colors"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" className="h-5 invert" /></button>
-                                            <button onClick={() => handleRegistrationPayClick('stc')} className="h-12 w-20 rounded-xl bg-[#4F008C] border border-white/20 flex items-center justify-center hover:opacity-90 transition-opacity text-xs font-bold">stc pay</button>
-                                            <button onClick={() => handleRegistrationPayClick('card')} className="h-12 w-20 rounded-xl bg-white border border-white/20 flex items-center justify-center hover:bg-gray-100 transition-colors"><img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" className="h-4" /></button>
+
+                        {/* Payment & Action Section - Light Mode Redesign */}
+                        <div className="bg-white rounded-[2rem] p-8 border border-gray-200 shadow-xl space-y-6">
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+                                <div className="space-y-4 flex-1">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-3 bg-primary/5 rounded-xl text-primary"><CreditCard className="w-6 h-6" /></div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-gray-900">ملخص الاشتراك</h3>
+                                            <p className="text-gray-400 text-xs font-bold mt-0.5">تفعيل فوري للباقة السنوية</p>
                                         </div>
                                     </div>
-                                )}
+                                    
+                                    <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-gray-100">
+                                        <div className="flex justify-between text-sm font-bold text-gray-600">
+                                            <span>رسوم الاشتراك</span>
+                                            <span>{selectedType === 'hall' ? '500' : '200'} ر.س</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm font-bold text-gray-600">
+                                            <span>الضريبة (15%)</span>
+                                            <span>{(selectedType === 'hall' ? 500 : 200) * 0.15} ر.س</span>
+                                        </div>
+                                        <div className="border-t border-gray-200 pt-2 flex justify-between text-lg font-black text-primary">
+                                            <span>الإجمالي</span>
+                                            <span>{(selectedType === 'hall' ? 500 : 200) * 1.15} ر.س</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Coupon Input */}
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <input 
+                                                className="w-full h-11 bg-gray-50 border border-gray-200 rounded-xl px-4 pl-10 text-sm font-bold outline-none focus:border-primary focus:bg-white transition-all uppercase"
+                                                placeholder="كود الخصم"
+                                                value={couponCode}
+                                                onChange={(e) => setCouponCode(e.target.value)}
+                                            />
+                                            <Ticket className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                        </div>
+                                        <Button variant="outline" className="h-11 px-6 rounded-xl font-bold border-gray-200 hover:border-primary hover:text-primary">تطبيق</Button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-4 w-full md:w-auto min-w-[280px]">
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">وسيلة الدفع الآمنة</p>
+                                    
+                                    <button onClick={() => handleRegistrationPayClick('card')} className="h-14 w-full rounded-xl bg-gray-900 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 gap-3 font-bold group">
+                                        <CreditCard className="w-5 h-5 group-hover:text-primary transition-colors" />
+                                        دفع وتفعيل الاشتراك
+                                    </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => handleRegistrationPayClick('apple')} className="h-12 w-full rounded-xl bg-black flex items-center justify-center hover:opacity-80 transition-opacity"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" className="h-5 invert" /></button>
+                                        <button onClick={() => handleRegistrationPayClick('stc')} className="h-12 w-full rounded-xl bg-[#4F008C] text-white font-bold text-sm flex items-center justify-center hover:opacity-90 transition-opacity">stc pay</button>
+                                    </div>
+
+                                    <p className="text-[10px] text-gray-400 text-center font-bold mt-2">
+                                        بالضغط على الدفع، أنت توافق على <a href="#" className="text-primary underline hover:text-primary/80 transition-colors">شروط وأحكام المنصة</a>
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-12">العودة وتغيير النشاط</button>
+
+                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-12 flex items-center justify-center gap-1">
+                            <ArrowRight className="w-3 h-3" /> العودة وتغيير النشاط
+                        </button>
                     </div>
                 </div>
             );
