@@ -43,7 +43,7 @@ import { prepareCheckout, verifyPaymentStatus } from './services/paymentService'
 import { HyperPayForm } from './components/Payment/HyperPayForm';
 import { 
   Loader2, CheckCircle2, Mail, ArrowLeft,
-  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload, Clock
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -182,11 +182,15 @@ const App: React.FC = () => {
                   const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
 
                   if (hasAssets) {
-                      // Has assets -> Go to Dashboard
-                      setActiveTab('dashboard');
+                      if (profile.status === 'approved') {
+                          // 1. Has assets AND Approved -> Dashboard
+                          setActiveTab('dashboard');
+                      } else {
+                          // 2. Has assets BUT Pending -> Request Pending Screen
+                          setActiveTab('request_pending');
+                      }
                   } else {
-                      // No assets -> Go to Selection Screen (Step 3)
-                      // Important: Pre-fill regData so the welcome screen shows the name
+                      // 3. No assets -> Selection Screen (Step 3)
                       setRegData(prev => ({ 
                           ...prev, 
                           fullName: profile.full_name || 'الشريك', 
@@ -260,12 +264,14 @@ const App: React.FC = () => {
               console.error('Asset creation error:', assetError);
               toast({ title: 'تنبيه', description: 'تم إنشاء الحساب ولكن حدث خطأ في إضافة النشاط.', variant: 'warning' });
           } else {
-              toast({ title: 'تم الاشتراك بنجاح', variant: 'success' });
+              toast({ title: 'تم تقديم الطلب', description: 'تمت إضافة النشاط بنجاح وبانتظار الموافقة.', variant: 'success' });
           }
 
           setIsPaymentModalOpen(false);
           await fetchProfile(currentUser.id);
-          setActiveTab('dashboard');
+          
+          // Redirect to "Request Pending" page instead of Dashboard immediately
+          setActiveTab('request_pending');
 
       } catch (err: any) {
           console.error(err);
@@ -276,7 +282,7 @@ const App: React.FC = () => {
   };
 
   // Define Authentication Pages
-  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login'].includes(activeTab);
+  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login', 'request_pending'].includes(activeTab);
   const isPublicPage = ['home', 'browse_halls', 'browse_services', 'hall_details', 'store_page'].includes(activeTab);
 
   // Helper for Hall Form Rendering
@@ -341,6 +347,23 @@ const App: React.FC = () => {
   );
 
   const renderContent = () => {
+    if (activeTab === 'request_pending') {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center p-6 font-tajawal">
+                <div className="w-24 h-24 bg-yellow-50 rounded-full flex items-center justify-center mb-6 animate-pulse border-4 border-yellow-100">
+                    <Clock className="w-10 h-10 text-yellow-600" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-900 mb-2">طلبك قيد المراجعة</h2>
+                <p className="text-gray-500 max-w-md font-bold leading-relaxed mb-8">
+                    شكراً لانضمامك! يقوم فريق الإدارة حالياً بمراجعة بياناتك والنشاط الذي قمت بإضافته. سيتم تفعيل حسابك وإشعارك قريباً عبر البريد الإلكتروني.
+                </p>
+                <Button variant="outline" onClick={handleLogout} className="h-12 px-8 rounded-xl font-bold border-gray-300">
+                    عودة للرئيسية
+                </Button>
+            </div>
+        );
+    }
+
     if (activeTab === 'vendor_register') {
         if (regStep === 3) {
             return (
@@ -372,8 +395,8 @@ const App: React.FC = () => {
                     <div className="text-center mb-8 space-y-4">
                         <img src={themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} alt="Logo" className="h-20 w-auto mx-auto object-contain" />
                         <div className="space-y-1">
-                            <h1 className="text-2xl font-black text-primary">إضافة قاعة جديدة</h1>
-                            <p className="text-gray-500 font-bold text-sm">أكمل البيانات أدناه لإدراج قاعتك في المنصة</p>
+                            <h1 className="text-2xl font-black text-primary">إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة</h1>
+                            <p className="text-gray-500 font-bold text-sm">أكمل البيانات أدناه لإدراج نشاطك في المنصة</p>
                         </div>
                     </div>
                     <div className="w-full max-w-5xl">
@@ -438,7 +461,6 @@ const App: React.FC = () => {
     }
 
     if (activeTab === 'vendor_login') {
-        // Use smart handleLoginSuccess
         return <VendorAuth isLogin onRegister={() => setActiveTab('vendor_register')} onLogin={handleLoginSuccess} onBack={() => setActiveTab('home')} />;
     }
 
