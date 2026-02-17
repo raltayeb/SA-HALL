@@ -115,21 +115,46 @@ const App: React.FC = () => {
     };
     fetchTheme();
 
-    // Auth Fetch
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) fetchProfile(session.user.id);
-      else {
-          setUserProfile(null);
-          setLoading(false);
-      }
-    });
+    // Auth Fetch with Robust Error Handling
+    const initSession = async () => {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) throw error;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) fetchProfile(session.user.id);
-      else {
+            if (session) {
+                await fetchProfile(session.user.id);
+            } else {
+                setUserProfile(null);
+                setLoading(false);
+            }
+        } catch (err: any) {
+            console.warn("Session validation error:", err.message);
+            // If refresh token invalid, clear session to prevent infinite loop or stuck state
+            await supabase.auth.signOut();
+            setUserProfile(null);
+            setLoading(false);
+        }
+    };
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
           setUserProfile(null);
           setLoading(false);
           setActiveTab('home');
+      } else if (event === 'TOKEN_REFRESH_REVOKED') {
+          // Handle revoked token explicitly
+          await supabase.auth.signOut();
+          setUserProfile(null);
+          setLoading(false);
+      } else if (session) {
+          // Only fetch if user changed or profile not loaded to avoid loops
+          if (!userProfile || userProfile.id !== session.user.id) {
+              await fetchProfile(session.user.id);
+          }
+      } else {
+          setUserProfile(null);
+          setLoading(false);
       }
     });
 
@@ -137,9 +162,24 @@ const App: React.FC = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
-    if (data) setUserProfile(data as UserProfile);
-    setLoading(false);
+    try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+        if (error) throw error;
+        
+        if (data) {
+            setUserProfile(data as UserProfile);
+        } else {
+            // Profile missing but session exists? Clean up
+            console.warn('Profile missing for authenticated user');
+            await supabase.auth.signOut();
+            setUserProfile(null);
+        }
+    } catch (err) {
+        console.error('Error fetching profile:', err);
+        setUserProfile(null);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -539,17 +579,12 @@ const App: React.FC = () => {
                                 </div>
 
                                 <div className="flex flex-col gap-4 w-full md:w-auto min-w-[280px]">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">وسيلة الدفع الآمنة</p>
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">إتمام العملية</p>
                                     
                                     <button onClick={() => handleRegistrationPayClick('card')} className="h-14 w-full rounded-xl bg-gray-900 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 gap-3 font-bold group">
                                         <CreditCard className="w-5 h-5 group-hover:text-primary transition-colors" />
-                                        دفع وتفعيل الاشتراك
+                                        الدفع وتفعيل الاشتراك
                                     </button>
-                                    
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button onClick={() => handleRegistrationPayClick('apple')} className="h-12 w-full rounded-xl bg-black flex items-center justify-center hover:opacity-80 transition-opacity"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" className="h-5 invert" /></button>
-                                        <button onClick={() => handleRegistrationPayClick('stc')} className="h-12 w-full rounded-xl bg-[#4F008C] text-white font-bold text-sm flex items-center justify-center hover:opacity-90 transition-opacity">stc pay</button>
-                                    </div>
 
                                     <p className="text-[10px] text-gray-400 text-center font-bold mt-2">
                                         بالضغط على الدفع، أنت توافق على <a href="#" className="text-primary underline hover:text-primary/80 transition-colors">شروط وأحكام المنصة</a>
