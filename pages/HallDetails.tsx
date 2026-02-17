@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
-import { Hall, UserProfile, VAT_RATE, HallPackage, BookingConfig, HallAddon, HALL_AMENITIES } from '../types';
+import { Hall, UserProfile, VAT_RATE, HallPackage, BookingConfig, HallAddon, HALL_AMENITIES, Coupon } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
@@ -38,6 +38,11 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,7 +75,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
 
   // Pricing Logic (Per Person)
   const priceDetails = useMemo(() => {
-      if (!selectedPackage) return { packageTotal: 0, addonsTotal: 0, seasonalIncrease: 0, total: 0, personPrice: 0 };
+      if (!selectedPackage) return { packageTotal: 0, addonsTotal: 0, seasonalIncrease: 0, total: 0, personPrice: 0, discountAmount: 0, grandTotal: 0, vatAmount: 0 };
       
       const personPrice = selectedPackage.price;
       const totalGuests = guestCounts.men + guestCounts.women;
@@ -91,29 +96,90 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
 
       const adjustedPackageCost = basePackageCost * seasonalMultiplier;
       const addonsTotal = selectedAddons.reduce((sum, a) => sum + Number(a.price), 0);
+      const subTotal = adjustedPackageCost + addonsTotal;
+
+      // Coupon Calculation
+      let discountAmount = 0;
+      if (appliedCoupon) {
+          if (appliedCoupon.discount_type === 'percentage') {
+              discountAmount = subTotal * (appliedCoupon.discount_value / 100);
+          } else {
+              discountAmount = appliedCoupon.discount_value;
+          }
+          discountAmount = Math.min(discountAmount, subTotal);
+      }
+
+      const taxableAmount = subTotal - discountAmount;
+      const vatAmount = taxableAmount * 0.15; // 15% VAT
+      const grandTotal = taxableAmount + vatAmount;
       
       return { 
           personPrice,
           packageTotal: adjustedPackageCost, 
           seasonalIncrease,
           addonsTotal,
-          total: adjustedPackageCost + addonsTotal 
+          subTotal,
+          discountAmount,
+          vatAmount,
+          grandTotal, // Total including VAT
+          total: subTotal // Original total before discount/VAT for consistency if needed, but grandTotal is what user pays
       };
-  }, [selectedPackage, bookingDate, guestCounts, item.seasonal_prices, selectedAddons]);
+  }, [selectedPackage, bookingDate, guestCounts, item.seasonal_prices, selectedAddons, appliedCoupon]);
 
-  // Payment Amounts
+  // Payment Amounts based on Grand Total
   const paymentAmounts = useMemo(() => {
       if (!bookingConfig) return { deposit: 0, hold: 0, consultation: 0 };
-      const deposit = bookingConfig.deposit_fixed + (priceDetails.total * (bookingConfig.deposit_percent / 100));
+      const deposit = bookingConfig.deposit_fixed + (priceDetails.grandTotal * (bookingConfig.deposit_percent / 100));
       return {
           deposit,
           hold: bookingConfig.hold_price,
           consultation: bookingConfig.consultation_price
       };
-  }, [bookingConfig, priceDetails.total]);
+  }, [bookingConfig, priceDetails.grandTotal]);
 
   const toggleAddon = (addon: HallAddon) => {
       setSelectedAddons(prev => prev.some(a => a.name === addon.name) ? prev.filter(a => a.name !== addon.name) : [...prev, addon]);
+  };
+
+  const handleApplyCoupon = async () => {
+      if (!couponCode) return;
+      setValidatingCoupon(true);
+      try {
+          const { data, error } = await supabase.from('coupons')
+            .select('*')
+            .eq('code', couponCode.toUpperCase())
+            .eq('vendor_id', item.vendor_id)
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          if (error || !data) {
+              toast({ title: 'كود غير صالح', description: 'تأكد من صحة الكود.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          const today = new Date().toISOString().split('T')[0];
+          if (data.start_date > today || data.end_date < today) {
+              toast({ title: 'منتهي الصلاحية', description: 'هذا الكوبون غير ساري حالياً.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          if (data.target_ids && data.target_ids.length > 0 && !data.target_ids.includes(item.id)) {
+              toast({ title: 'غير مخصص', description: 'هذا الكوبون لا يشمل هذه القاعة.', variant: 'destructive' });
+              setAppliedCoupon(null);
+              return;
+          }
+
+          setAppliedCoupon(data);
+          toast({ title: 'تم تطبيق الخصم', description: 'تم تفعيل الكوبون بنجاح.', variant: 'success' });
+
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'خطأ', description: 'حدث خطأ أثناء التحقق.', variant: 'destructive' });
+      } finally {
+          setValidatingCoupon(false);
+      }
   };
 
   const handlePaymentClick = async () => {
@@ -153,8 +219,11 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
               hall_id: item.id,
               vendor_id: item.vendor_id,
               booking_date: format(bookingDate, 'yyyy-MM-dd'),
-              total_amount: priceDetails.total,
+              total_amount: priceDetails.grandTotal, // Saved as Grand Total
+              vat_amount: priceDetails.vatAmount,
               paid_amount: 0, 
+              discount_amount: priceDetails.discountAmount,
+              applied_coupon: appliedCoupon?.code,
               booking_option: paymentOption,
               package_details: selectedPackage,
               guest_name: guestData.name,
@@ -317,7 +386,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 )}
 
-                {/* 6. Store CTA - ADDED AT BOTTOM */}
+                {/* 6. Store CTA */}
                 <div 
                     className="relative rounded-[2.5rem] overflow-hidden min-h-[220px] flex items-center border border-gray-100 group cursor-pointer shadow-sm hover:shadow-lg transition-all"
                     onClick={() => onNavigate && onNavigate('store_page')}
@@ -428,10 +497,51 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                 </div>
                             )}
 
-                            <div className="text-center py-4 border-t border-gray-50">
-                                <p className="text-[10px] font-bold text-gray-400 mb-1">الإجمالي التقريبي</p>
-                                <PriceTag amount={priceDetails.total * 1.15} className="text-3xl font-black text-primary justify-center" />
-                                {selectedAddons.length > 0 && <p className="text-[10px] text-primary mt-1 font-bold">+ {selectedAddons.length} خدمات إضافية</p>}
+                            {/* Coupon Input */}
+                            <div className="flex gap-2 pt-4 border-t border-gray-50">
+                                <div className="relative flex-1">
+                                    <input 
+                                        className="w-full h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 pl-8 text-xs font-bold focus:bg-white transition-colors uppercase outline-none focus:border-primary/50"
+                                        placeholder="كود الخصم"
+                                        value={couponCode}
+                                        onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                                        disabled={!!appliedCoupon}
+                                    />
+                                    <Tag className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                </div>
+                                {appliedCoupon ? (
+                                    <Button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} variant="destructive" className="h-10 rounded-xl px-3 text-xs font-bold">إزالة</Button>
+                                ) : (
+                                    <Button onClick={handleApplyCoupon} disabled={!couponCode || validatingCoupon} className="h-10 rounded-xl px-3 text-xs font-bold bg-gray-900 text-white shadow-none">
+                                        {validatingCoupon ? <Loader2 className="w-3 h-3 animate-spin" /> : 'تطبيق'}
+                                    </Button>
+                                )}
+                            </div>
+                            
+                            {/* Summary Breakdown */}
+                            <div className="text-center py-4 space-y-2 border-b border-gray-50">
+                                {appliedCoupon && (
+                                    <div className="flex justify-between items-center text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
+                                        <span>كوبون خصم ({appliedCoupon.code})</span>
+                                        <span>- {Math.round(priceDetails.discountAmount)} ر.س</span>
+                                    </div>
+                                )}
+                                
+                                <div className="flex justify-between text-xs font-bold text-gray-400">
+                                    <span>المجموع الفرعي</span>
+                                    <span>{Math.round(priceDetails.subTotal)} ر.س</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-bold text-gray-400">
+                                    <span>الضريبة (15%)</span>
+                                    <span>{Math.round(priceDetails.vatAmount)} ر.س</span>
+                                </div>
+
+                                <div className="flex justify-between items-end pt-2 border-t border-dashed border-gray-200">
+                                    <span className="text-xs font-bold text-gray-600">الإجمالي النهائي</span>
+                                    <PriceTag amount={priceDetails.grandTotal} className="text-3xl font-black text-primary" />
+                                </div>
+                                
+                                {selectedAddons.length > 0 && <p className="text-[10px] text-gray-400 mt-1 font-bold">+ {selectedAddons.length} خدمات إضافية</p>}
                             </div>
 
                             <div className="space-y-3">
