@@ -539,12 +539,17 @@ const App: React.FC = () => {
                                 </div>
 
                                 <div className="flex flex-col gap-4 w-full md:w-auto min-w-[280px]">
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">إتمام العملية</p>
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">وسيلة الدفع الآمنة</p>
                                     
                                     <button onClick={() => handleRegistrationPayClick('card')} className="h-14 w-full rounded-xl bg-gray-900 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 gap-3 font-bold group">
                                         <CreditCard className="w-5 h-5 group-hover:text-primary transition-colors" />
-                                        الدفع وتفعيل الاشتراك
+                                        دفع وتفعيل الاشتراك
                                     </button>
+                                    
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => handleRegistrationPayClick('apple')} className="h-12 w-full rounded-xl bg-black flex items-center justify-center hover:opacity-80 transition-opacity"><img src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg" className="h-5 invert" /></button>
+                                        <button onClick={() => handleRegistrationPayClick('stc')} className="h-12 w-full rounded-xl bg-[#4F008C] text-white font-bold text-sm flex items-center justify-center hover:opacity-90 transition-opacity">stc pay</button>
+                                    </div>
 
                                     <p className="text-[10px] text-gray-400 text-center font-bold mt-2">
                                         بالضغط على الدفع، أنت توافق على <a href="#" className="text-primary underline hover:text-primary/80 transition-colors">شروط وأحكام المنصة</a>
