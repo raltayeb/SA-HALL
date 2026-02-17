@@ -24,12 +24,14 @@ const HERO_IMAGES = [
   "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=2000"
 ];
 
-const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon: any, subtitle: string }) => (
+const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon?: any, subtitle?: string }) => (
   <div className="flex flex-col items-center text-center space-y-3 mb-12">
-      <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-          <Icon className="w-4 h-4 fill-current" />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">{subtitle}</span>
-      </div>
+      {subtitle && Icon && (
+        <div className="flex items-center gap-2 text-primary bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
+            <Icon className="w-4 h-4 fill-current" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{subtitle}</span>
+        </div>
+      )}
       <h2 className="text-4xl font-black tracking-tight text-gray-900">{title}</h2>
       <div className="w-16 h-1 bg-primary rounded-full"></div>
   </div>
@@ -282,7 +284,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
           {/* Services */}
           <div className="space-y-12">
-            <SectionHeader title="خدمات المناسبات" icon={Zap} subtitle="تجهيز احترافي" />
+            <SectionHeader title="خدمات المناسبات" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
             </div>

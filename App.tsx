@@ -134,7 +134,7 @@ const App: React.FC = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (data) setUserProfile(data as UserProfile);
     setLoading(false);
   };
@@ -167,12 +167,21 @@ const App: React.FC = () => {
           const { data: { user } } = await supabase.auth.getUser();
           if (!user) return;
 
-          const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+          // Retry logic to fetch profile in case trigger is slow
+          let profileData = null;
+          for (let i = 0; i < 3; i++) {
+              const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+              if (data) {
+                  profileData = data;
+                  break;
+              }
+              await new Promise(r => setTimeout(r, 1000)); // Wait 1s
+          }
           
-          if (profile) {
-              setUserProfile(profile as UserProfile);
+          if (profileData) {
+              setUserProfile(profileData as UserProfile);
 
-              if (profile.role === 'vendor') {
+              if (profileData.role === 'vendor') {
                   // Check if vendor has ANY assets (Halls or Services)
                   const [halls, services] = await Promise.all([
                       supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', user.id),
@@ -182,7 +191,7 @@ const App: React.FC = () => {
                   const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
 
                   if (hasAssets) {
-                      if (profile.status === 'approved') {
+                      if (profileData.status === 'approved') {
                           // 1. Has assets AND Approved -> Dashboard
                           setActiveTab('dashboard');
                       } else {
@@ -193,19 +202,23 @@ const App: React.FC = () => {
                       // 3. No assets -> Selection Screen (Step 3)
                       setRegData(prev => ({ 
                           ...prev, 
-                          fullName: profile.full_name || 'الشريك', 
-                          email: profile.email || '',
-                          phone: profile.phone_number || ''
+                          fullName: profileData.full_name || 'الشريك', 
+                          email: profileData.email || '',
+                          phone: profileData.phone_number || ''
                       }));
                       setRegStep(3); 
                       setActiveTab('vendor_register');
                   }
-              } else if (profile.role === 'super_admin') {
+              } else if (profileData.role === 'super_admin') {
                   setActiveTab('admin_dashboard');
               } else {
                   // Normal User
                   setActiveTab('home');
               }
+          } else {
+              // Profile Missing (Trigger Failed) - Force manual creation for normal users if needed, 
+              // but for now just stay on home or show error.
+              console.error('Profile not found after retries');
           }
       } catch (err) {
           console.error(err);
@@ -220,6 +233,35 @@ const App: React.FC = () => {
       try {
           const currentUser = (await supabase.auth.getUser()).data.user;
           if (!currentUser) throw new Error('User not found');
+
+          // --- FAILSAFE: Create Profile if missing (Critical Fix) ---
+          const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', currentUser.id).maybeSingle();
+          
+          if (!existingProfile) {
+              const { error: profileError } = await supabase.from('profiles').insert([{
+                  id: currentUser.id,
+                  email: currentUser.email,
+                  full_name: regData.fullName || currentUser.user_metadata.full_name || '',
+                  phone_number: regData.phone || currentUser.user_metadata.phone_number || '',
+                  role: 'vendor',
+                  status: 'pending',
+                  is_enabled: true,
+                  business_name: regData.fullName, // Default business name
+                  hall_limit: 1,
+                  service_limit: 3
+              }]);
+              
+              if (profileError) {
+                  console.error('Manual profile creation failed:', profileError);
+                  throw new Error('فشل إنشاء ملف المستخدم. يرجى المحاولة مرة أخرى.');
+              }
+          } else {
+              // Ensure phone number is updated
+              await supabase.from('profiles').update({
+                  phone_number: regData.phone
+              }).eq('id', currentUser.id);
+          }
+          // ---------------------------------------------------------
 
           // Construct Payload based on type
           let assetPayload;
@@ -241,11 +283,6 @@ const App: React.FC = () => {
                   type: 'hall',
                   is_active: true
               };
-              
-              await supabase.from('profiles').update({
-                  phone_number: regData.phone
-              }).eq('id', currentUser.id);
-
           } else {
               table = 'services';
               assetPayload = {

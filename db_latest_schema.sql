@@ -1,12 +1,12 @@
 
 -- =================================================================
--- SA HALL - LATEST COMPREHENSIVE SCHEMA UPDATE (V10)
+-- SA HALL - LATEST COMPREHENSIVE SCHEMA UPDATE (V11)
 -- =================================================================
 
 -- 1. ENABLE UUID EXTENSION
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. SYSTEM SETTINGS TABLE (For Admin Config)
+-- 2. SYSTEM SETTINGS TABLE
 CREATE TABLE IF NOT EXISTS public.system_settings (
   key TEXT PRIMARY KEY,
   value JSONB DEFAULT '{}'::jsonb,
@@ -14,17 +14,15 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
 );
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
--- Policy: Allow public to read settings (for theme/logo loading before login)
 DROP POLICY IF EXISTS "Public View Settings" ON public.system_settings;
 CREATE POLICY "Public View Settings" ON public.system_settings FOR SELECT USING (true);
 
--- Policy: Allow Admins to manage settings
 DROP POLICY IF EXISTS "Admin Manage Settings" ON public.system_settings;
 CREATE POLICY "Admin Manage Settings" ON public.system_settings FOR ALL USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
 );
 
--- 3. VENDOR CLIENTS (CRM)
+-- 3. VENDOR CLIENTS
 CREATE TABLE IF NOT EXISTS public.vendor_clients (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   vendor_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -40,11 +38,10 @@ CREATE TABLE IF NOT EXISTS public.vendor_clients (
 );
 ALTER TABLE public.vendor_clients ENABLE ROW LEVEL SECURITY;
 
--- Policy: Vendors manage their own clients
 DROP POLICY IF EXISTS "Vendor Manage Clients" ON public.vendor_clients;
 CREATE POLICY "Vendor Manage Clients" ON public.vendor_clients FOR ALL USING (auth.uid() = vendor_id);
 
--- 4. PROFILE UPDATES (For Registration & Limits)
+-- 4. PROFILE TABLE UPDATES
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS status TEXT CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_enabled BOOLEAN DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS hall_limit INTEGER DEFAULT 1;
@@ -55,7 +52,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS custom_logo_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS vendor_amenities JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid';
 
--- 5. HALL UPDATES (Detailed Capacity & Config)
+-- 5. ASSET TABLES UPDATES
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS capacity_men INTEGER DEFAULT 0;
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS capacity_women INTEGER DEFAULT 0;
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS name_en TEXT;
@@ -64,14 +61,19 @@ ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS policies TEXT;
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS seasonal_prices JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS addons JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS packages JSONB DEFAULT '[]'::jsonb;
-ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'hall'; -- 'hall', 'chalet', etc.
+ALTER TABLE public.halls ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'hall';
 
--- 6. STORE ORDERS (Marketplace)
+ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS barcode TEXT;
+ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'عام';
+ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS image_url TEXT;
+ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
+
+-- 6. STORE ORDERS
 CREATE TABLE IF NOT EXISTS public.store_orders (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-  vendor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL, -- Buyer (Vendor or User)
-  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL, -- Buyer (Registered User)
-  guest_info JSONB, -- For guest checkout {name, phone, address}
+  vendor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  guest_info JSONB,
   items JSONB DEFAULT '[]'::jsonb,
   total_amount DECIMAL(10, 2) NOT NULL,
   status TEXT DEFAULT 'pending',
@@ -81,48 +83,31 @@ CREATE TABLE IF NOT EXISTS public.store_orders (
 );
 ALTER TABLE public.store_orders ENABLE ROW LEVEL SECURITY;
 
--- Policy: Allow public insert (Guest checkout)
 DROP POLICY IF EXISTS "Store Public Insert" ON public.store_orders;
 CREATE POLICY "Store Public Insert" ON public.store_orders FOR INSERT WITH CHECK (true);
 
--- Policy: Users/Vendors view their own orders
 DROP POLICY IF EXISTS "View Own Orders" ON public.store_orders;
 CREATE POLICY "View Own Orders" ON public.store_orders FOR SELECT USING (
   auth.uid() = vendor_id OR auth.uid() = user_id OR 
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
 );
 
--- Policy: Admins manage all orders
 DROP POLICY IF EXISTS "Admin Manage Orders" ON public.store_orders;
 CREATE POLICY "Admin Manage Orders" ON public.store_orders FOR ALL USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
 );
 
--- 7. POS ITEMS (Store Products)
-ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS barcode TEXT;
-ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'عام';
-ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS image_url TEXT;
-ALTER TABLE public.pos_items ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT false;
-
--- Policy: Allow reading Admin items (for Public Store)
-DROP POLICY IF EXISTS "Read POS Items" ON public.pos_items;
-CREATE POLICY "Read POS Items" ON public.pos_items FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = pos_items.vendor_id AND role = 'super_admin') -- Admin Products
-  OR auth.uid() = vendor_id -- Vendor Own Products
-);
-
--- 8. STORAGE BUCKETS & POLICIES
+-- 7. STORAGE
 INSERT INTO storage.buckets (id, name, public) VALUES ('vendor-logos', 'vendor-logos', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('hall-images', 'hall-images', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('service-images', 'service-images', true) ON CONFLICT (id) DO NOTHING;
 
--- Admin Logo Upload Policy
 DROP POLICY IF EXISTS "Admin Upload Logos" ON storage.objects;
 CREATE POLICY "Admin Upload Logos" ON storage.objects FOR INSERT WITH CHECK (
   bucket_id = 'vendor-logos' AND EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'super_admin')
 );
 
--- 9. USER CREATION TRIGGER (Robust)
+-- 8. USER CREATION TRIGGER (ROBUST FIX)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger 
 LANGUAGE plpgsql 
@@ -133,32 +118,60 @@ DECLARE
     v_role TEXT;
     v_full_name TEXT;
     v_status TEXT;
+    v_hall_limit INTEGER;
+    v_service_limit INTEGER;
 BEGIN
-  v_role := COALESCE(new.raw_user_meta_data->>'role', 'user');
-  v_full_name := COALESCE(new.raw_user_meta_data->>'full_name', '');
-  
-  -- Vendors default to 'pending' unless auto-approved by payment logic later
+  -- Safe extraction with defaults
+  BEGIN
+    v_role := COALESCE(new.raw_user_meta_data->>'role', 'user');
+    v_full_name := COALESCE(new.raw_user_meta_data->>'full_name', '');
+    
+    -- Parse integer limits safely
+    v_hall_limit := (new.raw_user_meta_data->>'hall_limit')::integer;
+    v_service_limit := (new.raw_user_meta_data->>'service_limit')::integer;
+  EXCEPTION WHEN OTHERS THEN
+    v_role := 'user';
+    v_full_name := '';
+    v_hall_limit := 1;
+    v_service_limit := 3;
+  END;
+
+  -- Logic for Role Status
   IF v_role = 'vendor' THEN v_status := 'pending'; ELSE v_status := 'approved'; END IF;
 
-  INSERT INTO public.profiles (
-    id, email, full_name, role, status, is_enabled, business_name, hall_limit, service_limit, subscription_plan
-  )
-  VALUES (
-    new.id, 
-    new.email, 
-    v_full_name, 
-    v_role, 
-    v_status, 
-    true, 
-    v_full_name,
-    COALESCE((new.raw_user_meta_data->>'hall_limit')::integer, 1),
-    COALESCE((new.raw_user_meta_data->>'service_limit')::integer, 3),
-    'basic'
-  )
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    updated_at = NOW();
+  -- Ensure limits have values
+  IF v_hall_limit IS NULL THEN v_hall_limit := 1; END IF;
+  IF v_service_limit IS NULL THEN v_service_limit := 3; END IF;
+
+  -- Check if profile already exists (race condition prevention)
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = new.id) THEN
+      INSERT INTO public.profiles (
+        id, email, full_name, role, status, is_enabled, business_name, hall_limit, service_limit, subscription_plan
+      )
+      VALUES (
+        new.id, 
+        new.email, 
+        v_full_name, 
+        v_role, 
+        v_status, 
+        true, 
+        v_full_name,
+        v_hall_limit,
+        v_service_limit,
+        'basic'
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        email = EXCLUDED.email,
+        full_name = EXCLUDED.full_name,
+        role = EXCLUDED.role, -- Update role if changed
+        updated_at = NOW();
+  END IF;
+
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  -- Log error but do not fail auth creation to prevent 500 error
+  -- App will handle missing profile via manual insert
+  RAISE WARNING 'Profile creation failed for user %: %', new.id, SQLERRM;
   RETURN new;
 END;
 $$;
