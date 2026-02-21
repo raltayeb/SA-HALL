@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Loader2, ArrowRight, Smartphone, KeyRound } from 'lucide-react';
+import { Loader2, ArrowRight, Smartphone, KeyRound, Mail, ShieldCheck, Check } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
 
@@ -11,7 +11,7 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState(''); // Retrieved from backend
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const { toast } = useToast();
 

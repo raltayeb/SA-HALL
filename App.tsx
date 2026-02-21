@@ -596,11 +596,11 @@ const App: React.FC = () => {
             );
         } else {
             return (
-                <VendorAuth 
-                    onRegister={() => setRegStep(3)} 
-                    onLogin={handleLoginSuccess} 
-                    onDataChange={setRegData} 
-                    onBack={() => setActiveTab('home')} 
+                <VendorAuth
+                    onRegister={() => { setRegStep(3); setActiveTab('vendor_register'); }}
+                    onLogin={handleLoginSuccess}
+                    onDataChange={setRegData}
+                    onBack={() => setActiveTab('home')}
                 />
             );
         }

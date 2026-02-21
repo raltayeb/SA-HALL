@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../../supabaseClient';
 import { UserProfile } from '../../types';
 import { Button } from '../ui/Button';
 import {
@@ -16,12 +17,23 @@ interface PublicNavbarProps {
   activeTab: string;
 }
 
-export const PublicNavbar: React.FC<PublicNavbarProps> = ({ 
-  user, onLoginClick, onRegisterClick, onNavigate, onLogout, activeTab 
+export const PublicNavbar: React.FC<PublicNavbarProps> = ({
+  user, onLoginClick, onRegisterClick, onNavigate, onLogout, activeTab
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchLogo = async () => {
+      const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+      if (data?.value?.platform_logo_url) {
+        setSystemLogo(data.value.platform_logo_url);
+      }
+    };
+    fetchLogo();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -47,11 +59,11 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             
             {/* Right side: Logo & Desktop Nav Links (Start of RTL flow) */}
             <div className="flex items-center gap-8">
-              <div 
-                className="flex items-center cursor-pointer shrink-0" 
+              <div
+                className="flex items-center cursor-pointer shrink-0"
                 onClick={() => onNavigate('home')}
               >
-                <img src="https://dash.hall.sa/logo.svg" alt="SA Hall" className="h-24 w-auto object-contain transition-transform hover:scale-105" />
+                <img src={systemLogo} alt="SA Hall" className="h-24 w-auto object-contain transition-transform hover:scale-105" />
               </div>
 
               <nav className="hidden lg:flex items-center gap-1">

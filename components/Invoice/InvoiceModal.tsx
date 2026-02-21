@@ -1,248 +1,251 @@
 
 import React, { useState } from 'react';
-import { Modal } from '../ui/Modal';
-import { Booking, VAT_RATE } from '../../types';
-import { formatCurrency } from '../../utils/currency';
-import { Printer, Download, QrCode, Share2, Send, Loader2 } from 'lucide-react';
+import { supabase } from '../../supabaseClient';
+import { UserProfile, Invoice } from '../../types';
 import { Button } from '../ui/Button';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { Input } from '../ui/Input';
 import { useToast } from '../../context/ToastContext';
+import { X, Plus, Trash2, Receipt } from 'lucide-react';
 
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  booking: Booking | null;
+  onSuccess: () => void;
+  user: UserProfile;
 }
 
-export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking }) => {
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+interface InvoiceItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  total: number;
+}
+
+export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onSuccess, user }) => {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    customer_vat_number: '',
+    notes: ''
+  });
+  const [items, setItems] = useState<InvoiceItem[]>([
+    { name: '', qty: 1, unit_price: 0, total: 0 }
+  ]);
+
   const { toast } = useToast();
 
-  if (!booking) return null;
-
-  const isConsultation = booking.booking_type === 'consultation';
-  const isPackageBooking = !!booking.package_name; 
-  
-  // Base Price Logic
-  const rawSubtotal = isPackageBooking ? 0 : (booking.halls?.price_per_night || booking.chalets?.price_per_night || booking.services?.price || 0);
-  
-  // Items Total
-  const itemsTotal = booking.items ? booking.items.reduce((sum, i) => sum + (i.price * i.qty), 0) : 0;
-  
-  const totalSubWithItems = rawSubtotal + itemsTotal;
-  const discountAmount = Number(booking.discount_amount || 0);
-  const taxableAmount = Math.max(0, totalSubWithItems - discountAmount);
-  const vatAmount = isConsultation ? 0 : taxableAmount * VAT_RATE;
-  
-  const paidAmount = booking.paid_amount || 0;
-  const remainingAmount = Math.max(0, booking.total_amount - paidAmount);
-
-  const vendorName = booking.vendor?.business_name || booking.profiles?.business_name || 'SA Hall';
-  const taxId = booking.vendor?.pos_config?.tax_id || booking.profiles?.pos_config?.tax_id || 'غير متوفر';
-
-  // --- ACTIONS ---
-
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPdf(true);
-    const element = document.getElementById('printable-invoice');
-    if (!element) return;
-
-    try {
-      // Use html2canvas to capture the invoice div as an image (preserves Arabic fonts)
-      const canvas = await html2canvas(element, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`invoice_${booking.id.slice(0,8)}.pdf`);
-      toast({ title: 'تم التحميل', description: 'تم حفظ الفاتورة بنجاح.', variant: 'success' });
-    } catch (err) {
-      console.error(err);
-      toast({ title: 'خطأ', description: 'حدث خطأ أثناء إنشاء الملف.', variant: 'destructive' });
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+  const addItem = () => {
+    setItems([...items, { name: '', qty: 1, unit_price: 0, total: 0 }]);
   };
 
-  const handleShare = async () => {
-    const text = `فاتورة حجز من ${vendorName}\nرقم المرجع: #${booking.id.slice(0, 8)}\nالإجمالي: ${formatCurrency(booking.total_amount)}\nالتاريخ: ${booking.booking_date}`;
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
+    const newItems = [...items];
+    newItems[index] = { ...newItems[index], [field]: value };
     
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'فاتورة حجز',
-          text: text,
-        });
-      } catch (err) {
-        console.log('Share canceled');
-      }
-    } else {
-      // Fallback to WhatsApp
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    if (field === 'qty' || field === 'unit_price') {
+      const qty = field === 'qty' ? value : newItems[index].qty;
+      const unit_price = field === 'unit_price' ? value : newItems[index].unit_price;
+      newItems[index].total = qty * unit_price;
+    }
+    
+    setItems(newItems);
+  };
+
+  const calculateTotals = () => {
+    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+    const vat = subtotal * 0.15;
+    const total = subtotal + vat;
+    return { subtotal, vat, total };
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.customer_name || items.length === 0 || !items[0].name) {
+      toast({ title: 'تنبيه', description: 'يرجى تعبئة جميع الحقول المطلوبة', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { subtotal, vat, total } = calculateTotals();
+      const invoiceNumber = `INV-${Date.now()}`;
+
+      const { error } = await supabase.from('invoices').insert([{
+        invoice_number: invoiceNumber,
+        vendor_id: user.id,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        customer_email: formData.customer_email,
+        customer_vat_number: formData.customer_vat_number,
+        items: items,
+        subtotal,
+        vat_rate: 15,
+        vat_amount: vat,
+        total_amount: total,
+        payment_status: 'unpaid',
+        notes: formData.notes
+      }]);
+
+      if (error) throw error;
+
+      toast({ title: 'تم الإنشاء', description: 'تم إنشاء الفاتورة بنجاح', variant: 'success' });
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
+
+  const { subtotal, vat, total } = calculateTotals();
+
+  if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isConsultation ? "تصدير عرض سعر" : "خيارات الفاتورة"} className="max-w-md w-full mx-auto my-auto z-[2000] max-h-[85vh] flex flex-col">
-      
-      {/* Invoice Content (Visible & Printable) */}
-      <div className="bg-white p-6 rounded-t-xl overflow-y-auto custom-scrollbar flex-1" id="printable-invoice">
-        {/* Header Compact */}
-        <div className="flex flex-col-reverse justify-between items-center border-b pb-6 gap-4 text-center">
-          <div>
-            <h2 className="text-2xl font-black text-primary leading-none">{vendorName}</h2>
-            <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-widest">{isConsultation ? 'عرض مبدئي' : 'فاتورة ضريبية مبسطة'}</p>
-            <p className="text-[10px] text-gray-900 font-bold mt-1">الرقم الضريبي: <span className="font-mono">{taxId}</span></p>
-          </div>
-          <div className="bg-primary/5 p-3 rounded-2xl border border-primary/10">
-             <QrCode className="w-16 h-16 text-primary" />
-          </div>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+      <div className="bg-white rounded-[2rem] w-full max-w-4xl my-8 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center z-10">
+          <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+            <Receipt className="w-6 h-6 text-primary" />
+            إنشاء فاتورة جديدة
+          </h3>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Info Compact */}
-        <div className="py-6 space-y-4">
-            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                <span className="text-gray-500 text-xs font-bold">العميل</span>
-                <span className="font-black text-gray-900 text-sm">{booking.profiles?.full_name || booking.guest_name || 'عميل'}</span>
+        <div className="p-6 space-y-6">
+          {/* Customer Info */}
+          <div className="space-y-4">
+            <h4 className="text-lg font-black text-primary">بيانات العميل</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="اسم العميل *"
+                value={formData.customer_name}
+                onChange={e => setFormData({...formData, customer_name: e.target.value})}
+                className="h-12 rounded-xl"
+              />
+              <Input
+                label="رقم الجوال"
+                value={formData.customer_phone}
+                onChange={e => setFormData({...formData, customer_phone: e.target.value})}
+                className="h-12 rounded-xl"
+              />
+              <Input
+                label="البريد الإلكتروني"
+                type="email"
+                value={formData.customer_email}
+                onChange={e => setFormData({...formData, customer_email: e.target.value})}
+                className="h-12 rounded-xl"
+              />
+              <Input
+                label="الرقم الضريبي"
+                value={formData.customer_vat_number}
+                onChange={e => setFormData({...formData, customer_vat_number: e.target.value})}
+                className="h-12 rounded-xl"
+              />
             </div>
-            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                <span className="text-gray-500 text-xs font-bold">رقم المرجع</span>
-                <span className="font-mono font-black text-primary text-sm">#{booking.id.slice(0, 8).toUpperCase()}</span>
-            </div>
-            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                <span className="text-gray-500 text-xs font-bold">التاريخ</span>
-                <span className="font-bold font-mono text-sm">{new Date(booking.created_at || '').toLocaleDateString('ar-SA')}</span>
-            </div>
-        </div>
-
-        {/* Table Compact */}
-        <div className="border border-gray-100 rounded-2xl overflow-hidden shadow-sm mb-6">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-900 text-white font-black text-[10px] uppercase">
-              <tr>
-                <th className="p-3 text-right">الوصف</th>
-                <th className="p-3 text-left">المبلغ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
-              {/* Main Hall/Service/Chalet */}
-              {(booking.halls || booking.services || booking.chalets) && (
-                  <tr>
-                    <td className="p-3">
-                      <div className="font-bold text-gray-900 line-clamp-1">{booking.halls?.name || booking.chalets?.name || booking.services?.name}</div>
-                      <div className="text-[9px] text-gray-400 font-bold mt-0.5">{booking.booking_date}</div>
-                    </td>
-                    <td className="p-3 text-left font-mono font-bold text-gray-900">
-                        {isPackageBooking ? <span className="text-[9px] text-gray-400 font-medium">مشمول في الباقة</span> : formatCurrency(booking.halls?.price_per_night || booking.chalets?.price_per_night || booking.services?.price || 0)}
-                    </td>
-                  </tr>
-              )}
-              
-              {/* Extra Items */}
-              {booking.items && booking.items.map((item, idx) => (
-                  <tr key={idx}>
-                      <td className="p-3">
-                          <div className="font-medium text-gray-700 flex items-center gap-1 line-clamp-1">
-                              {item.name} <span className="text-[9px] text-gray-400">x{item.qty}</span>
-                          </div>
-                      </td>
-                      <td className="p-3 text-left font-mono font-medium text-gray-900">{formatCurrency(item.price * item.qty)}</td>
-                  </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Financial Details Compact */}
-        <div className="space-y-3 text-xs">
-          <div className="flex justify-between text-gray-500 font-bold px-2">
-            <span>المجموع الفرعي</span>
-            <span className="font-mono">{formatCurrency(totalSubWithItems)}</span>
-          </div>
-          
-          {discountAmount > 0 && (
-            <div className="flex justify-between text-green-600 font-bold px-2">
-                <span>خصم {booking.applied_coupon ? `(${booking.applied_coupon})` : ''}</span>
-                <span className="font-mono">- {formatCurrency(discountAmount)}</span>
-            </div>
-          )}
-
-          {!isConsultation && (
-            <div className="flex justify-between text-gray-500 font-bold px-2">
-                <span>الضريبة (15%)</span>
-                <span className="font-mono">{formatCurrency(vatAmount)}</span>
-            </div>
-          )}
-          
-          <div className="bg-gray-900 text-white p-4 rounded-2xl flex justify-between items-center shadow-lg mt-2">
-            <span className="font-black text-sm">الإجمالي النهائي</span>
-            <span className="font-mono font-black text-lg">{formatCurrency(booking.total_amount)}</span>
           </div>
 
-          {!isConsultation && (
-            <div className="pt-4 grid grid-cols-2 gap-4">
-                <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl text-center">
-                    <span className="block text-[10px] text-emerald-600 font-bold mb-1">المدفوع</span>
-                    <span className="font-mono font-black text-emerald-700">{formatCurrency(paidAmount)}</span>
+          {/* Items */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="text-lg font-black text-primary">العناصر</h4>
+              <Button onClick={addItem} variant="outline" className="h-10 gap-2">
+                <Plus className="w-4 h-4" /> إضافة عنصر
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="flex gap-3 items-start p-4 bg-gray-50 rounded-xl">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="اسم العنصر"
+                      value={item.name}
+                      onChange={e => updateItem(index, 'name', e.target.value)}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="w-20">
+                    <Input
+                      type="number"
+                      placeholder="الكمية"
+                      value={item.qty}
+                      onChange={e => updateItem(index, 'qty', parseInt(e.target.value) || 0)}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Input
+                      type="number"
+                      placeholder="السعر"
+                      value={item.unit_price}
+                      onChange={e => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                      className="h-10"
+                    />
+                  </div>
+                  <div className="w-24 text-left">
+                    <p className="text-sm font-bold text-gray-500 mt-2">{item.total} ر.س</p>
+                  </div>
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="w-10 h-10 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-                {remainingAmount > 0 ? (
-                    <div className="bg-red-50 border border-red-100 p-3 rounded-xl text-center">
-                        <span className="block text-[10px] text-red-500 font-bold mb-1">المتبقي</span>
-                        <span className="font-mono font-black text-red-600">{formatCurrency(remainingAmount)}</span>
-                    </div>
-                ) : (
-                    <div className="bg-gray-50 border border-gray-100 p-3 rounded-xl text-center">
-                        <span className="block text-[10px] text-gray-400 font-bold mb-1">المتبقي</span>
-                        <span className="font-mono font-black text-gray-400">0.00</span>
-                    </div>
-                )}
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Totals */}
+          <div className="border-t border-gray-200 pt-6 space-y-2">
+            <div className="flex justify-between text-sm font-bold text-gray-600">
+              <span>المجموع الفرعي</span>
+              <span>{subtotal.toFixed(2)} ر.س</span>
+            </div>
+            <div className="flex justify-between text-sm font-bold text-gray-600">
+              <span>ضريبة القيمة المضافة (15%)</span>
+              <span>{vat.toFixed(2)} ر.س</span>
+            </div>
+            <div className="flex justify-between text-lg font-black text-primary">
+              <span>الإجمالي</span>
+              <span>{total.toFixed(2)} ر.س</span>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-gray-500">ملاحظات</label>
+            <textarea
+              value={formData.notes}
+              onChange={e => setFormData({...formData, notes: e.target.value})}
+              className="w-full h-24 border border-gray-200 rounded-xl p-3 outline-none focus:border-primary resize-none"
+              placeholder="أضف ملاحظات إضافية..."
+            />
+          </div>
+
+          {/* Action */}
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex-1 h-14 rounded-2xl font-black"
+            >
+              {loading ? 'جاري الإنشاء...' : 'إنشاء الفاتورة'}
+            </Button>
+          </div>
         </div>
       </div>
-
-      {/* Action Buttons (Visible only on screen) */}
-      <div className="p-4 bg-gray-50 border-t border-gray-100 no-print space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-            <Button 
-                onClick={handleDownloadPDF} 
-                disabled={isGeneratingPdf} 
-                className="h-12 rounded-xl font-black gap-2 bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
-            >
-                {isGeneratingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                تحميل PDF
-            </Button>
-            <Button 
-                onClick={() => window.print()} 
-                variant="outline" 
-                className="h-12 rounded-xl font-bold gap-2 border-2 border-gray-200 hover:border-gray-300 bg-white"
-            >
-                <Printer className="w-4 h-4" /> طباعة
-            </Button>
-        </div>
-        <Button 
-            onClick={handleShare} 
-            variant="secondary" 
-            className="w-full h-12 rounded-xl font-bold gap-2 bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20"
-        >
-            <Share2 className="w-4 h-4" /> إرسال عبر واتساب / مشاركة
-        </Button>
-      </div>
-
-      <style>{`
-        @media print { 
-            body * { visibility: hidden; } 
-            #printable-invoice, #printable-invoice * { visibility: visible; } 
-            #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 20px; background: white; } 
-            .no-print { display: none !important; } 
-            /* Fix chart/background colors in print */
-            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        }
-      `}</style>
-    </Modal>
+    </div>
   );
 };
