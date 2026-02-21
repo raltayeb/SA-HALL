@@ -303,6 +303,16 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                     {SAUDI_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">سعر الليلة (ريال سعودي)</label>
+                                <Input 
+                                    type="number" 
+                                    value={currentHall.price_per_night || ''} 
+                                    onChange={e => setCurrentHall({...currentHall, price_per_night: Number(e.target.value)})} 
+                                    className="h-12 rounded-xl" 
+                                    placeholder="أدخل سعر الليلة"
+                                />
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-gray-500">الوصف (عربي)</label>

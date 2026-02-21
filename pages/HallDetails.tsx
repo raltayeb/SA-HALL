@@ -299,12 +299,34 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                 {/* 2. Packages */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                        <Package className="w-6 h-6 text-primary" /> باقات الحجز
+                        <Package className="w-6 h-6 text-primary" /> باقات الحجز وسعر الليلة
                     </h3>
+                    
+                    {/* Night Price Display */}
+                    {item.price_per_night && item.price_per_night > 0 && (
+                        <div className="mb-6 p-6 bg-gradient-to-l from-primary/10 to-primary/5 rounded-[2rem] border border-primary/20">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center">
+                                        <CalendarIcon className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-lg text-gray-900">سعر الليلة</h4>
+                                        <p className="text-xs text-gray-500 font-bold mt-1">مناسب للأعراس والمناسبات الكبيرة</p>
+                                    </div>
+                                </div>
+                                <div className="text-left">
+                                    <PriceTag amount={item.price_per_night} className="text-3xl font-black text-primary block" />
+                                    <span className="text-[10px] text-gray-400 font-bold">/ لليلة كاملة</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 no-scrollbar">
                         {item.packages?.map((pkg, idx) => (
-                            <div 
-                                key={idx} 
+                            <div
+                                key={idx}
                                 onClick={() => { setSelectedPackage(pkg); setGuestCounts({ men: pkg.min_men, women: pkg.min_women }); }}
                                 className={`cursor-pointer border-2 rounded-[2rem] p-6 transition-all relative overflow-hidden min-w-[280px] flex-1 ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
                             >
