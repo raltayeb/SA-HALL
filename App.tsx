@@ -31,8 +31,9 @@ import { VendorAccounting } from './pages/VendorAccounting';
 import { HallDetails } from './pages/HallDetails';
 import { ChaletDetails } from './pages/ChaletDetails';
 import { ServiceDetails } from './pages/ServiceDetails';
-import { GuestLogin } from './pages/GuestLogin'; 
-import { GuestPortal } from './pages/GuestPortal'; 
+import { GuestLogin } from './pages/GuestLogin';
+import { GuestPortal } from './pages/GuestPortal';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorClients } from './pages/VendorClients'; 
 import { Button } from './components/ui/Button';
@@ -572,7 +573,7 @@ const App: React.FC = () => {
     }
 
     if (activeTab === 'vendor_login') {
-        return <VendorAuth isLogin onRegister={() => setActiveTab('vendor_register')} onLogin={handleLoginSuccess} onBack={() => setActiveTab('home')} />;
+        return <VendorAuth isLogin onRegister={() => setActiveTab('vendor_register')} onLogin={handleLoginSuccess} onBack={() => setActiveTab('home')} onForgotPassword={() => setActiveTab('forgot_password')} />;
     }
 
     switch (activeTab) {
@@ -589,6 +590,8 @@ const App: React.FC = () => {
       case 'hall_details': return detailItem ? (detailType === 'service' ? <ServiceDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} /> : detailType === 'chalet' ? <ChaletDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} /> : <HallDetails item={detailItem} user={userProfile} onBack={() => setActiveTab('home')} />) : null;
       case 'store_page': return <PublicStore />;
       case 'guest_login': return <GuestLogin onBack={() => setActiveTab('home')} />;
+      case 'forgot_password': return <ForgotPassword onBack={() => setActiveTab('vendor_login')} onSuccess={() => setActiveTab('vendor_login')} />;
+      case 'guest_bookings': return userProfile ? <GuestPortal user={userProfile} onLogout={handleLogout} /> : <GuestLogin onBack={() => setActiveTab('home')} />;
       case 'guest_dashboard': return userProfile ? <GuestPortal user={userProfile} onLogout={handleLogout} /> : null;
       case 'settings': return <SystemSettings />;
       case 'admin_cms': return <ContentCMS />;
@@ -615,7 +618,7 @@ const App: React.FC = () => {
             <PublicNavbar user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onNavigate={handleNavigate} onLogout={handleLogout} activeTab={activeTab} />
         )}
         {isPublicPage || isAuthPage ? (
-            <main className={`pt-0 ${isAuthPage ? 'h-full' : ''}`}>{renderContent()}</main>
+            <main className={`pt-32 ${isAuthPage ? 'h-full pt-0' : ''}`}>{renderContent()}</main>
         ) : (
             <div className="flex">
             <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isOpen={false} setIsOpen={() => {}} platformLogo={userProfile?.role === 'vendor' ? userProfile?.custom_logo_url : themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} />

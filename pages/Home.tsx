@@ -43,6 +43,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
   const [searchTab, setSearchTab] = useState<'halls' | 'services'>('halls');
+  const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
 
   // Search State
   const [searchFilters, setSearchFilters] = useState({
@@ -52,6 +53,17 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
       womenCount: '',
       pricePerPerson: ''
   });
+
+  // Fetch system logo
+  useEffect(() => {
+      const fetchLogo = async () => {
+          const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+          if (data?.value?.platform_logo_url) {
+              setSystemLogo(data.value.platform_logo_url);
+          }
+      };
+      fetchLogo();
+  }, []);
 
   // Hero Animation
   useEffect(() => {
@@ -179,7 +191,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                           
                           {/* LOGO INSERTED HERE */}
                           <div className="flex justify-center mb-8">
-                              <img src="https://dash.hall.sa/logo.svg" alt="Logo" className="h-32 w-auto object-contain" />
+                              <img src={systemLogo} alt="Logo" className="h-32 w-auto object-contain" />
                           </div>
 
                           {/* Tabs */}
@@ -271,7 +283,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           
           {/* Halls */}
           <div className="space-y-12">
-            <SectionHeader title="أفخم القاعات" icon={Sparkles} subtitle="مساحات ملكية" />
+            <SectionHeader title="القاعات" icon={Sparkles} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>

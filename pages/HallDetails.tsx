@@ -384,26 +384,6 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                     <p className="text-lg font-black text-gray-900">{item.capacity_women || 0} امرأة</p>
                                 </div>
                             </div>
-
-                            {/* Guest Count for Night */}
-                            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-primary/10">
-                                <div>
-                                    <label className="text-[9px] font-bold text-gray-400 mb-1 block">عدد الرجال المتوقع</label>
-                                    <div className="flex items-center gap-2 bg-white rounded-xl px-2 py-1 border border-gray-200">
-                                        <button onClick={() => setGuestCounts(prev => ({...prev, men: Math.max(0, prev.men - 10)}))} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
-                                        <span className="flex-1 text-center font-black text-sm">{guestCounts.men}</span>
-                                        <button onClick={() => setGuestCounts(prev => ({...prev, men: Math.min(item.capacity_men || 100, prev.men + 10)}))} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-bold text-gray-400 mb-1 block">عدد النساء المتوقع</label>
-                                    <div className="flex items-center gap-2 bg-white rounded-xl px-2 py-1 border border-gray-200">
-                                        <button onClick={() => setGuestCounts(prev => ({...prev, women: Math.max(0, prev.women - 10)}))} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
-                                        <span className="flex-1 text-center font-black text-sm">{guestCounts.women}</span>
-                                        <button onClick={() => setGuestCounts(prev => ({...prev, women: Math.min(item.capacity_women || 100, prev.women + 10)}))} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -586,23 +566,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                         <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-lg">سعر الليلة</span>
                                     </div>
                                     <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                                        <p className="text-xs font-bold text-gray-600 mb-3">السعر ثابت بغض النظر عن عدد الضيوف</p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="bg-white p-3 rounded-xl border border-gray-100">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Users className="w-4 h-4 text-primary" />
-                                                    <span className="text-xs font-bold text-gray-500">الرجال</span>
-                                                </div>
-                                                <p className="text-sm font-black text-gray-900">{guestCounts.men} من {item.capacity_men || 0}</p>
-                                            </div>
-                                            <div className="bg-white p-3 rounded-xl border border-gray-100">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Users className="w-4 h-4 text-primary" />
-                                                    <span className="text-xs font-bold text-gray-500">النساء</span>
-                                                </div>
-                                                <p className="text-sm font-black text-gray-900">{guestCounts.women} من {item.capacity_women || 0}</p>
-                                            </div>
-                                        </div>
+                                        <p className="text-xs font-bold text-gray-600">السعر ثابت بغض النظر عن عدد الضيوف</p>
                                     </div>
                                 </div>
                             ) : selectedPackage && (
@@ -655,28 +619,56 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                             
                             {/* Summary Breakdown */}
                             <div className="text-center py-4 space-y-2 border-b border-gray-50">
+                                {/* Base Price */}
+                                {bookingType === 'night' ? (
+                                    <div className="flex justify-between text-xs font-bold text-gray-700">
+                                        <span>سعر الليلة</span>
+                                        <span>{Math.round(priceDetails.nightPrice)} ر.س</span>
+                                    </div>
+                                ) : selectedPackage && (
+                                    <div className="flex justify-between text-xs font-bold text-gray-700">
+                                        <span>الباقة ({selectedPackage.name})</span>
+                                        <span>{Math.round(priceDetails.packageTotal)} ر.س</span>
+                                    </div>
+                                )}
+
+                                {/* Addons */}
+                                {selectedAddons.length > 0 && (
+                                    <div className="space-y-1">
+                                        {selectedAddons.map((addon, idx) => (
+                                            <div key={idx} className="flex justify-between text-xs font-bold text-gray-500 pr-4">
+                                                <span>+ {addon.name}</span>
+                                                <span>{Math.round(addon.price)} ر.س</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Coupon */}
                                 {appliedCoupon && (
                                     <div className="flex justify-between items-center text-xs font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
                                         <span>كوبون خصم ({appliedCoupon.code})</span>
                                         <span>- {Math.round(priceDetails.discountAmount)} ر.س</span>
                                     </div>
                                 )}
-                                
-                                <div className="flex justify-between text-xs font-bold text-gray-400">
+
+                                {/* Subtotal */}
+                                <div className="flex justify-between text-xs font-bold text-gray-400 pt-2 border-t border-dashed border-gray-100">
                                     <span>المجموع الفرعي</span>
                                     <span>{Math.round(priceDetails.subTotal)} ر.س</span>
                                 </div>
+
+                                {/* VAT */}
                                 <div className="flex justify-between text-xs font-bold text-gray-400">
                                     <span>الضريبة (15%)</span>
                                     <span>{Math.round(priceDetails.vatAmount)} ر.س</span>
                                 </div>
 
+                                {/* Grand Total */}
                                 <div className="flex justify-between items-end pt-2 border-t border-dashed border-gray-200">
                                     <span className="text-xs font-bold text-gray-600">الإجمالي النهائي</span>
                                     <PriceTag amount={priceDetails.grandTotal} className="text-3xl font-black text-primary" />
                                 </div>
-                                
-                                {selectedAddons.length > 0 && <p className="text-[10px] text-gray-400 mt-1 font-bold">+ {selectedAddons.length} خدمات إضافية</p>}
                             </div>
 
                             <div className="space-y-3">

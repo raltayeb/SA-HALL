@@ -2,9 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile } from '../../types';
 import { Button } from '../ui/Button';
-import { 
-  ChevronDown, LayoutDashboard, LogOut, Menu, X, Home, 
-  Building2, Palmtree, Sparkles, ShoppingBag, LogIn, UserPlus 
+import {
+  ChevronDown, LayoutDashboard, LogOut, Menu, X, Home,
+  Building2, Palmtree, Sparkles, ShoppingBag, ClipboardList
 } from 'lucide-react';
 
 interface PublicNavbarProps {
@@ -35,8 +35,8 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: <Home className="w-4 h-4" /> },
-    { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" /> },
-    { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" /> },
+    { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" />, navigateTo: 'browse_halls', entityType: 'hall' },
+    { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" />, navigateTo: 'browse_services', entityType: 'service' },
     { id: 'store_page', label: 'المتجر', icon: <ShoppingBag className="w-4 h-4" /> },
   ];
 
@@ -77,20 +77,20 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             <div className="flex items-center gap-3">
               {!user ? (
                 <div className="flex items-center gap-2">
-                  <button 
-                    onClick={onLoginClick} 
+                  <button
+                    onClick={() => onNavigate('guest_bookings')}
                     className="px-5 h-11 text-sm font-bold text-gray-500 hover:text-primary hover:bg-gray-50 rounded-xl transition-all flex items-center gap-2 hidden md:flex"
                   >
-                    <LogIn className="w-4 h-4" />
-                    <span>دخول</span>
+                    <ClipboardList className="w-4 h-4" />
+                    <span>متابعة الحجز</span>
                   </button>
-                  <Button 
-                    onClick={onRegisterClick} 
-                    className="rounded-xl px-6 h-11 text-sm font-black bg-primary text-white hover:bg-primary/90 transition-all border-none gap-2 hidden md:flex"
+                  <button
+                    onClick={onLoginClick}
+                    className="px-5 h-11 text-sm font-black bg-primary text-white hover:bg-primary/90 rounded-xl transition-all flex items-center gap-2 hidden md:flex"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    <span>انضم إلينا</span>
-                  </Button>
+                    <Building2 className="w-4 h-4" />
+                    <span>بوابة الأعمال</span>
+                  </button>
                 </div>
               ) : (
                 <div className="relative" ref={menuRef}>
@@ -159,18 +159,20 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                     ))}
                     {!user && (
                         <div className="pt-6 mt-2 border-t border-gray-100 space-y-3">
-                           <Button 
-                                onClick={() => { onRegisterClick(); setIsMobileMenuOpen(false); }} 
-                                className="w-full rounded-2xl h-14 font-black bg-primary text-white hover:bg-primary/90 shadow-none"
-                            >
-                                انضم إلينا
-                            </Button>
-                            <button 
-                                onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }} 
+                           <button
+                                onClick={() => { onNavigate('guest_bookings'); setIsMobileMenuOpen(false); }}
                                 className="w-full h-14 rounded-2xl font-bold border-2 border-gray-100 text-gray-900 flex items-center justify-center gap-2 hover:bg-gray-50"
                             >
-                                تسجيل الدخول
+                                <ClipboardList className="w-5 h-5" />
+                                متابعة الحجز
                             </button>
+                           <Button
+                                onClick={() => { onLoginClick(); setIsMobileMenuOpen(false); }}
+                                className="w-full rounded-2xl h-14 font-black bg-primary text-white hover:bg-primary/90 shadow-none flex items-center justify-center gap-2"
+                            >
+                                <Building2 className="w-5 h-5" />
+                                بوابة الأعمال
+                            </Button>
                         </div>
                     )}
                 </nav>
