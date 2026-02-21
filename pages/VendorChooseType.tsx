@@ -21,6 +21,7 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
   const [step, setStep] = useState<'choose' | 'form'>('choose');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
   const { toast } = useToast();
 
   // Hall Form State
@@ -58,6 +59,7 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
 
   useEffect(() => {
     checkExistingAssets();
+    fetchLogo();
   }, [user.id]);
 
   const checkExistingAssets = async () => {
@@ -72,6 +74,13 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
     // If already has assets, redirect to dashboard
     if (hasHalls || hasServices) {
       window.location.href = '/#/dashboard';
+    }
+  };
+
+  const fetchLogo = async () => {
+    const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+    if (data?.value?.platform_logo_url) {
+      setSystemLogo(data.value.platform_logo_url);
     }
   };
 
@@ -220,8 +229,13 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-tajawal" dir="rtl">
         <div className="w-full max-w-4xl">
-          {/* Header */}
+          {/* Header with Logo */}
           <div className="text-center mb-12">
+            <img 
+              src={systemLogo} 
+              alt="Platform Logo" 
+              className="h-40 w-auto mx-auto mb-8 object-contain"
+            />
             <h1 className="text-4xl font-black text-primary mb-2">مرحبا ألف {user.full_name || 'شريك'} 👋</h1>
             <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
           </div>
@@ -274,11 +288,18 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-primary">
-              إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة
-            </h1>
-            <p className="text-gray-500 font-bold mt-1">أكمل البيانات لإدراج نشاطك في المنصة</p>
+          <div className="flex items-center gap-4">
+            <img 
+              src={systemLogo} 
+              alt="Platform Logo" 
+              className="h-20 w-auto object-contain"
+            />
+            <div>
+              <h1 className="text-3xl font-black text-primary">
+                إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة
+              </h1>
+              <p className="text-gray-500 font-bold mt-1">أكمل البيانات لإدراج نشاطك في المنصة</p>
+            </div>
           </div>
           <button
             onClick={() => setStep('choose')}
