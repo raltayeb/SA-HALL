@@ -37,6 +37,7 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorClients } from './pages/VendorClients'; 
 import { VendorSubscription } from './pages/VendorSubscription';
+import { VendorChooseType } from './pages/VendorChooseType';
 import { FeaturedHallsManagement } from './pages/FeaturedHallsManagement';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
@@ -177,12 +178,6 @@ const App: React.FC = () => {
 
   const routeUser = async (profile: UserProfile, userId: string) => {
       if (profile.role === 'vendor') {
-          // Check subscription status first
-          const hasSubscription = profile.has_active_subscription || 
-                                 profile.subscription_status === 'hall' || 
-                                 profile.subscription_status === 'service' ||
-                                 profile.subscription_status === 'both';
-
           // Check if vendor has ANY assets (Halls or Services)
           const [halls, services] = await Promise.all([
               supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', userId),
@@ -191,27 +186,29 @@ const App: React.FC = () => {
 
           const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
 
-          // If no subscription, redirect to subscription page
+          // NO assets? Redirect to vendor_choose_type (full screen, forced)
+          if (!hasAssets) {
+              setActiveTab('vendor_choose_type');
+              return;
+          }
+
+          // Has assets - check subscription status
+          const hasSubscription = profile.has_active_subscription ||
+                                 profile.subscription_status === 'hall' ||
+                                 profile.subscription_status === 'service' ||
+                                 profile.subscription_status === 'both';
+
+          // No subscription but has assets - go to subscription page
           if (!hasSubscription) {
               setActiveTab('vendor_subscription');
               return;
           }
 
-          if (hasAssets) {
-              if (profile.status === 'approved') {
-                  setActiveTab('dashboard');
-              } else {
-                  setActiveTab('request_pending');
-              }
+          // Has assets AND subscription - check approval status
+          if (profile.status === 'approved') {
+              setActiveTab('dashboard');
           } else {
-              setRegData(prev => ({
-                  ...prev,
-                  fullName: profile.full_name || 'الشريك',
-                  email: profile.email || '',
-                  phone: profile.phone_number || ''
-              }));
-              setRegStep(4); // Go to asset selection
-              setActiveTab('vendor_register');
+              setActiveTab('request_pending');
           }
       } else if (profile.role === 'super_admin') {
           setActiveTab('admin_dashboard');
@@ -364,8 +361,8 @@ const App: React.FC = () => {
       }
   };
 
-  // Define Authentication Pages
-  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login', 'forgot_password', 'request_pending'].includes(activeTab);
+  // Define Authentication Pages (Full Screen, No Sidebar)
+  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login', 'forgot_password', 'request_pending', 'vendor_choose_type', 'vendor_subscription'].includes(activeTab);
   const isPublicPage = ['home', 'browse_halls', 'browse_services', 'hall_details', 'store_page', 'legal_terms', 'legal_privacy', 'legal_sla', 'legal_help', 'legal_about'].includes(activeTab);
 
   // Helper for Hall Form Rendering
@@ -597,7 +594,7 @@ const App: React.FC = () => {
         } else {
             return (
                 <VendorAuth
-                    onRegister={() => { setRegStep(3); setActiveTab('vendor_register'); }}
+                    onRegister={() => { setRegStep(3); setActiveTab('vendor_choose_type'); }}
                     onLogin={handleLoginSuccess}
                     onDataChange={setRegData}
                     onBack={() => setActiveTab('home')}
@@ -638,7 +635,8 @@ const App: React.FC = () => {
       case 'accounting': return userProfile ? <VendorAccounting user={userProfile} /> : null;
       case 'vendor_marketplace': return userProfile ? <VendorMarketplace user={userProfile} /> : null;
       case 'vendor_clients': return userProfile ? <VendorClients user={userProfile} /> : null;
-      case 'vendor_subscription': return userProfile ? <VendorSubscription user={userProfile} onComplete={() => setActiveTab('dashboard')} /> : null;
+      case 'vendor_subscription': return userProfile ? <VendorSubscription user={userProfile} onComplete={() => { setRegStep(3); setActiveTab('vendor_register'); }} /> : null;
+      case 'vendor_choose_type': return userProfile ? <VendorChooseType user={userProfile} /> : null;
       case 'featured_halls': return userProfile?.role === 'super_admin' ? <FeaturedHallsManagement user={userProfile} /> : null;
       case 'admin_requests': return <AdminRequests />;
       default: return <Home user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onBrowseHalls={(f) => { setBrowseFilters(f); setActiveTab('browse_halls'); }} onNavigate={handleNavigate} onLogout={handleLogout} />;
@@ -654,7 +652,7 @@ const App: React.FC = () => {
             <PublicNavbar user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onNavigate={handleNavigate} onLogout={handleLogout} activeTab={activeTab} />
         )}
         {isPublicPage || isAuthPage ? (
-            <main className={`pt-32 ${isAuthPage ? 'h-full pt-0' : ''}`}>{renderContent()}</main>
+            <main className={`${isAuthPage ? 'pt-0 h-full' : 'pt-32'}`}>{renderContent()}</main>
         ) : (
             <div className="flex">
             <Sidebar user={userProfile} activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} isOpen={false} setIsOpen={() => {}} platformLogo={userProfile?.role === 'vendor' ? userProfile?.custom_logo_url : themeConfig?.logoUrl || "https://dash.hall.sa/logo.svg"} />

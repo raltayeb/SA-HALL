@@ -98,16 +98,10 @@ export const VendorSubscription: React.FC<VendorSubscriptionProps> = ({ user, on
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4 font-tajawal" dir="rtl">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
+        {/* Header - No Back Button for New Vendors */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-between mb-6">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary transition-colors"
-            >
-              <ArrowRight className="w-5 h-5" />
-              <span className="font-bold text-sm">عودة</span>
-            </button>
+            <div></div> {/* Empty div for spacing */}
           </div>
           
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
