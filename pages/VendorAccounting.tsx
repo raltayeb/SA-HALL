@@ -1,305 +1,314 @@
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, Booking, Expense, ExternalInvoice, Hall, StoreOrder } from '../types';
-import { PriceTag } from '../components/ui/PriceTag';
+import { UserProfile, Invoice, Expense } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
-import { TransactionDetailsModal } from '../components/Accounting/TransactionDetailsModal';
-import { 
-  Receipt, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft,
-  Wallet, Filter, Loader2, Calendar, Search, ExternalLink, Printer, User, Building2, ShoppingBag, ChevronLeft
-} from 'lucide-react';
-import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { PriceTag } from '../components/ui/PriceTag';
 import { useToast } from '../context/ToastContext';
+import {
+  FileText, Plus, Download, TrendingUp, TrendingDown,
+  Calculator, Receipt, CreditCard, Calendar, Search
+} from 'lucide-react';
 
 interface VendorAccountingProps {
   user: UserProfile;
 }
 
-interface LedgerItem {
-  id: string;
-  type: 'income_booking' | 'income_invoice' | 'expense' | 'store_purchase';
-  date: string;
-  description: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'unpaid';
-  category?: string;
-  data?: any;
-}
-
 export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'ledger' | 'expenses' | 'invoices'>('ledger');
-  
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'expenses' | 'zakat'>('invoices');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [externalInvoices, setExternalInvoices] = useState<ExternalInvoice[]>([]);
-  const [storeOrders, setStoreOrders] = useState<StoreOrder[]>([]);
-  const [assets, setAssets] = useState<{id: string, name: string}[]>([]);
-  
   const [loading, setLoading] = useState(true);
-  
-  const [dateFilter, setDateFilter] = useState({
-    start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-    end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
-  });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAssetId, setSelectedAssetId] = useState<string>('all');
-
-  // Modal State
-  const [selectedTransaction, setSelectedTransaction] = useState<LedgerItem | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchData = useCallback(async () => {
-    try {
-        const [bData, eData, iData, sData, hData, cData] = await Promise.all([
-            supabase.from('bookings').select('*, halls(name), chalets(name), client:user_id(full_name)').eq('vendor_id', user.id).neq('status', 'cancelled'),
-            supabase.from('expenses').select('*').eq('vendor_id', user.id).order('expense_date', { ascending: false }),
-            supabase.from('external_invoices').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
-            supabase.from('store_orders').select('*').eq('vendor_id', user.id),
-            supabase.from('halls').select('id, name').eq('vendor_id', user.id),
-            supabase.from('chalets').select('id, name').eq('vendor_id', user.id)
-        ]);
+  // Stats
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    vatCollected: 0,
+    vatPaid: 0,
+    zakatDue: 0
+  });
 
-        if (bData.data) setBookings(bData.data as any[]);
-        if (eData.data) setExpenses(eData.data as Expense[]);
-        if (iData.data) setExternalInvoices(iData.data as any[]);
-        if (sData.data) setStoreOrders(sData.data as any[]);
-        
-        setAssets([...(hData.data || []), ...(cData.data || [])]);
-
-    } catch (err) {
-        console.error("Fetch Error:", err);
-    } finally {
-        setLoading(false);
-    }
+  useEffect(() => {
+    fetchData();
   }, [user.id]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [invoicesData, expensesData] = await Promise.all([
+        supabase
+          .from('invoices')
+          .select('*')
+          .eq('vendor_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('expenses')
+          .select('*')
+          .eq('vendor_id', user.id)
+          .order('created_at', { ascending: false })
+      ]);
 
-  const ledgerData = useMemo<LedgerItem[]>(() => {
-    const startDate = startOfDay(new Date(dateFilter.start));
-    const endDate = endOfDay(new Date(dateFilter.end));
-
-    const checkDate = (dateStr: string) => {
-        if (!dateStr) return false;
-        const d = parseISO(dateStr); 
-        return isWithinInterval(d, { start: startDate, end: endDate });
-    };
-
-    const items: LedgerItem[] = [];
-
-    // 1. Income: Bookings
-    bookings.forEach(b => {
-        const assetId = b.hall_id || b.chalet_id;
-        if (selectedAssetId !== 'all' && assetId !== selectedAssetId) return;
-        
-        if (checkDate(b.booking_date)) {
-            items.push({
-                id: b.id,
-                type: 'income_booking',
-                date: b.booking_date,
-                description: `حجز: ${b.halls?.name || b.chalets?.name || 'أصل'} - ${b.guest_name || b.client?.full_name || 'عميل'}`,
-                amount: b.total_amount,
-                status: b.payment_status === 'paid' ? 'paid' : b.payment_status === 'partial' ? 'pending' : 'unpaid',
-                category: 'حجوزات',
-                data: b
-            });
-        }
-    });
-
-    // 2. Income: External Invoices
-    externalInvoices.forEach(inv => {
-        if (selectedAssetId !== 'all' && inv.hall_id && inv.hall_id !== selectedAssetId) return;
-        const date = inv.created_at?.split('T')[0] || '';
-        if (checkDate(date)) {
-            items.push({
-                id: inv.id,
-                type: 'income_invoice',
-                date: date,
-                description: `فاتورة خارجية: ${inv.customer_name}`,
-                amount: inv.total_amount,
-                status: inv.status === 'paid' ? 'paid' : 'unpaid',
-                category: 'خدمات خارجية',
-                data: inv
-            });
-        }
-    });
-
-    // 3. Expenses: General
-    if (selectedAssetId === 'all') { 
-        expenses.forEach(exp => {
-            if (checkDate(exp.expense_date)) {
-                items.push({
-                    id: exp.id,
-                    type: 'expense',
-                    date: exp.expense_date,
-                    description: exp.title,
-                    amount: exp.amount,
-                    status: 'paid',
-                    category: exp.category,
-                    data: exp
-                });
-            }
-        });
-        
-        // 4. Expenses: Store Purchases
-        storeOrders.forEach(order => {
-            const date = order.created_at.split('T')[0];
-            if (checkDate(date)) {
-                items.push({
-                    id: order.id,
-                    type: 'store_purchase',
-                    date: date,
-                    description: `شراء من المتجر (${order.items.length} منتجات)`,
-                    amount: order.total_amount,
-                    status: 'paid',
-                    category: 'مشتريات',
-                    data: order
-                });
-            }
-        });
+      setInvoices(invoicesData.data || []);
+      setExpenses(expensesData.data || []);
+      calculateStats(invoicesData.data || [], expensesData.data || []);
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'خطأ', description: 'فشل تحميل البيانات', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [bookings, expenses, externalInvoices, storeOrders, dateFilter, selectedAssetId]);
+  const calculateStats = (invoices: Invoice[], expenses: Expense[]) => {
+    const totalRevenue = invoices.reduce((sum, inv) => sum + inv.total_amount, 0);
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.total_amount, 0);
+    const vatCollected = invoices.reduce((sum, inv) => sum + inv.vat_amount, 0);
+    const vatPaid = expenses.reduce((sum, exp) => sum + exp.vat_amount, 0);
+    const netIncome = totalRevenue - totalExpenses;
+    const zakatDue = netIncome > 0 ? netIncome * 0.025 : 0; // 2.5% Zakat
 
-  const financials = useMemo(() => {
-    let totalIncome = 0;
-    let totalExpense = 0;
-
-    ledgerData.forEach(item => {
-        if (item.type === 'expense' || item.type === 'store_purchase') {
-            totalExpense += Number(item.amount);
-        } else {
-            // Calculate actual income based on paid amount if booking
-            if (item.type === 'income_booking') {
-               totalIncome += Number(item.data.paid_amount || 0);
-            } else if (item.status === 'paid') {
-               totalIncome += Number(item.amount);
-            }
-        }
+    setStats({
+      totalRevenue,
+      totalExpenses,
+      vatCollected,
+      vatPaid,
+      zakatDue
     });
-
-    return { totalIncome, totalExpense, netProfit: totalIncome - totalExpense };
-  }, [ledgerData]);
-
-  const handleRowClick = (item: LedgerItem) => {
-      setSelectedTransaction(item);
-      setIsDetailsOpen(true);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 font-sans text-right">
-      
-      <div className="bg-white p-6 rounded-[2rem] border border-gray-200 flex flex-col lg:flex-row justify-between items-center gap-4">
-         <div className="flex items-center gap-4 w-full lg:w-auto">
-            <div className="bg-primary/5 p-3 rounded-xl text-primary"><Receipt className="w-6 h-6" /></div>
-            <div>
-               <h2 className="text-xl font-black text-gray-900">النظام المالي الموحد</h2>
-               <div className="flex items-center gap-2 mt-1">
-                   <p className="text-xs font-bold text-gray-400">تصفية حسب الأصل:</p>
-                   <select 
-                        className="bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold px-2 py-1 outline-none cursor-pointer min-w-[120px]"
-                        value={selectedAssetId}
-                        onChange={(e) => setSelectedAssetId(e.target.value)}
-                   >
-                        <option value="all">كافة الأصول</option>
-                        {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                   </select>
-               </div>
-            </div>
-         </div>
-
-         <div className="flex items-center gap-3 w-full lg:w-auto bg-gray-50 p-2 rounded-xl border border-gray-200">
-            <input type="date" value={dateFilter.start} onChange={e => setDateFilter({...dateFilter, start: e.target.value})} className="bg-transparent text-xs font-black outline-none w-auto cursor-pointer text-gray-700" />
-            <span className="text-gray-400">-</span>
-            <input type="date" value={dateFilter.end} onChange={e => setDateFilter({...dateFilter, end: e.target.value})} className="bg-transparent text-xs font-black outline-none w-auto cursor-pointer text-gray-700" />
-         </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center bg-white p-6 rounded-[2rem] border border-gray-200">
+        <div>
+          <h2 className="text-3xl font-black text-primary">الفواتير والحسابات</h2>
+          <p className="text-sm text-gray-500 font-bold mt-1">إدارة الفواتير والمصروفات والزكاة</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setIsInvoiceModalOpen(true)}
+            className="rounded-xl h-12 px-6 font-bold gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            فاتورة جديدة
+          </Button>
+          <Button
+            onClick={() => setIsExpenseModalOpen(true)}
+            variant="outline"
+            className="rounded-xl h-12 px-6 font-bold gap-2 border-gray-200"
+          >
+            <Plus className="w-4 h-4" />
+            مصروف جديد
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-[2rem] border border-gray-200 space-y-2">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">الدخل المحصل</span>
-            <div className="flex items-center justify-between">
-               <PriceTag amount={financials.totalIncome} className="text-2xl font-black text-gray-900" />
-               <div className="p-2 bg-green-50 text-green-600 rounded-xl"><TrendingUp className="w-5 h-5" /></div>
+      {/* Stats Cards */}
+      <div className="grid md:grid-cols-5 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600">
+              <TrendingUp className="w-5 h-5" />
             </div>
-         </div>
-         <div className="bg-white p-6 rounded-[2rem] border border-gray-200 space-y-2">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">المصروفات والمشتريات</span>
-            <div className="flex items-center justify-between">
-               <PriceTag amount={financials.totalExpense} className="text-2xl font-black text-red-600" />
-               <div className="p-2 bg-red-50 text-red-600 rounded-xl"><TrendingDown className="w-5 h-5" /></div>
+            <span className="text-xs font-bold text-gray-500">الإيرادات</span>
+          </div>
+          <PriceTag amount={stats.totalRevenue} className="text-xl font-black text-green-600" />
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center text-red-600">
+              <TrendingDown className="w-5 h-5" />
             </div>
-         </div>
-         <div className="bg-primary text-white p-6 rounded-[2rem] space-y-2">
-            <span className="text-xs font-black text-white/80 uppercase tracking-widest relative z-10">صافي الربح</span>
-            <div className="flex items-center justify-between relative z-10">
-               <PriceTag amount={financials.netProfit} className="text-3xl font-black text-white" />
-               <Wallet className="w-8 h-8 text-white/80" />
+            <span className="text-xs font-bold text-gray-500">المصروفات</span>
+          </div>
+          <PriceTag amount={stats.totalExpenses} className="text-xl font-black text-red-600" />
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600">
+              <Receipt className="w-5 h-5" />
             </div>
-         </div>
+            <span className="text-xs font-bold text-gray-500">ضريبة القيمة المضافة</span>
+          </div>
+          <div className="text-sm font-black text-blue-600">
+            <div className="flex justify-between">
+              <span>المحصلة: {stats.vatCollected.toFixed(2)}</span>
+              <span>المدفوعة: {stats.vatPaid.toFixed(2)}</span>
+            </div>
+            <div className="text-xs text-gray-400 font-bold mt-1">
+              المستحق: {(stats.vatCollected - stats.vatPaid).toFixed(2)} ر.س
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-yellow-600">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-bold text-gray-500">الزكاة</span>
+          </div>
+          <PriceTag amount={stats.zakatDue} className="text-xl font-black text-yellow-600" />
+          <p className="text-[10px] text-gray-400 font-bold mt-1">2.5% من صافي الدخل</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <span className="text-xs font-bold text-gray-500">صافي الربح</span>
+          </div>
+          <PriceTag amount={stats.totalRevenue - stats.totalExpenses} className="text-xl font-black text-primary" />
+        </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-[2rem] overflow-hidden flex flex-col min-h-[500px]">
-         <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-             <h3 className="font-black text-lg">سجل المعاملات</h3>
-             <div className="relative w-64">
-                  <input placeholder="بحث في السجل..." className="w-full h-10 bg-gray-50 border border-gray-200 rounded-xl px-10 text-xs font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-             </div>
-         </div>
-         <div className="flex-1 overflow-x-auto">
-            <table className="w-full text-right text-sm">
-               <thead className="bg-gray-50 text-gray-500 font-bold text-[10px] uppercase tracking-widest">
-                  <tr>
-                     <th className="p-4">التاريخ</th>
-                     <th className="p-4">الوصف</th>
-                     <th className="p-4">النوع</th>
-                     <th className="p-4">المبلغ</th>
-                     <th className="p-4 w-10"></th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-gray-100">
-                  {ledgerData.filter(item => item.description.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
-                     <tr 
-                        key={`${item.type}-${item.id}`} 
-                        onClick={() => handleRowClick(item)}
-                        className="hover:bg-gray-50 transition-all cursor-pointer group"
-                     >
-                        <td className="p-4 font-mono text-xs font-bold text-gray-500">{item.date}</td>
-                        <td className="p-4 font-bold text-gray-900 group-hover:text-primary transition-colors">{item.description}</td>
-                        <td className="p-4">
-                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
-                               item.type.startsWith('income') ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'
-                           }`}>
-                               {item.type === 'income_booking' ? 'حجز' : item.type === 'store_purchase' ? 'مشتريات' : item.type === 'expense' ? 'مصروف' : 'فاتورة'}
-                           </span>
-                        </td>
-                        <td className="p-4 font-black">
-                           <span className={item.type.startsWith('income') ? 'text-green-600' : 'text-red-600'}>
-                              {item.type.startsWith('income') ? '+' : '-'} {item.amount.toLocaleString()}
-                           </span>
-                        </td>
-                        <td className="p-4">
-                            <ChevronLeft className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-                        </td>
-                     </tr>
-                  ))}
-               </tbody>
-            </table>
-         </div>
-      </div>
+      {/* Tabs */}
+      <div className="bg-white rounded-[2rem] border border-gray-200 overflow-hidden">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+              activeTab === 'invoices'
+                ? 'bg-primary/5 text-primary border-b-2 border-primary'
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <FileText className="w-4 h-4 inline-block ml-2" />
+            الفواتير ({invoices.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('expenses')}
+            className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+              activeTab === 'expenses'
+                ? 'bg-primary/5 text-primary border-b-2 border-primary'
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <Receipt className="w-4 h-4 inline-block ml-2" />
+            المصروفات ({expenses.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('zakat')}
+            className={`flex-1 px-6 py-4 text-sm font-bold transition-colors ${
+              activeTab === 'zakat'
+                ? 'bg-primary/5 text-primary border-b-2 border-primary'
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <Calculator className="w-4 h-4 inline-block ml-2" />
+            الزكاة والضريبة
+          </button>
+        </div>
 
-      <TransactionDetailsModal 
-        isOpen={isDetailsOpen} 
-        onClose={() => setIsDetailsOpen(false)} 
-        transaction={selectedTransaction} 
-      />
+        <div className="p-6">
+          {activeTab === 'invoices' && (
+            <div className="space-y-3">
+              {invoices.length === 0 ? (
+                <p className="text-center text-gray-400 font-bold py-8">لا توجد فواتير بعد</p>
+              ) : (
+                invoices.map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-gray-200">
+                        <FileText className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="font-black text-gray-900">{invoice.customer_name}</p>
+                        <p className="text-xs text-gray-500 font-bold">{invoice.invoice_number} • {invoice.issue_date}</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <PriceTag amount={invoice.total_amount} className="text-lg font-black text-primary" />
+                      <span className={`text-xs font-bold ${invoice.payment_status === 'paid' ? 'text-green-600' : 'text-red-600'}`}>
+                        {invoice.payment_status === 'paid' ? 'مدفوع' : 'غير مدفوع'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'expenses' && (
+            <div className="space-y-3">
+              {expenses.length === 0 ? (
+                <p className="text-center text-gray-400 font-bold py-8">لا توجد مصروفات بعد</p>
+              ) : (
+                expenses.map((expense) => (
+                  <div key={expense.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-gray-200">
+                        <Receipt className="w-5 h-5 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="font-black text-gray-900">{expense.supplier_name}</p>
+                        <p className="text-xs text-gray-500 font-bold">{expense.category} • {expense.expense_date}</p>
+                      </div>
+                    </div>
+                    <div className="text-left">
+                      <PriceTag amount={expense.total_amount} className="text-lg font-black text-red-600" />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'zakat' && (
+            <div className="space-y-6">
+              <div className="bg-yellow-50 rounded-2xl p-6 border border-yellow-100">
+                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                  <Calculator className="w-5 h-5 text-yellow-600" />
+                  حساب الزكاة
+                </h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 rounded-xl">
+                    <p className="text-xs text-gray-500 font-bold mb-1">صافي الدخل</p>
+                    <p className="text-xl font-black text-gray-900">{(stats.totalRevenue - stats.totalExpenses).toFixed(2)} ر.س</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl">
+                    <p className="text-xs text-gray-500 font-bold mb-1">نسبة الزكاة</p>
+                    <p className="text-xl font-black text-gray-900">2.5%</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border-2 border-yellow-200">
+                    <p className="text-xs text-yellow-600 font-bold mb-1">الزكاة المستحقة</p>
+                    <p className="text-xl font-black text-yellow-600">{stats.zakatDue.toFixed(2)} ر.س</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-2xl p-6 border border-blue-100">
+                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                  <Receipt className="w-5 h-5 text-blue-600" />
+                  ضريبة القيمة المضافة
+                </h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 rounded-xl">
+                    <p className="text-xs text-gray-500 font-bold mb-1">ضريبة محصلة</p>
+                    <p className="text-xl font-black text-blue-600">{stats.vatCollected.toFixed(2)} ر.س</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl">
+                    <p className="text-xs text-gray-500 font-bold mb-1">ضريبة مدفوعة</p>
+                    <p className="text-xl font-black text-blue-600">{stats.vatPaid.toFixed(2)} ر.س</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-xl border-2 border-blue-200">
+                    <p className="text-xs text-blue-600 font-bold mb-1">صافي الضريبة المستحقة</p>
+                    <p className="text-xl font-black text-blue-600">{(stats.vatCollected - stats.vatPaid).toFixed(2)} ر.س</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -35,8 +35,8 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
   const navItems = [
     { id: 'home', label: 'الرئيسية', icon: <Home className="w-4 h-4" /> },
-    { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" />, navigateTo: 'browse_halls', entityType: 'hall' },
-    { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" />, navigateTo: 'browse_services', entityType: 'service' },
+    { id: 'halls_page', label: 'القاعات', icon: <Building2 className="w-4 h-4" />, navigateTo: 'browse_halls' },
+    { id: 'services_page', label: 'الخدمات', icon: <Sparkles className="w-4 h-4" />, navigateTo: 'browse_services' },
     { id: 'store_page', label: 'المتجر', icon: <ShoppingBag className="w-4 h-4" /> },
   ];
 
@@ -60,7 +60,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                         key={item.id}
                         onClick={() => {
                             if (item.navigateTo) {
-                                onNavigate(item.navigateTo, { entityType: item.entityType });
+                                onNavigate(item.navigateTo);
                             } else {
                                 onNavigate(item.id);
                             }
@@ -158,7 +158,7 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                             key={item.id}
                             onClick={() => {
                                 if (item.navigateTo) {
-                                    onNavigate(item.navigateTo, { entityType: item.entityType });
+                                    onNavigate(item.navigateTo);
                                 } else {
                                     onNavigate(item.id);
                                 }

@@ -37,6 +37,10 @@ export interface UserProfile {
   service_limit: number;
   subscription_plan?: string;
   payment_status?: 'paid' | 'unpaid';
+  subscription_status?: 'none' | 'hall' | 'service' | 'both';
+  subscription_paid_at?: string;
+  subscription_amount?: number;
+  has_active_subscription?: boolean;
   theme_color?: string;
   whatsapp_number?: string;
   business_email?: string;
@@ -188,10 +192,12 @@ export interface Hall {
   image_url: string;
   images: string[];
   amenities: string[];
-  addons?: HallAddon[]; 
-  packages?: HallPackage[]; 
-  seasonal_prices?: SeasonalPrice[]; 
+  addons?: HallAddon[];
+  packages?: HallPackage[];
+  seasonal_prices?: SeasonalPrice[];
   is_active: boolean;
+  is_featured?: boolean;
+  featured_until?: string;
   created_at?: string;
 }
 
@@ -289,17 +295,6 @@ export interface PaymentLog {
   created_at: string;
 }
 
-export interface Expense {
-  id: string;
-  vendor_id: string;
-  title: string;
-  amount: number;
-  category: 'salary' | 'rent' | 'maintenance' | 'utilities' | 'marketing' | 'other';
-  expense_date: string;
-  notes?: string;
-  created_at?: string;
-}
-
 export interface ExternalInvoice {
   id: string;
   vendor_id: string;
@@ -371,6 +366,101 @@ export interface StoreOrder {
   delivery_status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  vendor_id: string;
+  subscription_type: 'hall' | 'service' | 'both';
+  amount: number;
+  payment_method?: string;
+  payment_status: 'pending' | 'completed' | 'failed' | 'refunded';
+  is_lifetime: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  total: number;
+  type?: 'product' | 'service' | 'addon' | 'package';
+}
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  vendor_id: string;
+  booking_id?: string;
+  customer_name: string;
+  customer_phone?: string;
+  customer_email?: string;
+  customer_vat_number?: string;
+  issue_date: string;
+  due_date?: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  vat_rate: number;
+  vat_amount: number;
+  discount_amount?: number;
+  total_amount: number;
+  payment_status: 'paid' | 'unpaid' | 'partial' | 'cancelled';
+  payment_method?: string;
+  payment_date?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Expense {
+  id: string;
+  vendor_id: string;
+  invoice_number?: string;
+  expense_date: string;
+  category: 'rent' | 'salaries' | 'utilities' | 'maintenance' | 'marketing' | 'supplies' | 'zakat' | 'tax' | 'insurance' | 'other';
+  supplier_name: string;
+  supplier_vat_number?: string;
+  description?: string;
+  amount: number;
+  vat_amount: number;
+  total_amount: number;
+  payment_method?: string;
+  receipt_image?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ZakatCalculation {
+  id: string;
+  vendor_id: string;
+  calculation_period_start: string;
+  calculation_period_end: string;
+  total_revenue: number;
+  total_expenses: number;
+  net_income: number;
+  zakat_base: number;
+  zakat_rate: number;
+  zakat_amount: number;
+  vat_collected: number;
+  vat_paid: number;
+  vat_payable: number;
+  status: 'pending' | 'filed' | 'paid';
+  filed_date?: string;
+  created_at: string;
+}
+
+export interface FeaturedHall {
+  id: string;
+  hall_id: string;
+  vendor_id: string;
+  start_date: string;
+  end_date: string;
+  is_active: boolean;
+  created_by?: string;
+  created_at: string;
+  halls?: Hall;
 }
 
 export const SAUDI_CITIES = ['الرياض', 'جدة', 'مكة المكرمة', 'المدينة المنورة', 'الدمام', 'الخبر', 'الطائف', 'أبها', 'تبوك', 'حائل', 'القصيم', 'جازان', 'نجران', 'الجوف', 'عرعر'];

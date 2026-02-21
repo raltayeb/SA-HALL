@@ -1,11 +1,11 @@
 
 import React from 'react';
 import { UserProfile } from '../../types';
-import { 
-  LayoutDashboard, Users, Building2, ClipboardList, 
-  CalendarDays, Settings, X, Tag, 
+import {
+  LayoutDashboard, Users, Building2, ClipboardList,
+  CalendarDays, Settings, X, Tag,
   FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, Store, LogOut
+  Receipt, Store, LogOut, Star
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -41,7 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         items: [
           { id: 'admin_users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
           { id: 'subscriptions', label: 'الشركاء والاشتراكات', icon: <Building2 className="w-5 h-5" /> },
-          { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> }, 
+          { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> },
+          { id: 'featured_halls', label: 'القاعات المميزة', icon: <Star className="w-5 h-5" /> },
         ]
       },
       {

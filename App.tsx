@@ -36,15 +36,17 @@ import { GuestPortal } from './pages/GuestPortal';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorClients } from './pages/VendorClients'; 
+import { VendorSubscription } from './pages/VendorSubscription';
+import { FeaturedHallsManagement } from './pages/FeaturedHallsManagement';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Modal } from './components/ui/Modal'; 
 import { PriceTag } from './components/ui/PriceTag';
 import { prepareCheckout, verifyPaymentStatus } from './services/paymentService';
 import { HyperPayForm } from './components/Payment/HyperPayForm';
-import { 
+import {
   Loader2, CheckCircle2, Mail, ArrowLeft,
-  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload, Clock, Image as ImageIcon, Ticket, ShieldCheck
+  Globe, Sparkles, Building2, Palmtree, Lock, CreditCard, User, Check, Eye, EyeOff, LogOut, Plus, ArrowRight, XCircle, FileText, Upload, Clock, Image as ImageIcon, Ticket, ShieldCheck, Home as HomeIcon
 } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -160,12 +162,27 @@ const App: React.FC = () => {
   };
 
   const handleNavigate = (tab: string, item?: any) => {
-      if (item) navigateToDetails(tab, item);
-      else setActiveTab(tab);
+      if (item) {
+          navigateToDetails(tab, item);
+      } else if (tab === 'browse_halls') {
+          setBrowseFilters({ entityType: 'hall' });
+          setActiveTab('browse_halls');
+      } else if (tab === 'browse_services') {
+          setBrowseFilters({ entityType: 'service' });
+          setActiveTab('browse_services');
+      } else {
+          setActiveTab(tab);
+      }
   };
 
   const routeUser = async (profile: UserProfile, userId: string) => {
       if (profile.role === 'vendor') {
+          // Check subscription status first
+          const hasSubscription = profile.has_active_subscription || 
+                                 profile.subscription_status === 'hall' || 
+                                 profile.subscription_status === 'service' ||
+                                 profile.subscription_status === 'both';
+
           // Check if vendor has ANY assets (Halls or Services)
           const [halls, services] = await Promise.all([
               supabase.from('halls').select('id', { count: 'exact', head: true }).eq('vendor_id', userId),
@@ -174,6 +191,12 @@ const App: React.FC = () => {
 
           const hasAssets = (halls.count || 0) > 0 || (services.count || 0) > 0;
 
+          // If no subscription, redirect to subscription page
+          if (!hasSubscription) {
+              setActiveTab('vendor_subscription');
+              return;
+          }
+
           if (hasAssets) {
               if (profile.status === 'approved') {
                   setActiveTab('dashboard');
@@ -181,13 +204,13 @@ const App: React.FC = () => {
                   setActiveTab('request_pending');
               }
           } else {
-              setRegData(prev => ({ 
-                  ...prev, 
-                  fullName: profile.full_name || 'الشريك', 
+              setRegData(prev => ({
+                  ...prev,
+                  fullName: profile.full_name || 'الشريك',
                   email: profile.email || '',
                   phone: profile.phone_number || ''
               }));
-              setRegStep(3); 
+              setRegStep(4); // Go to asset selection
               setActiveTab('vendor_register');
           }
       } else if (profile.role === 'super_admin') {
@@ -367,7 +390,7 @@ const App: React.FC = () => {
                 </div>
             </div>
         </div>
-        
+
         <div>
             <h3 className="text-base font-black text-primary mb-3 text-right">معلومات القاعة الأساسية</h3>
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm space-y-4">
@@ -395,7 +418,7 @@ const App: React.FC = () => {
         <div>
             <h3 className="text-base font-black text-primary mb-3 text-right">المرفقات والوسائط</h3>
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Logo Section */}
                     <div className="border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center hover:bg-gray-50 transition-colors cursor-pointer group">
                         <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center text-primary mb-3 group-hover:scale-110 transition-transform">
@@ -476,9 +499,9 @@ const App: React.FC = () => {
                     <div className="w-full max-w-4xl space-y-8">
                         {/* Form Section */}
                         {selectedType === 'hall' ? renderHallForm() : (
-                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+                            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6 max-w-2xl mx-auto">
                                 <h3 className="text-lg font-black text-primary mb-4 border-b border-gray-100 pb-4">بيانات الخدمة</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <Input label="الاسم التجاري" value={assetData.name} onChange={e => setAssetData({...assetData, name: e.target.value})} className="h-11 rounded-xl font-bold" />
                                     <div className="space-y-1">
                                         <label className="text-xs font-bold text-gray-500">التصنيف</label>
@@ -487,7 +510,7 @@ const App: React.FC = () => {
                                         </select>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <Input label="السعر يبدأ من" type="number" value={assetData.price} onChange={e => setAssetData({...assetData, price: e.target.value})} className="h-11 rounded-xl font-bold" />
                                 </div>
                                 <div className="space-y-1">
@@ -554,9 +577,20 @@ const App: React.FC = () => {
                             </div>
                         </div>
 
-                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-12 flex items-center justify-center gap-1">
+                        <button onClick={() => setRegStep(3)} className="w-full text-center text-xs font-bold text-gray-400 hover:text-gray-600 mt-6 transition-colors mb-4 flex items-center justify-center gap-1">
                             <ArrowRight className="w-3 h-3" /> العودة وتغيير النشاط
                         </button>
+
+                        {/* Return to Home Button */}
+                        <div className="pt-4 border-t border-gray-200">
+                            <button
+                                onClick={() => { setActiveTab('home'); setRegStep(1); }}
+                                className="w-full h-12 rounded-2xl font-bold text-sm text-gray-500 hover:text-primary hover:bg-gray-50 border border-gray-200 transition-all flex items-center justify-center gap-2"
+                            >
+                                <HomeIcon className="w-4 h-4" />
+                                العودة إلى الصفحة الرئيسية
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
@@ -604,6 +638,8 @@ const App: React.FC = () => {
       case 'accounting': return userProfile ? <VendorAccounting user={userProfile} /> : null;
       case 'vendor_marketplace': return userProfile ? <VendorMarketplace user={userProfile} /> : null;
       case 'vendor_clients': return userProfile ? <VendorClients user={userProfile} /> : null;
+      case 'vendor_subscription': return userProfile ? <VendorSubscription user={userProfile} onComplete={() => setActiveTab('dashboard')} /> : null;
+      case 'featured_halls': return userProfile?.role === 'super_admin' ? <FeaturedHallsManagement user={userProfile} /> : null;
       case 'admin_requests': return <AdminRequests />;
       default: return <Home user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onBrowseHalls={(f) => { setBrowseFilters(f); setActiveTab('browse_halls'); }} onNavigate={handleNavigate} onLogout={handleLogout} />;
     }

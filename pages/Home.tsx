@@ -40,6 +40,7 @@ const SectionHeader = ({ title, icon: Icon, subtitle }: { title: string, icon?: 
 export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick, onBrowseHalls, onNavigate, onLogout }) => {
   const [halls, setHalls] = useState<Hall[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [featuredHalls, setFeaturedHalls] = useState<Hall[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
   const [searchTab, setSearchTab] = useState<'halls' | 'services'>('halls');
@@ -76,13 +77,63 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: hData } = await supabase.from('halls').select('*, vendor:vendor_id(*)').eq('is_active', true).eq('type', 'hall').limit(4);
-      const { data: sData } = await supabase.from('services').select('*, vendor:vendor_id(*)').eq('is_active', true).limit(4);
+      // Fetch featured halls
+      const now = new Date().toISOString();
+      const { data: featuredData, error: featuredError } = await supabase
+        .from('halls')
+        .select('*, vendor:vendor_id(*)')
+        .eq('is_active', true)
+        .eq('is_featured', true)
+        .gt('featured_until', now)
+        .limit(3);
+
+      if (featuredError) {
+        console.error('❌ Featured halls error:', featuredError);
+      }
       
+      console.log('✅ Featured halls query - Date used:', now);
+      console.log('✅ Featured halls data:', featuredData);
+      console.log('✅ Featured halls count:', featuredData?.length);
+      
+      if (featuredData && featuredData.length === 0) {
+        // Check if there are any featured halls at all (without date filter)
+        const { data: allFeatured } = await supabase
+          .from('halls')
+          .select('id, name, is_featured, featured_until, is_active')
+          .eq('is_featured', true);
+        
+        console.log('🔍 All featured halls (no date filter):', allFeatured);
+        
+        if (allFeatured && allFeatured.length > 0) {
+          console.log('⚠️ Featured halls exist but expired or future date issue');
+          allFeatured.forEach(h => {
+            console.log(`Hall: ${h.name}, featured_until: ${h.featured_until}, is_active: ${h.is_active}`);
+          });
+        } else {
+          console.log('⚠️ No featured halls in database at all');
+        }
+      }
+
+      // Fetch regular halls
+      const { data: hData } = await supabase
+        .from('halls')
+        .select('*, vendor:vendor_id(*)')
+        .eq('is_active', true)
+        .eq('type', 'hall')
+        .limit(4);
+
+      // Fetch services
+      const { data: sData } = await supabase
+        .from('services')
+        .select('*, vendor:vendor_id(*)')
+        .eq('is_active', true)
+        .limit(4);
+
+      setFeaturedHalls(featuredData || []);
       setHalls(hData || []);
       setServices(sData || []);
     } catch (err) {
-      console.error(err);
+      console.error('❌ General error:', err);
     } finally {
       setLoading(false);
     }
@@ -280,7 +331,69 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
 
       {/* Main Sections */}
       <section className="py-24 px-6 lg:px-12 w-full max-w-[1920px] mx-auto space-y-32">
-          
+
+          {/* Featured Halls - Always show section header */}
+          <div className="space-y-12">
+            <SectionHeader title="قاعات مميزة" icon={Sparkles} />
+            
+            {featuredHalls.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {featuredHalls.map(h => (
+                  <div
+                    key={h.id}
+                    onClick={() => onNavigate('hall_details', { item: h, type: 'hall' })}
+                    className="group relative cursor-pointer overflow-hidden rounded-[2.5rem] h-[450px]"
+                  >
+                    {/* Full Image Background */}
+                    <img
+                      src={h.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      alt={h.name}
+                    />
+                    
+                    {/* Gradient Overlay with Theme Color */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    {/* Featured Badge */}
+                    <div className="absolute top-6 right-6 bg-white/20 backdrop-blur-md text-white px-4 py-2 rounded-full text-xs font-black flex items-center gap-1 border border-white/30">
+                      <Sparkles className="w-3 h-3" /> مميزة
+                    </div>
+                    
+                    {/* Content - Bottom Section */}
+                    <div className="absolute inset-x-0 bottom-0 p-6">
+                      {/* Hall Name & Rating */}
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-2xl font-black text-white truncate flex-1">{h.name}</h3>
+                        <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full mr-3 shrink-0">
+                          <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm font-black text-white">4.9</span>
+                        </div>
+                      </div>
+                      
+                      {/* Location & Price */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-white/90">
+                          <MapPin className="w-4 h-4" />
+                          <span className="text-sm font-bold">{h.city}</span>
+                        </div>
+                        <div className="text-right">
+                          <PriceTag amount={h.price_per_night} className="text-lg font-black text-white" />
+                          <span className="text-[10px] text-white/70 font-bold">/ لليلة</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-gray-50 rounded-[2rem] border border-gray-100">
+                <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 font-bold text-lg">لا توجد قاعات مميزة حالياً</p>
+                <p className="text-gray-400 text-sm mt-2">القاعات المميزة ستظهر هنا عند إضافتها من قبل الإدارة</p>
+              </div>
+            )}
+          </div>
+
           {/* Halls */}
           <div className="space-y-12">
             <SectionHeader title="القاعات" icon={Sparkles} />
