@@ -5,7 +5,7 @@ import { UserProfile, Hall, SAUDI_CITIES, HallAddon, HallPackage, HALL_AMENITIES
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
-import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus, Lock, CreditCard, CalendarDays, FileText, Image as ImageIcon } from 'lucide-react';
+import { Plus, X, Loader2, Trash2, Sparkles, Minus, Package, CheckSquare, ListPlus, Lock, CreditCard, CalendarDays, FileText, Image as ImageIcon, Clock } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { Modal } from '../components/ui/Modal';
 import { Calendar } from '../components/ui/Calendar';
@@ -169,21 +169,22 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
   };
 
   const handleBulkBlock = async () => {
-      if (!bulkStart || !bulkEnd || bulkDay === '') {
-          toast({ title: 'ناقص البيانات', description: 'يرجى تحديد التاريخ واليوم.', variant: 'destructive' });
+      if (!bulkStart || !bulkEnd) {
+          toast({ title: 'ناقص البيانات', description: 'يرجى تحديد فترة التاريخ.', variant: 'destructive' });
           return;
       }
       if (!currentHall.id) return;
 
       const start = parseISO(bulkStart);
       const end = parseISO(bulkEnd);
-      const targetDay = parseInt(bulkDay);
 
       const daysToBlock: string[] = [];
       const interval = eachDayOfInterval({ start, end });
 
+      // Block all dates in range, or filter by weekday if specified
       interval.forEach(day => {
-          if (getDay(day) === targetDay) {
+          const shouldBlock = bulkDay === '' || getDay(day) === parseInt(bulkDay);
+          if (shouldBlock) {
               const str = format(day, 'yyyy-MM-dd');
               if (!blockedDates.some(d => isSameDay(d, day))) {
                   daysToBlock.push(str);
@@ -192,7 +193,7 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
       });
 
       if (daysToBlock.length === 0) {
-          toast({ title: 'لا يوجد أيام', description: 'لم يتم العثور على أيام مطابقة في هذه الفترة.', variant: 'warning' });
+          toast({ title: 'لا يوجد أيام', description: 'لم يتم العثور على أيام للحجب في هذه الفترة.', variant: 'warning' });
           return;
       }
 
@@ -203,15 +204,18 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
           status: 'blocked',
           total_amount: 0,
           vat_amount: 0,
-          notes: 'Bulk Blocked'
+          notes: bulkDay !== '' ? `Blocked recurring day ${bulkDay}` : 'Blocked date range'
       }));
 
       const { error } = await supabase.from('bookings').insert(payloads);
-      
+
       if (error) {
           toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
       } else {
-          toast({ title: 'تم الحجب', description: `تم إغلاق ${daysToBlock.length} يوم بنجاح.`, variant: 'success' });
+          const msg = bulkDay !== '' 
+            ? `تم حظر ${daysToBlock.length} يوم متكرر بنجاح.`
+            : `تم حظر ${daysToBlock.length} يوم في الفترة بنجاح.`;
+          toast({ title: 'تم الحجب', description: msg, variant: 'success' });
           setBlockedDates(prev => [...prev, ...daysToBlock.map(d => parseISO(d))]);
           setBulkStart('');
           setBulkEnd('');
@@ -423,11 +427,109 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
 
                  {activeTab === 'calendar' && (
                      <div className="space-y-6">
-                        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
-                            <h3 className="text-sm font-black text-gray-900 mb-6">التقويم</h3>
-                            <div className="max-w-md mx-auto">
-                                <Calendar mode="single" selected={calendarDate} onSelect={(d) => { setCalendarDate(d); if(d) toggleBlockDate(d); }} className="w-full" modifiers={{ blocked: blockedDates }} modifiersClassNames={{ blocked: "bg-gray-900 text-white" }} />
+                        {/* Date Range Blocking */}
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-black text-primary mb-2 flex items-center gap-2">
+                                <CalendarDays className="w-4 h-4" />
+                                حظر فترة زمنية
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500">من تاريخ</label>
+                                    <input
+                                        type="date"
+                                        value={bulkStart}
+                                        onChange={e => setBulkStart(e.target.value)}
+                                        className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500">إلى تاريخ</label>
+                                    <input
+                                        type="date"
+                                        value={bulkEnd}
+                                        onChange={e => setBulkEnd(e.target.value)}
+                                        className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                                    />
+                                </div>
                             </div>
+                            <Button 
+                                onClick={handleBulkBlock} 
+                                disabled={!bulkStart || !bulkEnd}
+                                className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2 disabled:opacity-50"
+                            >
+                                <Lock className="w-4 h-4" /> حظر الفترة المحددة
+                            </Button>
+                        </div>
+
+                        {/* Recurring Weekday Blocking */}
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-black text-primary mb-2 flex items-center gap-2">
+                                <Clock className="w-4 h-4" />
+                                حظر أيام أسبوعية متكررة
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500">من تاريخ</label>
+                                    <input
+                                        type="date"
+                                        value={bulkStart}
+                                        onChange={e => setBulkStart(e.target.value)}
+                                        className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-500">إلى تاريخ</label>
+                                    <input
+                                        type="date"
+                                        value={bulkEnd}
+                                        onChange={e => setBulkEnd(e.target.value)}
+                                        className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">اليوم الأسبوعي</label>
+                                <select
+                                    value={bulkDay}
+                                    onChange={e => setBulkDay(e.target.value)}
+                                    className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                                >
+                                    <option value="">اختر اليوم...</option>
+                                    <option value="0">الأحد</option>
+                                    <option value="1">الإثنين</option>
+                                    <option value="2">الثلاثاء</option>
+                                    <option value="3">الأربعاء</option>
+                                    <option value="4">الخميس</option>
+                                    <option value="5">الجمعة</option>
+                                    <option value="6">السبت</option>
+                                </select>
+                            </div>
+                            <Button 
+                                onClick={handleBulkBlock} 
+                                disabled={!bulkStart || !bulkEnd || bulkDay === ''}
+                                className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2 disabled:opacity-50"
+                            >
+                                <Lock className="w-4 h-4" /> حظر الأيام المتكررة
+                            </Button>
+                        </div>
+
+                        {/* Calendar View */}
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center">
+                            <h3 className="text-sm font-black text-gray-900 mb-6">التقويم - انقر للحجب/الفك</h3>
+                            <div className="max-w-md mx-auto">
+                                <Calendar 
+                                    mode="single" 
+                                    selected={calendarDate} 
+                                    onSelect={(d) => { setCalendarDate(d); if(d) toggleBlockDate(d); }} 
+                                    className="w-full" 
+                                    modifiers={{ blocked: blockedDates }} 
+                                    modifiersClassNames={{ blocked: "bg-gray-900 text-white" }} 
+                                />
+                            </div>
+                            <p className="text-xs text-gray-400 font-bold mt-4">
+                                الأيام المحجوبة: {blockedDates.length}
+                            </p>
                         </div>
                      </div>
                  )}

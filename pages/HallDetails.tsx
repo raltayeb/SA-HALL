@@ -28,10 +28,13 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
   const [bookingDate, setBookingDate] = useState<Date | undefined>(undefined);
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [bookingConfig, setBookingConfig] = useState<BookingConfig | null>(null);
-  
+
+  // Booking Type: 'night' or 'package'
+  const [bookingType, setBookingType] = useState<'night' | 'package'>(item.price_per_night && item.price_per_night > 0 ? 'night' : 'package');
+
   // Guest Counts
   const [guestCounts, setGuestCounts] = useState({ men: 0, women: 0 });
-  
+
   const [guestData, setGuestData] = useState({ name: user?.full_name || '', phone: user?.phone_number || '', email: user?.email || '' });
   const [paymentOption, setPaymentOption] = useState<'deposit' | 'hold_48h' | 'consultation' | null>(null);
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
@@ -46,10 +49,15 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
   const { toast } = useToast();
 
   useEffect(() => {
-    // 1. Set Default Package & Counts
-    if (item.packages && item.packages.length > 0) {
+    // 1. Set Default based on available options
+    if (item.price_per_night && item.price_per_night > 0) {
+        setBookingType('night');
+        // Set default guest counts based on capacity
+        setGuestCounts({ men: item.capacity_men || 50, women: item.capacity_women || 50 });
+    } else if (item.packages && item.packages.length > 0) {
         const def = item.packages.find(p => p.is_default) || item.packages[0];
         setSelectedPackage(def);
+        setBookingType('package');
         setGuestCounts({ men: def.min_men || 0, women: def.min_women || 0 });
     }
 
@@ -71,32 +79,39 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
         }
     };
     fetchConfig();
-  }, [item.id, item.packages]);
+  }, [item.id, item.packages, item.price_per_night, item.capacity_men, item.capacity_women]);
 
-  // Pricing Logic (Per Person)
+  // Pricing Logic (Night Price OR Package)
   const priceDetails = useMemo(() => {
-      if (!selectedPackage) return { packageTotal: 0, addonsTotal: 0, seasonalIncrease: 0, total: 0, personPrice: 0, discountAmount: 0, grandTotal: 0, vatAmount: 0 };
-      
-      const personPrice = selectedPackage.price;
-      const totalGuests = guestCounts.men + guestCounts.women;
-      const basePackageCost = totalGuests * personPrice;
-      
+      let baseCost = 0;
+      let personPrice = 0;
+
+      if (bookingType === 'night') {
+          // Night price - fixed cost regardless of guest count
+          baseCost = item.price_per_night || 0;
+      } else if (selectedPackage) {
+          // Package price - per person
+          personPrice = selectedPackage.price;
+          const totalGuests = guestCounts.men + guestCounts.women;
+          baseCost = totalGuests * personPrice;
+      }
+
       let seasonalMultiplier = 1;
       let seasonalIncrease = 0;
 
-      // Check Seasonality
-      if (bookingDate) {
+      // Check Seasonality (only for packages)
+      if (bookingType === 'package' && bookingDate) {
           const dateStr = format(bookingDate, 'yyyy-MM-dd');
           const season = item.seasonal_prices?.find(s => dateStr >= s.start_date && dateStr <= s.end_date);
           if (season) {
               seasonalMultiplier = 1 + (season.increase_percentage / 100);
-              seasonalIncrease = (basePackageCost * seasonalMultiplier) - basePackageCost;
+              seasonalIncrease = (baseCost * seasonalMultiplier) - baseCost;
           }
+          baseCost = baseCost * seasonalMultiplier;
       }
 
-      const adjustedPackageCost = basePackageCost * seasonalMultiplier;
       const addonsTotal = selectedAddons.reduce((sum, a) => sum + Number(a.price), 0);
-      const subTotal = adjustedPackageCost + addonsTotal;
+      const subTotal = baseCost + addonsTotal;
 
       // Coupon Calculation
       let discountAmount = 0;
@@ -112,19 +127,20 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
       const taxableAmount = subTotal - discountAmount;
       const vatAmount = taxableAmount * 0.15; // 15% VAT
       const grandTotal = taxableAmount + vatAmount;
-      
-      return { 
+
+      return {
           personPrice,
-          packageTotal: adjustedPackageCost, 
+          packageTotal: bookingType === 'package' ? baseCost : 0,
+          nightPrice: bookingType === 'night' ? baseCost : 0,
           seasonalIncrease,
           addonsTotal,
           subTotal,
           discountAmount,
           vatAmount,
-          grandTotal, // Total including VAT
-          total: subTotal // Original total before discount/VAT for consistency if needed, but grandTotal is what user pays
+          grandTotal,
+          total: subTotal
       };
-  }, [selectedPackage, bookingDate, guestCounts, item.seasonal_prices, selectedAddons, appliedCoupon]);
+  }, [bookingType, selectedPackage, bookingDate, guestCounts, item.seasonal_prices, item.price_per_night, selectedAddons, appliedCoupon]);
 
   // Payment Amounts based on Grand Total
   const paymentAmounts = useMemo(() => {
@@ -296,22 +312,52 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                     </div>
                 </div>
 
-                {/* 2. Packages */}
+                {/* 2. Packages & Night Price */}
                 <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
                     <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-                        <Package className="w-6 h-6 text-primary" /> باقات الحجز وسعر الليلة
+                        <Package className="w-6 h-6 text-primary" /> خيارات الحجز
                     </h3>
-                    
-                    {/* Night Price Display */}
-                    {item.price_per_night && item.price_per_night > 0 && (
-                        <div className="mb-6 p-6 bg-gradient-to-l from-primary/10 to-primary/5 rounded-[2rem] border border-primary/20">
+
+                    {/* Booking Type Toggle */}
+                    <div className="flex gap-3 mb-6">
+                        {item.price_per_night && item.price_per_night > 0 && (
+                            <button
+                                onClick={() => setBookingType('night')}
+                                className={`flex-1 p-4 rounded-2xl border-2 transition-all ${bookingType === 'night' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <CalendarIcon className={`w-5 h-5 ${bookingType === 'night' ? 'text-primary' : 'text-gray-400'}`} />
+                                    {bookingType === 'night' && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                                </div>
+                                <p className="font-black text-sm text-gray-900">سعر الليلة</p>
+                                <PriceTag amount={item.price_per_night} className="text-lg font-black text-primary mt-1" />
+                            </button>
+                        )}
+                        {item.packages && item.packages.length > 0 && (
+                            <button
+                                onClick={() => { setBookingType('package'); if (!selectedPackage) { const def = item.packages?.find(p => p.is_default) || item.packages?.[0]; setSelectedPackage(def); setGuestCounts({ men: def?.min_men || 0, women: def?.min_women || 0 }); }}}
+                                className={`flex-1 p-4 rounded-2xl border-2 transition-all ${bookingType === 'package' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <Package className={`w-5 h-5 ${bookingType === 'package' ? 'text-primary' : 'text-gray-400'}`} />
+                                    {bookingType === 'package' && <CheckCircle2 className="w-5 h-5 text-primary" />}
+                                </div>
+                                <p className="font-black text-sm text-gray-900">باقات الأفراد</p>
+                                <p className="text-xs text-gray-500 font-bold mt-1">تبدأ من {item.packages[0].price} ر.س</p>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Night Price Details */}
+                    {bookingType === 'night' && item.price_per_night && item.price_per_night > 0 && (
+                        <div className="p-6 bg-gradient-to-l from-primary/10 to-primary/5 rounded-[2rem] border border-primary/20 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center">
                                         <CalendarIcon className="w-6 h-6 text-primary" />
                                     </div>
                                     <div>
-                                        <h4 className="font-black text-lg text-gray-900">سعر الليلة</h4>
+                                        <h4 className="font-black text-lg text-gray-900">سعر الليلة الكاملة</h4>
                                         <p className="text-xs text-gray-500 font-bold mt-1">مناسب للأعراس والمناسبات الكبيرة</p>
                                     </div>
                                 </div>
@@ -320,37 +366,78 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                                     <span className="text-[10px] text-gray-400 font-bold">/ لليلة كاملة</span>
                                 </div>
                             </div>
+                            
+                            {/* Max Capacity for Night */}
+                            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-primary/10">
+                                <div className="bg-white p-3 rounded-xl border border-primary/10">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Users className="w-4 h-4 text-primary" />
+                                        <span className="text-xs font-bold text-gray-500">الحد الأقصى للرجال</span>
+                                    </div>
+                                    <p className="text-lg font-black text-gray-900">{item.capacity_men || 0} رجل</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-primary/10">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Users className="w-4 h-4 text-primary" />
+                                        <span className="text-xs font-bold text-gray-500">الحد الأقصى للنساء</span>
+                                    </div>
+                                    <p className="text-lg font-black text-gray-900">{item.capacity_women || 0} امرأة</p>
+                                </div>
+                            </div>
+
+                            {/* Guest Count for Night */}
+                            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-primary/10">
+                                <div>
+                                    <label className="text-[9px] font-bold text-gray-400 mb-1 block">عدد الرجال المتوقع</label>
+                                    <div className="flex items-center gap-2 bg-white rounded-xl px-2 py-1 border border-gray-200">
+                                        <button onClick={() => setGuestCounts(prev => ({...prev, men: Math.max(0, prev.men - 10)}))} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
+                                        <span className="flex-1 text-center font-black text-sm">{guestCounts.men}</span>
+                                        <button onClick={() => setGuestCounts(prev => ({...prev, men: Math.min(item.capacity_men || 100, prev.men + 10)}))} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-bold text-gray-400 mb-1 block">عدد النساء المتوقع</label>
+                                    <div className="flex items-center gap-2 bg-white rounded-xl px-2 py-1 border border-gray-200">
+                                        <button onClick={() => setGuestCounts(prev => ({...prev, women: Math.max(0, prev.women - 10)}))} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
+                                        <span className="flex-1 text-center font-black text-sm">{guestCounts.women}</span>
+                                        <button onClick={() => setGuestCounts(prev => ({...prev, women: Math.min(item.capacity_women || 100, prev.women + 10)}))} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 no-scrollbar">
-                        {item.packages?.map((pkg, idx) => (
-                            <div
-                                key={idx}
-                                onClick={() => { setSelectedPackage(pkg); setGuestCounts({ men: pkg.min_men, women: pkg.min_women }); }}
-                                className={`cursor-pointer border-2 rounded-[2rem] p-6 transition-all relative overflow-hidden min-w-[280px] flex-1 ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <h4 className="font-black text-lg">{pkg.name}</h4>
-                                    {selectedPackage?.name === pkg.name && <CheckCircle2 className="w-6 h-6 text-primary" />}
-                                </div>
-                                <div className="space-y-2 text-xs font-bold text-gray-500 mb-4">
-                                    <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
-                                        <span>رجال</span>
-                                        <span>{pkg.min_men} - {pkg.max_men}</span>
+                    {/* Package Selection */}
+                    {bookingType === 'package' && item.packages && item.packages.length > 0 && (
+                        <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4 no-scrollbar">
+                            {item.packages.map((pkg, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={() => { setSelectedPackage(pkg); setGuestCounts({ men: pkg.min_men, women: pkg.min_women }); }}
+                                    className={`cursor-pointer border-2 rounded-[2rem] p-6 transition-all relative overflow-hidden min-w-[280px] flex-1 ${selectedPackage?.name === pkg.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h4 className="font-black text-lg">{pkg.name}</h4>
+                                        {selectedPackage?.name === pkg.name && <CheckCircle2 className="w-6 h-6 text-primary" />}
                                     </div>
-                                    <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
-                                        <span>نساء</span>
-                                        <span>{pkg.min_women} - {pkg.max_women}</span>
+                                    <div className="space-y-2 text-xs font-bold text-gray-500 mb-4">
+                                        <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
+                                            <span>رجال</span>
+                                            <span>{pkg.min_men} - {pkg.max_men}</span>
+                                        </div>
+                                        <div className="flex justify-between bg-white p-2 rounded-lg border border-gray-100">
+                                            <span>نساء</span>
+                                            <span>{pkg.min_women} - {pkg.max_women}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-end gap-1">
+                                        <PriceTag amount={pkg.price} className="text-xl font-black text-primary block text-left" />
+                                        <span className="text-[10px] text-gray-400 font-bold mb-1">/ للفرد</span>
                                     </div>
                                 </div>
-                                <div className="flex items-end gap-1">
-                                    <PriceTag amount={pkg.price} className="text-xl font-black text-primary block text-left" />
-                                    <span className="text-[10px] text-gray-400 font-bold mb-1">/ للفرد</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* 3. Addons / Services - MOVED HERE */}
@@ -492,7 +579,33 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                             </div>
 
                             {/* Guest Counts & Pricing Logic */}
-                            {selectedPackage && (
+                            {bookingType === 'night' ? (
+                                <div className="space-y-4 border-t border-gray-50 pt-4">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">نوع الحجز</label>
+                                        <span className="text-xs font-black text-primary bg-primary/5 px-2 py-1 rounded-lg">سعر الليلة</span>
+                                    </div>
+                                    <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                                        <p className="text-xs font-bold text-gray-600 mb-3">السعر ثابت بغض النظر عن عدد الضيوف</p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Users className="w-4 h-4 text-primary" />
+                                                    <span className="text-xs font-bold text-gray-500">الرجال</span>
+                                                </div>
+                                                <p className="text-sm font-black text-gray-900">{guestCounts.men} من {item.capacity_men || 0}</p>
+                                            </div>
+                                            <div className="bg-white p-3 rounded-xl border border-gray-100">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Users className="w-4 h-4 text-primary" />
+                                                    <span className="text-xs font-bold text-gray-500">النساء</span>
+                                                </div>
+                                                <p className="text-sm font-black text-gray-900">{guestCounts.women} من {item.capacity_women || 0}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : selectedPackage && (
                                 <div className="space-y-4 border-t border-gray-50 pt-4">
                                     <div className="flex justify-between items-center">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">الباقة المختارة</label>
