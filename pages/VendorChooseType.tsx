@@ -230,11 +230,11 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-tajawal" dir="rtl">
         <div className="w-full max-w-4xl">
           {/* Header with Logo */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <img 
               src={systemLogo} 
               alt="Platform Logo" 
-              className="h-40 w-auto mx-auto mb-8 object-contain"
+              className="h-40 w-auto mx-auto mb-6 object-contain"
             />
             <h1 className="text-4xl font-black text-primary mb-2">مرحبا ألف {user.full_name || 'شريك'} 👋</h1>
             <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
@@ -287,25 +287,25 @@ export const VendorChooseType: React.FC<VendorChooseTypeProps> = ({ user, onBack
     <div className="min-h-screen bg-gray-50 py-12 px-4 font-tajawal" dir="rtl">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <img 
               src={systemLogo} 
               alt="Platform Logo" 
-              className="h-20 w-auto object-contain"
+              className="h-16 w-auto object-contain"
             />
             <div>
-              <h1 className="text-3xl font-black text-primary">
+              <h1 className="text-2xl font-black text-primary">
                 إضافة {selectedType === 'hall' ? 'قاعة' : 'خدمة'} جديدة
               </h1>
-              <p className="text-gray-500 font-bold mt-1">أكمل البيانات لإدراج نشاطك في المنصة</p>
+              <p className="text-gray-500 font-bold mt-0.5">أكمل البيانات لإدراج نشاطك في المنصة</p>
             </div>
           </div>
           <button
             onClick={() => setStep('choose')}
             className="flex items-center gap-2 text-gray-500 hover:text-primary transition-colors"
           >
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-4 h-4" />
             <span className="font-bold text-sm">عودة</span>
           </button>
         </div>

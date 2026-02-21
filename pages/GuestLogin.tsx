@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -13,7 +13,19 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
   const { toast } = useToast();
+
+  useEffect(() => {
+    fetchLogo();
+  }, []);
+
+  const fetchLogo = async () => {
+    const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+    if (data?.value?.platform_logo_url) {
+      setSystemLogo(data.value.platform_logo_url);
+    }
+  };
 
   const handleLookupAndSendOtp = async () => {
     const normalizedPhone = normalizeNumbers(phone);
@@ -82,11 +94,11 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row font-tajawal text-right overflow-hidden bg-white" dir="rtl">
-      <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 sm:px-12 lg:px-24 py-12 bg-white relative">
-        <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen w-full flex font-tajawal text-right bg-white" dir="rtl">
+      <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 sm:px-12 lg:px-24 py-12 bg-white">
+        <div className="w-full max-w-md space-y-6">
 
-          <div className="text-right space-y-2 mb-10">
+          <div className="text-right space-y-2 mb-8">
             <button onClick={onBack} className="text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-2 font-bold text-xs">
               <ArrowRight className="w-4 h-4" /> العودة للرئيسية
             </button>
@@ -137,9 +149,6 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           )}
 
           <div className="space-y-4 pt-4 text-center">
-            <div className="flex flex-col gap-2 text-sm font-bold text-primary">
-              <a href="/vendor-login" className="hover:underline">بوابة الأعمال</a>
-            </div>
             <div className="pt-8">
               <button onClick={onBack} className="text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors">
                 العودة للرئيسية
@@ -152,12 +161,7 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       <div className="hidden md:flex md:w-1/2 bg-primary items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
         <div className="relative z-10 text-center">
-          <img src="https://dash.hall.sa/logo.svg" className="h-64 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl object-contain" alt="Logo" />
-          <div className="flex flex-col items-center gap-1 mt-4 opacity-50">
-            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-          </div>
+          <img src={systemLogo} className="h-64 w-auto mx-auto mb-6 invert brightness-0 filter drop-shadow-xl object-contain" alt="Logo" />
         </div>
       </div>
     </div>
