@@ -447,7 +447,7 @@ const App: React.FC = () => {
                         className="h-64 w-auto mb-8 object-contain" 
                     />
                     <div className="text-center mb-12 space-y-3">
-                        <h1 className="text-4xl font-black text-primary">مرحباً ألف، {regData.fullName}</h1>
+                        <h1 className="text-4xl font-black text-primary">مرحبا ألف {regData.fullName}</h1>
                         <p className="text-xl text-gray-500 font-bold">ما هو نوع النشاط الذي تريد إضافته؟</p>
                     </div>
                     <div className="grid md:grid-cols-2 gap-8 w-full max-w-4xl">

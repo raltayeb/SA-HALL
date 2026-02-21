@@ -118,7 +118,7 @@ export const GuestPortal: React.FC<GuestPortalProps> = ({ user, onLogout }) => {
                       {firstName[0]}
                   </div>
                   <div>
-                      <h1 className="text-xl font-black text-gray-900 leading-none">مرحباً ألف {firstName} 👋</h1>
+                      <h1 className="text-xl font-black text-gray-900 leading-none">مرحبا ألف {firstName} 👋</h1>
                       <p className="text-[10px] font-bold text-gray-400 mt-1">تتبع طلباتك وحجوزاتك</p>
                   </div>
               </div>

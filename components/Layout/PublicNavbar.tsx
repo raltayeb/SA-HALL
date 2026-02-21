@@ -56,13 +56,19 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
 
               <nav className="hidden lg:flex items-center gap-1">
                 {navItems.map(item => (
-                    <button 
+                    <button
                         key={item.id}
-                        onClick={() => onNavigate(item.id)} 
+                        onClick={() => {
+                            if (item.navigateTo) {
+                                onNavigate(item.navigateTo, { entityType: item.entityType });
+                            } else {
+                                onNavigate(item.id);
+                            }
+                        }}
                         className={`
                             px-4 py-2 rounded-xl text-sm font-bold transition-all duration-200 flex items-center gap-2 border border-transparent
-                            ${activeTab === item.id 
-                                ? 'bg-primary/5 text-primary' 
+                            ${activeTab === item.id
+                                ? 'bg-primary/5 text-primary'
                                 : 'text-gray-500 hover:text-primary hover:bg-gray-50'}
                         `}
                     >
@@ -148,9 +154,16 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
             <div className="lg:hidden bg-white border-t border-gray-100 py-6 px-6 animate-in slide-in-from-top-5 shadow-2xl absolute w-full left-0 right-0 top-24 z-[90]">
                 <nav className="flex flex-col gap-2">
                     {navItems.map(item => (
-                        <button 
+                        <button
                             key={item.id}
-                            onClick={() => { onNavigate(item.id); setIsMobileMenuOpen(false); }} 
+                            onClick={() => {
+                                if (item.navigateTo) {
+                                    onNavigate(item.navigateTo, { entityType: item.entityType });
+                                } else {
+                                    onNavigate(item.id);
+                                }
+                                setIsMobileMenuOpen(false);
+                            }}
                             className={`w-full text-right px-4 py-3.5 rounded-xl text-sm font-bold flex items-center gap-3 transition-colors ${activeTab === item.id ? 'bg-primary text-white' : 'text-gray-600 hover:bg-gray-50'}`}
                         >
                             {item.icon}
