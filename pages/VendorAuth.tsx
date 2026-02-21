@@ -20,6 +20,7 @@ interface VendorAuthProps {
 
 export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegister, onLogin, onDataChange, onBack, onForgotPassword }) => {
   const [mode, setMode] = useState<'login' | 'register'>(isLogin ? 'login' : 'register');
+  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password');
   const [regStep, setRegStep] = useState(1); // 1: Info, 2: OTP, 3: Password
   const [loading, setLoading] = useState(false);
   const [systemLogo, setSystemLogo] = useState('https://dash.hall.sa/logo.svg');
@@ -28,7 +29,7 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '', 
+    confirmPassword: '',
     fullName: '',
     phone: '',
     otp: ''
@@ -70,15 +71,42 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
     e.preventDefault();
     setLoading(true);
     try {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
+        if (loginMethod === 'otp') {
+            // Send OTP
+            const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
+            if (error) throw error;
+            toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني', variant: 'success' });
+            setRegStep(2); // OTP verification step
+        } else {
+            // Password login
+            const { error } = await supabase.auth.signInWithPassword({
+              email: formData.email,
+              password: formData.password,
+            });
+            if (error) throw error;
+            toast({ title: 'تم تسجيل الدخول', variant: 'success' });
+            if (onLogin) onLogin();
+        }
+    } catch (err: any) {
+        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setLoading(true);
+    try {
+        const { error } = await supabase.auth.verifyOtp({
+            email: formData.email,
+            token: normalizeNumbers(formData.otp),
+            type: 'magiclink'
         });
         if (error) throw error;
         toast({ title: 'تم تسجيل الدخول', variant: 'success' });
         if (onLogin) onLogin();
     } catch (err: any) {
-        toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+        toast({ title: 'رمز خاطئ', description: 'تأكد من الرمز وحاول مرة أخرى', variant: 'destructive' });
     } finally {
         setLoading(false);
     }
@@ -165,37 +193,88 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col md:flex-row font-tajawal text-right overflow-hidden bg-white" dir="rtl">
-        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-6 sm:px-12 lg:px-24 py-12 bg-white relative">
-            <div className="w-full max-w-md space-y-8">
-                
-                <div className="text-right space-y-2 mb-10">
-                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">
+    <div className="min-h-screen w-full flex flex-col md:flex-row font-tajawal text-right bg-white" dir="rtl">
+        <div className="w-full md:w-1/2 flex flex-col justify-center items-center px-4 py-8 bg-white">
+            <div className="w-full max-w-md space-y-6">
+
+                <div className="text-right space-y-2 mb-6">
+                    <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
                         {mode === 'login' ? 'تسجيل الدخول' : regStep === 1 ? 'انضم كشريك نجاح' : regStep === 2 ? 'تفعيل الحساب' : 'تأمين الحساب'}
                     </h2>
                 </div>
 
                 {mode === 'login' && (
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
-                            <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary text-left" dir="ltr" required />
-                        </div>
-                        <div className="space-y-1 relative">
-                            <label className="text-xs font-bold text-gray-500">كلمة المرور</label>
-                            <div className="relative">
-                                <Input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="h-12 rounded-lg border-gray-200 focus:border-primary" required />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
+                    <>
+                        {regStep === 1 ? (
+                            <>
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setLoginMethod('password')}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                            loginMethod === 'password'
+                                                ? 'bg-primary text-white'
+                                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        كلمة المرور
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setLoginMethod('otp')}
+                                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                                            loginMethod === 'otp'
+                                                ? 'bg-primary text-white'
+                                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        رمز التحقق
+                                    </button>
+                                </div>
+                                <form onSubmit={handleLogin} className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
+                                        <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="h-11 rounded-lg border-gray-200 focus:border-primary text-left" dir="ltr" required />
+                                    </div>
+                                    {loginMethod === 'password' && (
+                                        <div className="space-y-1 relative">
+                                            <label className="text-xs font-bold text-gray-500">كلمة المرور</label>
+                                            <div className="relative">
+                                                <Input type={showPassword ? "text" : "password"} value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="h-11 rounded-lg border-gray-200 focus:border-primary" required />
+                                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                </button>
+                                            </div>
+                                            <div className="flex justify-end">
+                                                <button type="button" onClick={onForgotPassword} className="text-xs text-primary hover:underline">نسيت كلمة المرور؟</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="pt-2">
+                                        <Button disabled={loading} className="w-full h-11 rounded-lg font-black text-base bg-primary text-white hover:bg-primary/90">
+                                            {loading ? <Loader2 className="animate-spin" /> : (loginMethod === 'otp' ? 'إرسال الرمز' : 'دخول للمنصة')}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </>
+                        ) : (
+                            <div className="space-y-4 text-center">
+                                <div className="flex flex-col items-center justify-center space-y-2">
+                                    <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Mail className="w-7 h-7" /></div>
+                                    <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{formData.email}</b></p>
+                                </div>
+                                <Input value={formData.otp} onChange={e => setFormData({...formData, otp: normalizeNumbers(e.target.value)})} className="h-12 text-center text-xl font-black tracking-widest rounded-xl border-2 focus:border-primary" placeholder="------" maxLength={6} />
+                                <div className="flex gap-2">
+                                    <Button onClick={handleVerifyOtp} disabled={loading} className="flex-1 h-11 rounded-lg font-black text-base bg-primary text-white hover:bg-primary/90">
+                                        {loading ? <Loader2 className="animate-spin" /> : 'تحقق ودخول'}
+                                    </Button>
+                                    <Button onClick={() => setRegStep(1)} variant="outline" className="flex-1 h-11 rounded-lg font-bold text-base border-gray-200">
+                                        عودة
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
-                        <div className="pt-4">
-                            <Button disabled={loading} className="w-full h-12 rounded-lg font-black text-base bg-primary text-white hover:bg-primary/90">
-                                {loading ? <Loader2 className="animate-spin" /> : 'دخول للمنصة'}
-                            </Button>
-                        </div>
-                    </form>
+                        )}
+                    </>
                 )}
 
                 {mode === 'register' && regStep === 1 && (
