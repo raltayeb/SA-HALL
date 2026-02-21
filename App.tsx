@@ -365,8 +365,8 @@ const App: React.FC = () => {
   };
 
   // Define Authentication Pages
-  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login', 'request_pending'].includes(activeTab);
-  const isPublicPage = ['home', 'browse_halls', 'browse_services', 'hall_details', 'store_page'].includes(activeTab);
+  const isAuthPage = ['vendor_login', 'vendor_register', 'guest_login', 'forgot_password', 'request_pending'].includes(activeTab);
+  const isPublicPage = ['home', 'browse_halls', 'browse_services', 'hall_details', 'store_page', 'legal_terms', 'legal_privacy', 'legal_sla', 'legal_help', 'legal_about'].includes(activeTab);
 
   // Helper for Hall Form Rendering
   const renderHallForm = () => (

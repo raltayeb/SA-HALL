@@ -6,6 +6,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { useToast } from '../context/ToastContext';
+import { InvoiceModal } from '../components/Invoice/InvoiceModal';
+import { ExpenseModal } from '../components/Expense/ExpenseModal';
 import {
   FileText, Plus, Download, TrendingUp, TrendingDown,
   Calculator, Receipt, CreditCard, Calendar, Search
@@ -309,6 +311,20 @@ export const VendorAccounting: React.FC<VendorAccountingProps> = ({ user }) => {
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      <InvoiceModal
+        isOpen={isInvoiceModalOpen}
+        onClose={() => setIsInvoiceModalOpen(false)}
+        onSuccess={fetchData}
+        user={user}
+      />
+      <ExpenseModal
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        onSuccess={fetchData}
+        user={user}
+      />
     </div>
   );
 };

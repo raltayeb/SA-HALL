@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabaseClient';
-import { UserProfile, Invoice } from '../../types';
+import { UserProfile, Invoice, Booking } from '../../types';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { useToast } from '../../context/ToastContext';
@@ -10,8 +10,9 @@ import { X, Plus, Trash2, Receipt } from 'lucide-react';
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  user: UserProfile;
+  onSuccess?: () => void;
+  user?: UserProfile;
+  booking?: Booking | null;
 }
 
 interface InvoiceItem {
@@ -21,7 +22,7 @@ interface InvoiceItem {
   total: number;
 }
 
-export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onSuccess, user }) => {
+export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onSuccess, user, booking }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     customer_name: '',
@@ -35,6 +36,29 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onS
   ]);
 
   const { toast } = useToast();
+
+  // Pre-fill from booking if provided
+  useEffect(() => {
+    if (booking) {
+      setFormData({
+        customer_name: booking.guest_name || '',
+        customer_phone: booking.guest_phone || '',
+        customer_email: booking.guest_email || '',
+        customer_vat_number: '',
+        notes: booking.notes || ''
+      });
+      
+      // Add booking items
+      if (booking.items && booking.items.length > 0) {
+        setItems(booking.items.map(item => ({
+          name: item.name,
+          qty: item.qty,
+          unit_price: item.price,
+          total: item.price * item.qty
+        })));
+      }
+    }
+  }, [booking]);
 
   const addItem = () => {
     setItems([...items, { name: '', qty: 1, unit_price: 0, total: 0 }]);
@@ -75,9 +99,8 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onS
       const { subtotal, vat, total } = calculateTotals();
       const invoiceNumber = `INV-${Date.now()}`;
 
-      const { error } = await supabase.from('invoices').insert([{
+      const invoiceData: any = {
         invoice_number: invoiceNumber,
-        vendor_id: user.id,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
         customer_email: formData.customer_email,
@@ -89,12 +112,25 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, onS
         total_amount: total,
         payment_status: 'unpaid',
         notes: formData.notes
-      }]);
+      };
+
+      // Add vendor_id if creating from accounting (not from booking)
+      if (user) {
+        invoiceData.vendor_id = user.id;
+      }
+
+      // Add booking_id if creating from booking
+      if (booking) {
+        invoiceData.booking_id = booking.id;
+        invoiceData.payment_status = booking.payment_status || 'unpaid';
+      }
+
+      const { error } = await supabase.from('invoices').insert([invoiceData]);
 
       if (error) throw error;
 
       toast({ title: 'تم الإنشاء', description: 'تم إنشاء الفاتورة بنجاح', variant: 'success' });
-      onSuccess();
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
