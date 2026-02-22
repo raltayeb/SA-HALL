@@ -53,11 +53,44 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         // Generate OTP
         const generatedOTP = generateOTP(6);
 
+        console.log('Sending SMS OTP to:', normalizedPhone);
+
         // Send via SMS
         const smsResult = await sendSMSOTP(normalizedPhone, generatedOTP);
 
+        console.log('SMS Result:', smsResult);
+
         if (!smsResult.success) {
-          throw new Error(smsResult.error || 'فشل إرسال الرسالة');
+          // Fallback to email if SMS fails
+          console.log('SMS failed, falling back to email lookup');
+          
+          // Try to find email from bookings
+          const { data: bookingData } = await supabase
+            .from('bookings')
+            .select('guest_email')
+            .eq('guest_phone', normalizedPhone)
+            .not('guest_email', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (bookingData?.guest_email) {
+            // Send via email instead
+            const { error: authError } = await supabase.auth.signInWithOtp({ email: bookingData.guest_email });
+            if (authError) throw authError;
+            
+            toast({ 
+              title: 'تم الإرسال', 
+              description: `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${bookingData.guest_email}`, 
+              variant: 'success' 
+            });
+            setEmail(bookingData.guest_email);
+            setStep(2);
+          } else {
+            throw new Error('فشل إرسال الرسالة النصية. يرجى التأكد من رقم الجوال أو استخدام البريد الإلكتروني.');
+          }
+          setLoading(false);
+          return;
         }
 
         // Store OTP for verification
@@ -115,8 +148,12 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       }
 
     } catch (err: any) {
-      console.error(err);
-      toast({ title: 'خطأ', description: err.message || 'حدث خطأ أثناء محاولة الدخول.', variant: 'destructive' });
+      console.error('Send OTP Error:', err);
+      toast({ 
+        title: 'خطأ', 
+        description: err.message || 'حدث خطأ أثناء محاولة الدخول. يرجى المحاولة مرة أخرى.', 
+        variant: 'destructive' 
+      });
     } finally {
       setLoading(false);
     }

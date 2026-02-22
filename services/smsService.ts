@@ -8,7 +8,10 @@ const SMS_CONFIG = {
   clientId: 'SAhallrbd7ghczyv2lk9uzjh',
   password: '3xq4jb1c6iounhmoedrxk34fm4me5til',
   token: 'eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJJbmZpbml0byIsImlhdCI6MTc3MTcwMzQ5NSwic3ViIjoiU0FoYWxscmJkN2doY3p5djJsazl1empoIn0.7JanoZXS1LatQfs98zqRoN7n6RgmAJDdalZ_wwWZjzU',
-  from: 'SAhall' // Sender ID
+  from: 'SAhall', // Sender ID
+  // Use CORS proxy if needed
+  useProxy: true, // Enable CORS proxy
+  proxyURL: 'https://corsproxy.io/?'
 };
 
 export interface SendSMSResponse {
@@ -26,7 +29,12 @@ export interface SendSMSResponse {
 export const sendSMSOTP = async (phone: string, otp: string): Promise<SendSMSResponse> => {
   try {
     // Format phone number (remove leading 0, add country code)
-    const formattedPhone = phone.startsWith('966') ? phone : `966${phone.substring(1)}`;
+    let formattedPhone = phone;
+    if (phone.startsWith('0')) {
+      formattedPhone = '966' + phone.substring(1);
+    } else if (!phone.startsWith('966')) {
+      formattedPhone = '966' + phone;
+    }
 
     const message = `رمز التحقق الخاص بك هو: ${otp}\nصالح لمدة 5 دقائق`;
 
@@ -57,7 +65,17 @@ export const sendSMSOTP = async (phone: string, otp: string): Promise<SendSMSRes
       }
     };
 
-    const response = await fetch(`${SMS_CONFIG.baseURL}/unified/v2/send`, {
+    console.log('📱 Sending SMS to:', formattedPhone);
+    console.log('📝 Message:', message);
+    console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+
+    const url = SMS_CONFIG.useProxy 
+      ? `${SMS_CONFIG.proxyURL}${encodeURIComponent(`${SMS_CONFIG.baseURL}/unified/v2/send`)}`
+      : `${SMS_CONFIG.baseURL}/unified/v2/send`;
+
+    console.log('🔗 Request URL:', url);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': SMS_CONFIG.token,
@@ -66,21 +84,42 @@ export const sendSMSOTP = async (phone: string, otp: string): Promise<SendSMSRes
       body: JSON.stringify(requestBody)
     });
 
-    const data = await response.json();
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response OK:', response.ok);
 
-    if (response.ok && data.status === 'success') {
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Response error:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ Response data:', data);
+
+    if (data.status === 'success' || data.success === true) {
       return {
         success: true,
-        messageId: data.message_id || data.id
+        messageId: data.message_id || data.id || data.messageId
       };
     } else {
       return {
         success: false,
-        error: data.message || 'فشل إرسال الرسالة'
+        error: data.message || data.error || 'فشل إرسال الرسالة'
       };
     }
   } catch (error: any) {
-    console.error('SMS API Error:', error);
+    console.error('❌ SMS API Error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    // Check for CORS error
+    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+      return {
+        success: false,
+        error: 'خطأ في الاتصال. يرجى التحقق من الاتصال بالإنترنت أو استخدام البريد الإلكتروني بدلاً من ذلك.'
+      };
+    }
+    
     return {
       success: false,
       error: error.message || 'خطأ في الاتصال بخدمة الرسائل'
