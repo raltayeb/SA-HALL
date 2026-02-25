@@ -176,20 +176,20 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <p className="text-sm font-semibold text-gray-900">#{index + 1000}</p>
                         </td>
                         <td className="p-4">
-                          <p className="text-sm text-gray-700">{order.customer_email || '-'}</p>
+                          <p className="text-sm text-gray-700">{selectedOrder.guest_info?.phone || '-'}</p>
                         </td>
                         <td className="p-4">
                           <p className="text-sm font-bold text-gray-900">
-                            {Number(order.total_amount).toLocaleString()} ر.س
+                            {Number(selectedOrder.total_amount).toLocaleString()} ر.س
                           </p>
                         </td>
                         <td className="p-4">
                           <Badge variant={
-                            order.status === 'completed' ? 'success' :
-                            order.status === 'cancelled' ? 'destructive' : 'default'
+                            selectedOrder.status === 'completed' ? 'success' :
+                            selectedOrder.status === 'cancelled' ? 'destructive' : 'default'
                           }>
-                            {order.status === 'completed' ? 'مكتمل' :
-                             order.status === 'cancelled' ? 'ملغي' : 'قيد المعالجة'}
+                            {selectedOrder.status === 'completed' ? 'مكتمل' :
+                             selectedOrder.status === 'cancelled' ? 'ملغي' : 'قيد المعالجة'}
                           </Badge>
                         </td>
                         <td className="p-4">
@@ -340,7 +340,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
               <Input
                 type="number"
                 value={currentItem.price}
-                onChange={e => setCurrentItem({ ...currentItem, price: e.target.value })}
+                onChange={e => setCurrentItem({ ...currentItem, price: Number(e.target.value) })}
                 placeholder="0"
               />
             </div>
@@ -349,7 +349,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
               <Input
                 type="number"
                 value={currentItem.stock}
-                onChange={e => setCurrentItem({ ...currentItem, stock: e.target.value })}
+                onChange={e => setCurrentItem({ ...currentItem, stock: Number(e.target.value) })}
                 placeholder="0"
               />
             </div>
@@ -365,14 +365,6 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 block mb-1">الوصف</label>
-            <textarea
-              value={currentItem.description}
-              onChange={e => setCurrentItem({ ...currentItem, description: e.target.value })}
-              className="w-full p-3 rounded-lg border border-gray-200 focus:border-primary focus:outline-none min-h-[80px]"
-            />
           </div>
           <div className="flex gap-2 pt-4 border-t">
             <Button onClick={handleSaveItem} disabled={saving} className="flex-1">
