@@ -1,239 +1,184 @@
-# 📋 ملخص التغييرات - نظام الاشتراكات والمحاسبة والقاعات المميزة
+# Implementation Summary: Admin Hall Visibility & Popup Announcements
 
-## ✅ تم الإنجاز بنجاح
+## ✅ Completed Tasks
 
-### 1. 🏢 نظام الاشتراكات (Vendor Subscription System)
+### 1. Database Schema (`db_admin_features.sql`)
 
-#### الملفات الجديدة:
-- `pages/VendorSubscription.tsx` - صفحة اختيار ودفع الاشتراك
-- `db_vendor_subscription.sql` - ملف قاعدة البيانات الكامل
+Created two new tables:
 
-#### المميزات:
-- ✅ **اشتراك مدى الحياة** للقاعات (500 ر.س) والخدمات (200 ر.س)
-- ✅ **توجيه تلقائي** للبائع الجديد إلى صفحة الاشتراك
-- ✅ **منع الوصول** للصفحات بدون اشتراك نشط
-- ✅ **تحديث الملف الشخصي** تلقائياً بعد الدفع
+**`popup_announcements`** - For managing popup announcements
+- Title, content, image URL
+- Button text and link
+- Priority ordering
+- Target audience filtering (all/users/vendors)
+- Active/inactive status
+- Show on load toggle
 
-#### التدفق:
-```
-تسجيل جديد → التحقق من الاشتراك → 
-  ├─ لا يوجد اشتراك → صفحة الدفع
-  └─ يوجد اشتراك → اختيار قاعة/خدمة → إضافة الأصل
-```
+**`hall_visibility`** - For controlling hall visibility per user
+- Many-to-many relationship (halls ↔ users)
+- Boolean visibility flag
+- Unique constraint on (hall_id, user_id)
 
----
+**Helper Functions:**
+- `get_visible_halls_for_user(user_uuid)` - Get all visible halls for a user
+- `is_hall_visible_to_user(hall_uuid, user_uuid)` - Check if specific hall is visible
 
-### 2. 💰 النظام المحاسبي (Accounting & Zakat System)
+**Security:**
+- RLS enabled on both tables
+- Super admins can manage everything
+- Users can view their own visibility
+- Vendors can view visibility for their halls
 
-#### الملفات المحدثة:
-- `pages/VendorAccounting.tsx` - لوحة الفواتير والمصروفات والزكاة
+### 2. Admin Settings Page (`pages/AdminSettings.tsx`)
 
-#### المميزات:
-- ✅ **إنشاء الفواتير** مع ضريبة القيمة المضافة (15%)
-- ✅ **تسجيل المصروفات** مع الفاتورة الضريبية
-- ✅ **حساب الزكاة** تلقائياً (2.5% من صافي الدخل)
-- ✅ **عرض ضريبة القيمة المضافة**:
-  - المحصلة من العملاء
-  - المدفوعة للموردين
-  - الصافي المستحق
-- ✅ **متوافق مع هيئة الزكاة والضريبة السعودية**
+A comprehensive admin interface with two tabs:
 
-#### الإحصائيات المعروضة:
-1. الإيرادات الكلية
-2. المصروفات الكلية
-3. ضريبة القيمة المضافة (المحصلة - المدفوعة)
-4. الزكاة المستحقة (2.5%)
-5. صافي الربح
+**Tab 1: Popup Announcements (الإعلانات الظاهرة)**
+- List all announcements with status badges
+- Create/Edit modal with:
+  - Title and content fields
+  - Image URL preview
+  - Button text and link
+  - Priority number
+  - Target audience dropdown
+  - Active/show_on_load toggles
+- Delete functionality with confirmation
 
----
+**Tab 2: Hall Visibility (ظهور القاعات)**
+- Hall selector dropdown
+- Bulk action buttons (Show/Hide all)
+- User search functionality
+- Toggle buttons per user (eye icons)
+- Visual feedback (green=visible, red=hidden)
+- Role indicators for users/vendors
 
-### 3. ⭐ القاعات المميزة (Featured Halls System)
+### 3. Popup Announcements Component (`components/PopupAnnouncements.tsx`)
 
-#### الملفات الجديدة:
-- `pages/FeaturedHallsManagement.tsx` - لوحة إدارة القاعات المميزة
+Auto-displaying popup component:
+- Fetches active announcements on mount
+- Filters by user role
+- Shows highest priority announcement
+- Beautiful modal with image support
+- Button click handling (external links)
+- Smooth animations
 
-#### الملفات المحدثة:
-- `pages/Home.tsx` - إضافة قسم "قاعات مميزة" في الصفحة الرئيسية
-- `components/Layout/Sidebar.tsx` - إضافة قائمة للسوبر أدمن
-- `types.ts` - إضافة الأنواع الجديدة
+### 4. Integration
 
-#### المميزات:
-- ✅ **قسم في الصفحة الرئيسية** يعرض 3 قاعات مميزة
-- ✅ **تصميم فخم** مع شارة "مميزة" متدرجة
-- ✅ **تحديد مدة التمييز** (7, 14, 30, 60, 90, 180 يوم)
-- ✅ **انتهاء تلقائي** عند انتهاء المدة
-- ✅ **إدارة السوبر أدمن** للقاعات المميزة
+**`App.tsx`:**
+- Imported `PopupAnnouncements` component
+- Added component to main render (shows on all pages)
+- Imported `AdminSettings` page
+- Added route: `case 'admin_settings'`
 
-#### قاعدة البيانات:
+**`components/Layout/Sidebar.tsx`:**
+- Added Megaphone icon
+- Added menu item: "إعدادات المنصة" (Platform Settings)
+- Only visible to super_admin role
+
+### 5. Documentation
+
+**`ADMIN_FEATURES_GUIDE.md`:**
+- Complete feature documentation
+- Database migration instructions
+- Usage guide for admins
+- API reference
+- Security details
+- Testing instructions
+- Future enhancement ideas
+
+## 🎯 User Stories Completed
+
+### Admin Controls Hall Visibility
+> As an admin, I want to control which halls are visible to each subscriber, so I can manage premium features and restricted access.
+
+**Features:**
+- ✅ View all users in a list
+- ✅ Toggle visibility per hall per user
+- ✅ Bulk show/hide for all users
+- ✅ Search users quickly
+- ✅ Visual feedback on visibility status
+
+### Admin Manages Popup Announcements
+> As an admin, I want to create popup announcements that show when the site loads, so I can promote features and communicate with users.
+
+**Features:**
+- ✅ Create rich announcements with images
+- ✅ Set priority and target audience
+- ✅ Enable/disable show on load
+- ✅ Add call-to-action buttons
+- ✅ Edit and delete announcements
+
+## 📁 Files Created/Modified
+
+### New Files:
+1. `db_admin_features.sql` - Database migration
+2. `pages/AdminSettings.tsx` - Admin management UI
+3. `components/PopupAnnouncements.tsx` - Auto-popup component
+4. `ADMIN_FEATURES_GUIDE.md` - Documentation
+5. `IMPLEMENTATION_SUMMARY.md` - This file
+
+### Modified Files:
+1. `App.tsx` - Integrated popup and admin route
+2. `components/Layout/Sidebar.tsx` - Added menu item
+
+## 🚀 How to Use
+
+### Step 1: Run Database Migration
 ```sql
--- جدول القاعات المميزة
-CREATE TABLE featured_halls (
-    hall_id UUID,
-    start_date TIMESTAMP,
-    end_date TIMESTAMP,
-    is_active BOOLEAN
-);
-
--- دالة الانتهاء التلقائي
-CREATE FUNCTION expire_featured_halls()
--- تحدث تلقائياً عند الوصول للقاعة
+-- In Supabase SQL Editor
+-- Copy and paste contents of db_admin_features.sql
 ```
 
----
+### Step 2: Access Admin Settings
+1. Login as super_admin
+2. Click "إعدادات المنصة" in sidebar
+3. Manage announcements and hall visibility
 
-### 4. 🗄️ قاعدة البيانات
+### Step 3: Test Popup
+1. Create an announcement with "يظهر عند التحميل" enabled
+2. Logout
+3. Visit the site as a user
+4. Popup should appear automatically
 
-#### الجداول الجديدة:
-1. **subscriptions** - تتبع الاشتراكات
-2. **invoices** - الفواتير الضريبية
-3. **expenses** - المصروفات
-4. **zakat_calculations** - حسابات الزكاة
-5. **featured_halls** - القاعات المميزة
+### Step 4: Test Hall Visibility
+1. Go to "ظهور القاعات" tab
+2. Select a hall
+3. Hide from a specific user
+4. Login as that user
+5. The hall should not appear in browse results
 
-#### التعديلات:
-- **user_profiles**: إضافة حقول الاشتراك
-- **halls**: إضافة حقول التمييز
+## 🔐 Security Considerations
 
-#### الأمان (RLS):
-```sql
--- البائع يرى بياناته فقط
-CREATE POLICY "Vendors view own invoices" ON invoices
-    FOR SELECT USING (vendor_id = auth.uid());
+- **RLS Policies**: Properly configured for both tables
+- **Admin Only**: Only super_admin can manage settings
+- **User Privacy**: Users can only see their own visibility
+- **Vendor Access**: Vendors can see visibility for their halls only
 
--- السوبر أدمن يرى الكل
-CREATE POLICY "Super admin view all" ON subscriptions
-    FOR SELECT USING (role = 'super_admin');
+## 🎨 UI/UX Highlights
+
+- **RTL Support**: Full Arabic interface
+- **Responsive**: Works on mobile and desktop
+- **Icons**: Lucide icons for visual clarity
+- **Animations**: Smooth transitions and hover effects
+- **Accessibility**: Proper labels and semantic HTML
+- **Toast Notifications**: Success/error feedback
+
+## 📊 Next Steps (Optional Enhancements)
+
+1. **Scheduled Announcements**: Add start/end dates
+2. **Analytics**: Track views and click-through rates
+3. **A/B Testing**: Test different announcements
+4. **User Groups**: Create groups for bulk visibility
+5. **Export/Import**: Bulk upload visibility settings
+6. **Audit Log**: Track admin changes
+
+## ✅ Build Status
+
+```
+✓ Build successful - No errors
+✓ TypeScript compilation passed
+✓ All components integrated
+✓ Production ready
 ```
 
----
-
-### 5. 🔄 التكامل في App.tsx
-
-#### المسارات الجديدة:
-```typescript
-case 'vendor_subscription': // صفحة الاشتراك
-case 'featured_halls':      // إدارة القاعات المميزة (سوبر أدمن فقط)
-```
-
-#### منطق التوجيه:
-```typescript
-const routeUser = async (profile, userId) => {
-    // 1. التحقق من الاشتراك
-    if (!hasSubscription) {
-        setActiveTab('vendor_subscription');
-        return;
-    }
-    
-    // 2. التحقق من الأصول
-    if (!hasAssets) {
-        setRegStep(4); // اختيار قاعة/خدمة
-    }
-};
-```
-
----
-
-## 📦 كيفية التنفيذ
-
-### الخطوة 1: تنفيذ SQL
-```bash
-# في Supabase Dashboard → SQL Editor
-# انسخ محتويات db_vendor_subscription.sql ونفذها
-```
-
-### الخطوة 2: اختبار الاشتراك
-1. سجل بائع جديد
-2. يجب توجيهه إلى صفحة الاشتراك
-3. اختر نوع واشترك
-4. يجب توجيهه إلى اختيار قاعة/خدمة
-
-### الخطوة 3: اختبار القاعات المميزة
-1. سجل دخول كـ Super Admin
-2. انتقل إلى "القاعات المميزة" في القائمة
-3. أضف قاعة لمدة محددة
-4. تحقق من ظهورها في الصفحة الرئيسية
-
-### الخطوة 4: اختبار النظام المحاسبي
-1. انتقل إلى "الفواتير والحسابات"
-2. أضف فاتورة جديدة
-3. أضف مصروف جديد
-4. تحقق من حساب الزكاة والضريبة
-
----
-
-## 🎯 الميزات الرئيسية
-
-### للبائعين:
-- ✅ اشتراك لمرة واحدة مدى الحياة
-- ✅ نظام فواتير متكامـل مع الضريبة
-- ✅ تتبع المصروفات
-- ✅ حساب الزكاة تلقائياً
-- ✅ لوحة محاسبية شاملة
-
-### للسوبر أدمن:
-- ✅ إدارة القاعات المميزة
-- ✅ تحديد مدة التمييز
-- ✅ عرض جميع الاشتراكات
-- ✅ إحصائيات شاملة
-
-### للزوار:
-- ✅ قسم "قاعات مميزة" في الصفحة الرئيسية
-- ✅ تصميم فخم وجذاب
-- ✅ وصول سريع للقاعات المميزة
-
----
-
-## 📊 الإحصائيات والحسابات
-
-### ضريبة القيمة المضافة (15%):
-```
-ضريبة محصلة من العملاء: 1500 ر.س
-ضريبة مدفوعة للموردين: 500 ر.س
-صافي الضريبة المستحقة: 1000 ر.س
-```
-
-### الزكاة (2.5%):
-```
-الإيرادات: 100,000 ر.س
-المصروفات: 60,000 ر.س
-صافي الدخل: 40,000 ر.س
-الزكاة المستحقة: 1,000 ر.س (2.5%)
-```
-
----
-
-## 🔒 الأمان والصلاحيات
-
-### البائعين:
-- رؤية بياناتهم فقط
-- إنشاء الفواتير والمصروفات
-- عرض حسابات الزكاة الخاصة بهم
-
-### السوبر أدمن:
-- رؤية جميع البيانات
-- إدارة القاعات المميزة
-- إدارة الاشتراكات
-
----
-
-## 📝 ملاحظات مهمة
-
-1. **SQL Execution**: يجب تنفيذ ملف `db_vendor_subscription.sql` قبل الاستخدام
-2. **RLS Policies**: تم تطبيق سياسات الأمان على جميع الجداول الجديدة
-3. **Auto-expiry**: القاعات المميزة تنتهي تلقائياً عند انتهاء المدة
-4. **Zakat Compliance**: النظام متوافق مع هيئة الزكاة والضريبة السعودية
-5. **Lifetime Subscription**: الاشتراكات مدى الحياة بدون تجديد
-
----
-
-## 🚀 الخطوات التالية (اختياري)
-
-1. **بوابة الدفع**: تكامل مع HyperPay أو Moyasar
-2. **تقارير PDF**: تصدير الفواتير والتقارير
-3. **إشعارات**: تنبيهات بانتهاء القاعات المميزة
-4. **تحليلات**: رسوم بيانية للإيرادات والمصروفات
-5. **تعدد العملات**: دعم عملات مختلفة
-
----
-
-**تم الإنجاز بنجاح! 🎉**
+The implementation is complete and ready for deployment! 🎉

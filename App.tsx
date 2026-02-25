@@ -15,13 +15,14 @@ import { VendorSubscriptions } from './pages/VendorSubscriptions';
 import { SystemSettings } from './pages/SystemSettings';
 import { UsersManagement } from './pages/UsersManagement';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { HallsManagement } from './pages/HallsManagement';
+import { SubscribersManagement } from './pages/SubscribersManagement';
 import { ContentCMS } from './pages/ContentCMS';
-import { ServiceCategories } from './pages/ServiceCategories'; 
-import { AdminStore } from './pages/AdminStore'; 
 import { VendorCoupons } from './pages/VendorCoupons';
 import { CalendarBoard } from './pages/CalendarBoard';
 import { VendorServices } from './pages/VendorServices';
 import { VendorBrandSettings } from './pages/VendorBrandSettings';
+import { AdminStore } from './pages/AdminStore';
 import { BrowseHalls } from './pages/BrowseHalls';
 import { PublicListing } from './pages/PublicListing';
 import { PublicStore } from './pages/PublicStore';
@@ -39,6 +40,7 @@ import { VendorClients } from './pages/VendorClients';
 import { VendorSubscription } from './pages/VendorSubscription';
 import { VendorChooseType } from './pages/VendorChooseType';
 import { FeaturedHallsManagement } from './pages/FeaturedHallsManagement';
+import { PopupAnnouncements } from './components/PopupAnnouncements';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { Modal } from './components/ui/Modal'; 
@@ -610,6 +612,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return userProfile ? <Dashboard user={userProfile} /> : null;
       case 'admin_dashboard': return <AdminDashboard />;
+      case 'admin_halls': return <HallsManagement />;
+      case 'admin_subscribers': return <SubscribersManagement />;
       case 'my_halls': return userProfile ? <VendorHalls user={userProfile} /> : null;
       case 'admin_users': return <UsersManagement />;
       case 'subscriptions': return <VendorSubscriptions />;
@@ -626,8 +630,7 @@ const App: React.FC = () => {
       case 'guest_dashboard': return userProfile ? <GuestPortal user={userProfile} onLogout={handleLogout} /> : null;
       case 'settings': return <SystemSettings />;
       case 'admin_cms': return <ContentCMS />;
-      case 'admin_categories': return <ServiceCategories />;
-      case 'admin_store': return userProfile ? <AdminStore user={userProfile} /> : null;
+      case 'admin_store': return <AdminStore user={userProfile!} />;
       case 'coupons': return userProfile ? <VendorCoupons user={userProfile} /> : null;
       case 'calendar': return userProfile ? <CalendarBoard user={userProfile} /> : null;
       case 'vendor_services': return userProfile ? <VendorServices user={userProfile} /> : null;
@@ -648,6 +651,9 @@ const App: React.FC = () => {
   return (
     <NotificationProvider userId={userProfile?.id}>
         <div className={`min-h-screen ${userProfile?.role !== 'user' && !isPublicPage && !isAuthPage ? 'bg-gray-50' : 'bg-white'}`}>
+        {/* Popup Announcements */}
+        <PopupAnnouncements userRole={userProfile?.role} />
+        
         {isPublicPage && !isAuthPage && (
             <PublicNavbar user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onNavigate={handleNavigate} onLogout={handleLogout} activeTab={activeTab} />
         )}

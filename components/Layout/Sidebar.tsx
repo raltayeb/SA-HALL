@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList,
   CalendarDays, Settings, X, Tag,
   FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, Store, LogOut, Star
+  Receipt, Store, LogOut, Star, Megaphone, UserCheck
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -39,8 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {
         title: "إدارة المنصة",
         items: [
-          { id: 'admin_users', label: 'المستخدمين', icon: <Users className="w-5 h-5" /> },
-          { id: 'subscriptions', label: 'الشركاء والاشتراكات', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'admin_halls', label: 'إدارة القاعات', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'admin_subscribers', label: 'إدارة المشتركين', icon: <UserCheck className="w-5 h-5" /> },
           { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> },
           { id: 'featured_halls', label: 'القاعات المميزة', icon: <Star className="w-5 h-5" /> },
         ]
@@ -48,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
       {
         title: "الإعدادات والمحتوى",
         items: [
-          { id: 'admin_categories', label: 'التصنيفات', icon: <Layers className="w-5 h-5" /> },
           { id: 'admin_cms', label: 'إدارة المحتوى', icon: <FileText className="w-5 h-5" /> },
           { id: 'settings', label: 'إعدادات النظام', icon: <Settings className="w-5 h-5" /> },
         ]

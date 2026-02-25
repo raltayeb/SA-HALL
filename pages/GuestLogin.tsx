@@ -6,7 +6,7 @@ import { Input } from '../components/ui/Input';
 import { Loader2, ArrowRight, Smartphone, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
-import { sendSMSOTP, generateOTP, storeOTP, verifyOTP, clearOTP } from '../services/smsService';
+import { sendSMSOTP, verifySMSOTP } from '../services/smsService';
 
 export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [step, setStep] = useState(1);
@@ -50,20 +50,17 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           return;
         }
 
-        // Generate OTP
-        const generatedOTP = generateOTP(6);
-
         console.log('Sending SMS OTP to:', normalizedPhone);
 
-        // Send via SMS
-        const smsResult = await sendSMSOTP(normalizedPhone, generatedOTP);
+        // Send via Supabase OTP
+        const smsResult = await sendSMSOTP(normalizedPhone);
 
         console.log('SMS Result:', smsResult);
 
         if (!smsResult.success) {
           // Fallback to email if SMS fails
           console.log('SMS failed, falling back to email lookup');
-          
+
           // Try to find email from bookings
           const { data: bookingData } = await supabase
             .from('bookings')
@@ -78,11 +75,11 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             // Send via email instead
             const { error: authError } = await supabase.auth.signInWithOtp({ email: bookingData.guest_email });
             if (authError) throw authError;
-            
-            toast({ 
-              title: 'تم الإرسال', 
-              description: `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${bookingData.guest_email}`, 
-              variant: 'success' 
+
+            toast({
+              title: 'تم الإرسال',
+              description: `تم إرسال رمز التحقق إلى بريدك الإلكتروني ${bookingData.guest_email}`,
+              variant: 'success'
             });
             setEmail(bookingData.guest_email);
             setStep(2);
@@ -93,11 +90,8 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           return;
         }
 
-        // Store OTP for verification
-        storeOTP(normalizedPhone, generatedOTP, 5); // 5 minutes expiry
-
         toast({ title: 'تم الإرسال', description: `تم إرسال رمز التحقق إلى رقم جوالك.`, variant: 'success' });
-        setEmail(normalizedPhone); // Use phone as email for verification
+        setPhone(normalizedPhone);
         setStep(2);
 
       } else {
@@ -149,10 +143,10 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     } catch (err: any) {
       console.error('Send OTP Error:', err);
-      toast({ 
-        title: 'خطأ', 
-        description: err.message || 'حدث خطأ أثناء محاولة الدخول. يرجى المحاولة مرة أخرى.', 
-        variant: 'destructive' 
+      toast({
+        title: 'خطأ',
+        description: err.message || 'حدث خطأ أثناء محاولة الدخول. يرجى المحاولة مرة أخرى.',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
@@ -169,27 +163,24 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     try {
       // Verify SMS OTP
       if (sendMethod === 'sms') {
-        const normalizedPhone = normalizeNumbers(phone) || email;
-        const isValid = verifyOTP(normalizedPhone, otp);
+        const normalizedPhone = normalizeNumbers(phone);
+        const result = await verifySMSOTP(normalizedPhone, otp);
 
-        if (!isValid) {
-          throw new Error('الرمز غير صحيح أو منتهي الصلاحية');
+        if (!result.success) {
+          throw new Error(result.error || 'الرمز غير صحيح أو منتهي الصلاحية');
         }
 
-        // Clear OTP after successful verification
-        clearOTP(normalizedPhone);
-
         toast({ title: 'تم التحقق', description: 'تم التحقق بنجاح، جاري تسجيل الدخول...', variant: 'success' });
-        
+
         // Simulate login success
         if (onBack) onBack();
-        
+
       } else {
         // Verify Email OTP
-        const { error } = await supabase.auth.verifyOtp({ 
-          email, 
-          token: normalizeNumbers(otp), 
-          type: 'magiclink' 
+        const { error } = await supabase.auth.verifyOtp({
+          email,
+          token: normalizeNumbers(otp),
+          type: 'magiclink'
         });
 
         if (error) throw error;
@@ -285,8 +276,8 @@ export const GuestLogin: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           ) : (
             <div className="space-y-4 text-center">
               <div className="flex flex-col items-center justify-center space-y-2">
-                <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Mail className="w-7 h-7" /></div>
-                <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{email}</b></p>
+                <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Smartphone className="w-7 h-7" /></div>
+                <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{sendMethod === 'sms' ? phone : email}</b></p>
               </div>
               <Input
                 value={otp}

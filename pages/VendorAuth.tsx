@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { 
-  Loader2, Eye, EyeOff, Mail, Lock, Check, ShieldCheck
+import {
+  Loader2, Eye, EyeOff, Mail, Lock, Check, ShieldCheck, Smartphone
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
+import { sendSMSOTP, verifySMSOTP } from '../services/smsService';
 
 interface VendorAuthProps {
     isLogin?: boolean;
@@ -72,10 +73,21 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
     setLoading(true);
     try {
         if (loginMethod === 'otp') {
-            // Send OTP
-            const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
-            if (error) throw error;
-            toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني', variant: 'success' });
+            // Check if using phone or email
+            const isPhone = formData.phone && isValidSaudiPhone(normalizeNumbers(formData.phone));
+            
+            if (isPhone) {
+                const normalizedPhone = normalizeNumbers(formData.phone);
+                // Send OTP via SMS using Supabase
+                const { error } = await sendSMSOTP(normalizedPhone);
+                if (error) throw error;
+                toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى رقم جوالك', variant: 'success' });
+            } else {
+                // Send OTP via email
+                const { error } = await supabase.auth.signInWithOtp({ email: formData.email });
+                if (error) throw error;
+                toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني', variant: 'success' });
+            }
             setRegStep(2); // OTP verification step
         } else {
             // Password login
@@ -97,12 +109,22 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
   const handleVerifyOtp = async () => {
     setLoading(true);
     try {
-        const { error } = await supabase.auth.verifyOtp({
-            email: formData.email,
-            token: normalizeNumbers(formData.otp),
-            type: 'magiclink'
-        });
-        if (error) throw error;
+        // Check if using phone or email
+        const isPhone = formData.phone && isValidSaudiPhone(normalizeNumbers(formData.phone));
+        
+        if (isPhone) {
+            const normalizedPhone = normalizeNumbers(formData.phone);
+            const { error } = await verifySMSOTP(normalizedPhone, normalizeNumbers(formData.otp));
+            if (error) throw error;
+        } else {
+            const { error } = await supabase.auth.verifyOtp({
+                email: formData.email,
+                token: normalizeNumbers(formData.otp),
+                type: 'magiclink'
+            });
+            if (error) throw error;
+        }
+        
         toast({ title: 'تم تسجيل الدخول', variant: 'success' });
         if (onLogin) onLogin();
     } catch (err: any) {
@@ -232,10 +254,56 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                                     </button>
                                 </div>
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
-                                        <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="h-11 rounded-lg border-gray-200 focus:border-primary text-left" dir="ltr" required />
-                                    </div>
+                                    {loginMethod === 'otp' && (
+                                        <div className="flex gap-2 mb-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({...formData, phone: ''})}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                    !formData.phone
+                                                        ? 'bg-primary/10 text-primary'
+                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                📧 البريد الإلكتروني
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({...formData, phone: '05'})}
+                                                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                                    formData.phone
+                                                        ? 'bg-primary/10 text-primary'
+                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                📱 رقم الجوال
+                                            </button>
+                                        </div>
+                                    )}
+                                    {loginMethod === 'otp' && formData.phone ? (
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-gray-500">رقم الجوال</label>
+                                            <Input 
+                                                value={formData.phone} 
+                                                onChange={e => setFormData({...formData, phone: normalizeNumbers(e.target.value)})} 
+                                                className="h-11 rounded-lg border-gray-200 focus:border-primary text-left" 
+                                                dir="ltr" 
+                                                placeholder="05xxxxxxxx"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-gray-500">البريد الإلكتروني</label>
+                                            <Input 
+                                                type="email" 
+                                                value={formData.email} 
+                                                onChange={e => setFormData({...formData, email: e.target.value})} 
+                                                className="h-11 rounded-lg border-gray-200 focus:border-primary text-left" 
+                                                dir="ltr" 
+                                                required 
+                                            />
+                                        </div>
+                                    )}
                                     {loginMethod === 'password' && (
                                         <div className="space-y-1 relative">
                                             <label className="text-xs font-bold text-gray-500">كلمة المرور</label>
@@ -260,8 +328,10 @@ export const VendorAuth: React.FC<VendorAuthProps> = ({ isLogin = false, onRegis
                         ) : (
                             <div className="space-y-4 text-center">
                                 <div className="flex flex-col items-center justify-center space-y-2">
-                                    <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-600"><Mail className="w-7 h-7" /></div>
-                                    <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{formData.email}</b></p>
+                                    <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                                        {formData.phone ? <Smartphone className="w-7 h-7" /> : <Mail className="w-7 h-7" />}
+                                    </div>
+                                    <p className="text-sm text-gray-500">تم إرسال رمز التحقق إلى <b>{formData.phone || formData.email}</b></p>
                                 </div>
                                 <Input value={formData.otp} onChange={e => setFormData({...formData, otp: normalizeNumbers(e.target.value)})} className="h-12 text-center text-xl font-black tracking-widest rounded-xl border-2 focus:border-primary" placeholder="------" maxLength={6} />
                                 <div className="flex gap-2">

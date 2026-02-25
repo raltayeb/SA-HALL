@@ -122,6 +122,7 @@ export interface ContentPage {
   title: string;
   content: string;
   updated_at: string;
+  is_published?: boolean;
 }
 
 export interface SystemSettings {

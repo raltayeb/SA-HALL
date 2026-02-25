@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Loader2, ArrowRight, Mail, KeyRound, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowRight, Mail, KeyRound, CheckCircle, Smartphone } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
-import { normalizeNumbers } from '../utils/helpers';
+import { normalizeNumbers, isValidSaudiPhone } from '../utils/helpers';
+import { sendSMSOTP, verifySMSOTP } from '../services/smsService';
 
 interface ForgotPasswordProps {
     onBack: () => void;
@@ -16,6 +17,8 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [usePhone, setUsePhone] = useState(false);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,19 +26,38 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
   const { toast } = useToast();
 
   const handleSendOtp = async () => {
-    if (!email || !email.includes('@')) {
-        toast({ title: 'بريد غير صالح', description: 'يرجى إدخال بريد إلكتروني صحيح.', variant: 'destructive' });
-        return;
-    }
-
     setLoading(true);
     try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/forgot-password',
-        });
-        if (error) throw error;
+        if (usePhone) {
+            // Phone-based password reset
+            const normalizedPhone = normalizeNumbers(phone);
+            
+            if (!normalizedPhone || !isValidSaudiPhone(normalizedPhone)) {
+                toast({ title: 'رقم غير صالح', description: 'يرجى إدخال رقم سعودي صحيح (يبدأ بـ 05).', variant: 'destructive' });
+                setLoading(false);
+                return;
+            }
+            
+            // Send OTP via SMS
+            const { error } = await sendSMSOTP(normalizedPhone);
+            if (error) throw error;
 
-        toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
+            toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى رقم جوالك.', variant: 'success' });
+        } else {
+            // Email-based password reset
+            if (!email || !email.includes('@')) {
+                toast({ title: 'بريد غير صالح', description: 'يرجى إدخال بريد إلكتروني صحيح.', variant: 'destructive' });
+                setLoading(false);
+                return;
+            }
+            
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/forgot-password',
+            });
+            if (error) throw error;
+
+            toast({ title: 'تم الإرسال', description: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني.', variant: 'success' });
+        }
         setStep(2);
     } catch (err: any) {
         console.error(err);
@@ -53,14 +75,20 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
     setLoading(true);
     try {
-        // Note: OTP verification for password reset uses magiclink type
-        const { error } = await supabase.auth.verifyOtp({
-            email,
-            token: normalizeNumbers(otp),
-            type: 'magiclink'
-        });
-
-        if (error) throw error;
+        if (usePhone) {
+            // Verify phone OTP
+            const normalizedPhone = normalizeNumbers(phone);
+            const { error } = await verifySMSOTP(normalizedPhone, normalizeNumbers(otp));
+            if (error) throw error;
+        } else {
+            // Verify email OTP
+            const { error } = await supabase.auth.verifyOtp({
+                email,
+                token: normalizeNumbers(otp),
+                type: 'magiclink'
+            });
+            if (error) throw error;
+        }
 
         toast({ title: 'تم التحقق', description: 'تم التحقق بنجاح، يرجى إنشاء كلمة مرور جديدة.', variant: 'success' });
         setStep(3);
@@ -110,24 +138,59 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
 
             <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Mail className="w-8 h-8 text-primary" />
+                    {usePhone ? <Smartphone className="w-8 h-8 text-primary" /> : <Mail className="w-8 h-8 text-primary" />}
                 </div>
                 <h2 className="text-2xl font-black text-primary">استعادة كلمة المرور</h2>
-                <p className="text-gray-500 font-bold mt-2 text-sm">أدخل بريدك الإلكتروني لاستلام رمز التحقق</p>
+                <p className="text-gray-500 font-bold mt-2 text-sm">أدخل {usePhone ? 'رقم جوالك' : 'بريدك الإلكتروني'} لاستلام رمز التحقق</p>
             </div>
 
             {step === 1 && (
                 <div className="space-y-4 animate-in slide-in-from-right">
-                    <Input
-                        label="البريد الإلكتروني"
-                        type="email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        icon={<Mail className="w-4 h-4" />}
-                        className="h-12 rounded-xl"
-                        placeholder="example@email.com"
-                        dir="ltr"
-                    />
+                    <div className="flex gap-2 mb-2">
+                        <button
+                            type="button"
+                            onClick={() => setUsePhone(false)}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                !usePhone
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                        >
+                            📧 البريد الإلكتروني
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setUsePhone(true)}
+                            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                                usePhone
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                            }`}
+                        >
+                            📱 رقم الجوال
+                        </button>
+                    </div>
+                    {usePhone ? (
+                        <Input
+                            label="رقم الجوال"
+                            value={phone}
+                            onChange={e => setPhone(normalizeNumbers(e.target.value))}
+                            className="h-12 rounded-xl"
+                            placeholder="05xxxxxxxx"
+                            dir="ltr"
+                        />
+                    ) : (
+                        <Input
+                            label="البريد الإلكتروني"
+                            type="email"
+                            value={email}
+                            onChange={e => setEmail(e.target.value)}
+                            icon={<Mail className="w-4 h-4" />}
+                            className="h-12 rounded-xl"
+                            placeholder="example@email.com"
+                            dir="ltr"
+                        />
+                    )}
                     <Button onClick={handleSendOtp} disabled={loading} className="w-full h-14 rounded-2xl font-black text-lg shadow-lg shadow-primary/20">
                         {loading ? <Loader2 className="animate-spin" /> : 'إرسال رمز التحقق'}
                     </Button>
@@ -139,7 +202,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack, onSucces
                     <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600">
                         <KeyRound className="w-8 h-8" />
                     </div>
-                    <p className="text-sm font-bold text-gray-500">أدخل الرمز المرسل إلى <b className="text-gray-700">{email}</b></p>
+                    <p className="text-sm font-bold text-gray-500">أدخل الرمز المرسل إلى <b className="text-gray-700">{usePhone ? phone : email}</b></p>
                     <Input
                         placeholder="------"
                         value={otp}
