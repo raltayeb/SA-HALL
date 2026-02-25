@@ -4,11 +4,10 @@ import { UserProfile } from '../../types';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
   CalendarDays, Settings, X, Tag,
-  FileText, BarChart3, Layers, Inbox, Bell,
+  FileText, BarChart3, Layers, Inbox,
   Receipt, Store, LogOut, Star, Megaphone, UserCheck, Banknote
 } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useNotifications } from '../../context/NotificationContext';
 
 interface SidebarProps {
   user: UserProfile | null;
@@ -21,8 +20,6 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab, onLogout, isOpen, setIsOpen, platformLogo }) => {
-  const { unreadCount, markAllAsRead } = useNotifications();
-
   if (!user) return null;
 
   let menuGroups = [];
@@ -122,15 +119,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
                   <p className="text-sm font-black text-gray-900 truncate">{user.full_name}</p>
                   <p className="text-[9px] font-bold text-gray-400 truncate">{user.email}</p>
               </div>
-              <button 
-                onClick={() => { setActiveTab(user.role === 'vendor' ? 'hall_bookings' : 'guest_dashboard'); markAllAsRead(); }} 
-                className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 hover:border-primary text-gray-400 hover:text-primary transition-colors"
-              >
-                <Bell className="w-4 h-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
-                )}
-              </button>
             </div>
         </div>
 

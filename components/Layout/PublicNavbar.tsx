@@ -132,7 +132,13 @@ export const PublicNavbar: React.FC<PublicNavbarProps> = ({
                         <p className="text-[10px] text-gray-400 mt-0.5 truncate">{user.email}</p>
                       </div>
                       <div className="p-1.5 space-y-0.5">
-                        <button onClick={() => { onNavigate('dashboard'); setIsUserMenuOpen(false); }} className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors">
+                        <button 
+                          onClick={() => { 
+                            onNavigate(user.role === 'super_admin' ? 'admin_dashboard' : 'dashboard'); 
+                            setIsUserMenuOpen(false); 
+                          }} 
+                          className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-primary transition-colors"
+                        >
                             <LayoutDashboard className="w-4 h-4" />
                             <span>لوحة التحكم</span>
                         </button>
