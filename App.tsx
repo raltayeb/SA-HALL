@@ -140,7 +140,18 @@ const App: React.FC = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Listen for navigation events from dashboard
+    const handleNavigate = (e: any) => {
+      const page = e.detail?.page;
+      if (page) setActiveTab(page);
+    };
+
+    window.addEventListener('navigate', handleNavigate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('navigate', handleNavigate);
+    };
   }, []);
 
   const fetchProfile = async (userId: string) => {
@@ -633,7 +644,7 @@ const App: React.FC = () => {
       case 'guest_dashboard': return userProfile ? <GuestPortal user={userProfile} onLogout={handleLogout} /> : null;
       case 'settings': return <SystemSettings />;
       case 'admin_cms': return <ContentCMS />;
-      case 'admin_store': return <AdminStore user={userProfile!} />;
+      case 'admin_store': return <AdminStore />;
       case 'coupons': return userProfile ? <VendorCoupons user={userProfile} /> : null;
       case 'calendar': return userProfile ? <CalendarBoard user={userProfile} /> : null;
       case 'vendor_services': return userProfile ? <VendorServices user={userProfile} /> : null;

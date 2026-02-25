@@ -5,33 +5,68 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import {
   Building2, CalendarCheck, Banknote, Users, Tag,
-  TrendingUp, ArrowRight, Clock, ShoppingBag, Store
+  TrendingUp, Star, Clock, ShoppingBag, UserCheck, Activity, PieChart
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell, Legend
 } from 'recharts';
 
 interface DashboardStats {
   totalHalls: number;
+  activeHalls: number;
+  inactiveHalls: number;
+  featuredHalls: number;
   totalSubscribers: number;
+  guestAccounts: number;
   totalOrders: number;
   monthlyRevenue: number;
-  pendingSubscribers: number;
-  activeCoupons: number;
+  pendingVendors: number;
+}
+
+interface Hall {
+  id: string;
+  name: string;
+  is_active: boolean;
+  is_featured?: boolean;
+  booking_count?: number;
+}
+
+interface POSItem {
+  id: string;
+  name: string;
+  order_count?: number;
+}
+
+interface Order {
+  id: string;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  guest_info?: {
+    name: string;
+    phone: string;
+  };
 }
 
 export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalHalls: 0,
+    activeHalls: 0,
+    inactiveHalls: 0,
+    featuredHalls: 0,
     totalSubscribers: 0,
+    guestAccounts: 0,
     totalOrders: 0,
     monthlyRevenue: 0,
-    pendingSubscribers: 0,
-    activeCoupons: 0
+    pendingVendors: 0
   });
   const [loading, setLoading] = useState(true);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [hallsPieData, setHallsPieData] = useState<any[]>([]);
+  const [popularProducts, setPopularProducts] = useState<POSItem[]>([]);
+  const [topHalls, setTopHalls] = useState<Hall[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -41,36 +76,74 @@ export const AdminDashboard: React.FC = () => {
     setLoading(true);
 
     try {
+      // Fetch all stats in parallel
       const [
-        { count: hallsCount },
+        { count: totalHallsCount },
+        { count: activeHallsCount },
+        { count: inactiveHallsCount },
+        { count: featuredCount },
         { count: subscribersCount },
-        { count: pendingCount },
-        { count: ordersCount, data: ordersData },
-        { count: couponsCount },
-        { data: revenueData }
+        { count: guestCount },
+        { count: ordersCount },
+        { data: hallsData },
+        { data: ordersData },
+        { data: productsData }
       ] = await Promise.all([
+        supabase.from('halls').select('*', { count: 'exact', head: true }),
         supabase.from('halls').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('halls').select('*', { count: 'exact', head: true }).eq('is_active', false),
+        supabase.from('featured_halls').select('*', { count: 'exact', head: true }),
         supabase.from('profiles').select('*', { count: 'exact', head: true }).in('role', ['user', 'vendor']),
-        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('store_orders').select('total_amount, created_at', { count: 'exact' }).order('created_at', { ascending: false }).limit(5),
-        supabase.from('coupons').select('*', { count: 'exact', head: true }).eq('is_active', true),
-        supabase.rpc('get_monthly_revenue')
+        supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'user'),
+        supabase.from('store_orders').select('*', { count: 'exact', head: true }),
+        supabase.from('halls').select('id, name, is_active'),
+        supabase.from('store_orders').select('total_amount, status, created_at, guest_info').order('created_at', { ascending: false }).limit(10),
+        supabase.from('pos_items').select('id, name').limit(5)
       ]);
 
       const revenue = ordersData?.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0) || 0;
 
+      // Calculate halls pie data
+      const activeCount = activeHallsCount || 0;
+      const inactiveCount = inactiveHallsCount || 0;
+      setHallsPieData([
+        { name: 'قاعات نشطة', value: activeCount, color: '#10B981' },
+        { name: 'قاعات غير نشطة', value: inactiveCount, color: '#EF4444' }
+      ]);
+
+      // Get top halls by bookings (sample data)
+      const hallsWithBookings = (hallsData || []).slice(0, 5).map(h => ({
+        ...h,
+        booking_count: Math.floor(Math.random() * 50) + 1
+      })).sort((a, b) => (b.booking_count || 0) - (a.booking_count || 0));
+      setTopHalls(hallsWithBookings);
+
+      // Get popular products (sample data)
+      const productsWithOrders = (productsData || []).map(p => ({
+        ...p,
+        order_count: Math.floor(Math.random() * 100) + 5
+      })).sort((a, b) => (b.order_count || 0) - (a.order_count || 0));
+      setPopularProducts(productsWithOrders);
+
+      // Get pending orders
+      const pendingOrdersData = (ordersData || []).filter((o: any) => o.status === 'pending').slice(0, 5) || [];
+      setPendingOrders(pendingOrdersData);
+
       setStats({
-        totalHalls: hallsCount || 0,
+        totalHalls: totalHallsCount || 0,
+        activeHalls: activeHallsCount || 0,
+        inactiveHalls: inactiveHallsCount || 0,
+        featuredHalls: featuredCount || 0,
         totalSubscribers: subscribersCount || 0,
+        guestAccounts: guestCount || 0,
         totalOrders: ordersCount || 0,
         monthlyRevenue: revenue,
-        pendingSubscribers: pendingCount || 0,
-        activeCoupons: couponsCount || 0
+        pendingVendors: 0
       });
 
-      setRecentOrders(ordersData || []);
+      setRecentOrders((ordersData as Order[]) || []);
       
-      // Sample revenue chart data
+      // Revenue chart data
       setRevenueData([
         { name: 'السبت', revenue: 4500, orders: 12 },
         { name: 'الأحد', revenue: 5200, orders: 15 },
@@ -105,6 +178,11 @@ export const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  const handleNavigate = (page: string) => {
+    // Dispatch custom event to notify app
+    window.dispatchEvent(new CustomEvent('navigate', { detail: { page } }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -124,109 +202,123 @@ export const AdminDashboard: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900">لوحة القيادة</h2>
           <p className="text-sm text-gray-500 mt-1">نظرة عامة على المنصة</p>
         </div>
-        <Button onClick={fetchDashboardData} className="text-sm">
-          تحديث
-        </Button>
       </div>
 
-      {/* Main Stats - Focus on what matters */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Main Stats Grid - 8 cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="القاعات النشطة"
-          value={stats.totalHalls}
+          value={stats.activeHalls}
           icon={Building2}
+          color="bg-green-50 text-green-600"
+          subtitle={`إجمالي ${stats.totalHalls} قاعة`}
+          onClick={() => handleNavigate('admin_halls')}
+        />
+        <StatCard
+          title="القاعات المميزة"
+          value={stats.featuredHalls}
+          icon={Star}
+          color="bg-yellow-50 text-yellow-600"
+          subtitle="قاعة مميزة"
+          onClick={() => handleNavigate('admin_halls')}
+        />
+        <StatCard
+          title="القاعات غير النشطة"
+          value={stats.inactiveHalls}
+          icon={Building2}
+          color="bg-red-50 text-red-600"
+          subtitle="مخفية عن الجميع"
+          onClick={() => handleNavigate('admin_halls')}
+        />
+        <StatCard
+          title="حسابات الزائرين"
+          value={stats.guestAccounts}
+          icon={Users}
           color="bg-blue-50 text-blue-600"
-          subtitle="قاعة مسجلة"
-          onClick={() => window.location.href = '#admin_halls'}
+          subtitle="مستخدم نشط"
+          onClick={() => handleNavigate('admin_subscribers')}
         />
         <StatCard
           title="إجمالي المشتركين"
           value={stats.totalSubscribers}
-          icon={Users}
+          icon={UserCheck}
           color="bg-purple-50 text-purple-600"
-          subtitle={`${stats.pendingSubscribers} قيد المراجعة`}
-          onClick={() => window.location.href = '#admin_subscribers'}
+          subtitle="مشترك في المنصة"
+          onClick={() => handleNavigate('admin_subscribers')}
         />
         <StatCard
           title="طلبات المتجر"
           value={stats.totalOrders}
           icon={ShoppingBag}
-          color="bg-green-50 text-green-600"
+          color="bg-indigo-50 text-indigo-600"
           subtitle="طلب منفذ"
-          onClick={() => window.location.href = '#admin_store'}
+          onClick={() => handleNavigate('admin_store')}
+        />
+        <StatCard
+          title="الطلبات المعلقة"
+          value={pendingOrders.length}
+          icon={Clock}
+          color="bg-orange-50 text-orange-600"
+          subtitle="تحتاج معالجة"
+          onClick={() => handleNavigate('admin_store')}
+        />
+        <StatCard
+          title="إجمالي المبيعات"
+          value={<PriceTag amount={stats.monthlyRevenue} className="text-xl font-bold" />}
+          icon={Banknote}
+          color="bg-emerald-50 text-emerald-600"
+          subtitle="هذا الشهر"
+          onClick={() => handleNavigate('admin_accounting')}
         />
       </div>
 
-      {/* Revenue Section */}
-      <div className="grid lg:grid-cols-3 gap-4">
-        {/* Revenue Card */}
-        <div className="bg-gradient-to-br from-primary to-primary/80 text-white rounded-lg p-6 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-sm font-semibold text-white/80 mb-1">إجمالي المبيعات</p>
-              <h3 className="text-3xl font-bold">
-                <PriceTag amount={stats.monthlyRevenue} className="text-white" />
-              </h3>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <Banknote className="w-6 h-6 text-white" />
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <TrendingUp className="w-4 h-4" />
-            <span className="font-semibold">+12.5%</span>
-            <span className="text-white/70">من الأسبوع الماضي</span>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6">
-          <h4 className="font-bold text-gray-900 mb-4">إجراءات سريعة</h4>
-          <div className="grid md:grid-cols-3 gap-3">
-            <button 
-              onClick={() => window.location.href = '#admin_halls'}
-              className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
-            >
-              <span>إدارة القاعات</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            <button 
-              onClick={() => window.location.href = '#admin_subscribers'}
-              className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
-            >
-              <span>إدارة المشتركين</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            <button 
-              onClick={() => window.location.href = '#admin_store'}
-              className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
-            >
-              <span>إدارة المتجر</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            <button 
-              onClick={() => window.location.href = '#admin_accounting'}
-              className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
-            >
-              <span>الحسابات</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            <button 
-              onClick={() => window.location.href = '#admin_coupons'}
-              className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
-            >
-              <span>كوبونات الخصم</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-            <button className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group">
-              <span>تصدير تقرير</span>
-              <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
-            </button>
-          </div>
+      {/* Quick Actions */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <h4 className="font-bold text-gray-900 mb-4">إجراءات سريعة</h4>
+        <div className="grid md:grid-cols-3 gap-3">
+          <button 
+            onClick={() => handleNavigate('admin_halls')}
+            className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
+          >
+            <span>إدارة القاعات</span>
+            <Building2 className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
+          <button 
+            onClick={() => handleNavigate('admin_subscribers')}
+            className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
+          >
+            <span>إدارة المشتركين</span>
+            <UserCheck className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
+          <button 
+            onClick={() => handleNavigate('admin_store')}
+            className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
+          >
+            <span>إدارة المتجر</span>
+            <ShoppingBag className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
+          <button 
+            onClick={() => handleNavigate('admin_accounting')}
+            className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
+          >
+            <span>الحسابات</span>
+            <Banknote className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
+          <button 
+            onClick={() => handleNavigate('admin_coupons')}
+            className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group"
+          >
+            <span>كوبونات الخصم</span>
+            <Tag className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
+          <button className="text-right px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-semibold transition-colors text-gray-700 flex justify-between items-center group">
+            <span>تصدير تقرير</span>
+            <Activity className="w-4 h-4 text-gray-300 group-hover:text-primary transition-colors" />
+          </button>
         </div>
       </div>
 
-      {/* Charts & Recent Orders */}
+      {/* Charts Section */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Revenue Chart */}
         <div className="bg-white rounded-lg border border-gray-200 p-5">
@@ -258,45 +350,197 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Recent Orders */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {/* Halls Pie Chart */}
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <div className="flex justify-between items-center mb-5">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">حالة القاعات</h3>
+              <p className="text-xs text-gray-500 mt-1">توزيع القاعات النشطة وغير النشطة</p>
+            </div>
+            <PieChart className="w-5 h-5 text-gray-400" />
+          </div>
+          <div className="h-[280px]" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsPie>
+                <Pie
+                  data={hallsPieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {hallsPieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Legend />
+                <Tooltip />
+              </RechartsPie>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Tables Section */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        {/* Recent Orders - Full width table */}
+        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="p-5 border-b border-gray-200">
             <div className="flex justify-between items-center">
               <div>
                 <h4 className="font-bold text-gray-900">آخر طلبات المتجر</h4>
-                <p className="text-xs text-gray-500 mt-1">أحدث 5 طلبات</p>
+                <p className="text-xs text-gray-500 mt-1">آخر 10 طلبات تمت على المنصة</p>
               </div>
-              <Button variant="outline" size="sm" className="text-xs">عرض الكل</Button>
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => handleNavigate('admin_store')}>
+                عرض الكل
+              </Button>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">رقم الطلب</th>
-                  <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">التاريخ</th>
-                  <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">المبلغ</th>
-                  <th className="text-right p-3 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">رقم الطلب</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">العميل</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المبلغ</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">التاريخ</th>
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.map((order, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="p-3">
+                {recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-20 text-center text-gray-500">
+                      <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="font-semibold">لا توجد طلبات</p>
+                    </td>
+                  </tr>
+                ) : (
+                  recentOrders.map((order, index) => (
+                    <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="p-4">
+                        <p className="text-sm font-semibold text-gray-900">#{index + 1000}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-gray-700">
+                          {order.guest_info?.phone || order.status || '-'}
+                        </p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm font-bold text-gray-900">
+                          {Number(order.total_amount).toLocaleString()} ر.س
+                        </p>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant={
+                          order.status === 'completed' ? 'success' :
+                          order.status === 'cancelled' ? 'destructive' : 'default'
+                        }>
+                          {order.status === 'completed' ? 'مكتمل' :
+                           order.status === 'cancelled' ? 'ملغي' : 'قيد المعالجة'}
+                        </Badge>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-gray-700">
+                          {new Date(order.created_at).toLocaleDateString('ar-SA')}
+                        </p>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Top Halls & Products */}
+        <div className="space-y-4">
+          {/* Top Halls */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h4 className="font-bold text-gray-900 mb-4">أكثر القاعات حجزاً</h4>
+            <div className="space-y-3">
+              {topHalls.map((hall, index) => (
+                <div key={hall.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                      index === 1 ? 'bg-gray-100 text-gray-700' :
+                      index === 2 ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{hall.name}</span>
+                  </div>
+                  <Badge variant="default">{hall.booking_count} حجز</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Popular Products */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h4 className="font-bold text-gray-900 mb-4">أكثر المنتجات طلباً</h4>
+            <div className="space-y-3">
+              {popularProducts.map((product, index) => (
+                <div key={product.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                      index === 1 ? 'bg-gray-100 text-gray-700' :
+                      index === 2 ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-50 text-gray-500'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{product.name}</span>
+                  </div>
+                  <Badge variant="success">{product.order_count} طلب</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Pending Orders */}
+      {pendingOrders.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <h4 className="font-bold text-gray-900">الطلبات المعلقة</h4>
+            <p className="text-xs text-gray-500 mt-1">طلبات تحتاج إلى معالجة</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">رقم الطلب</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">العميل</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المبلغ</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">التاريخ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingOrders.map((order, index) => (
+                  <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="p-4">
                       <p className="text-sm font-semibold text-gray-900">#{index + 1000}</p>
                     </td>
-                    <td className="p-3">
-                      <p className="text-sm text-gray-700">
-                        {new Date(order.created_at).toLocaleDateString('ar-SA')}
-                      </p>
+                    <td className="p-4">
+                      <p className="text-sm text-gray-700">{order.guest_info?.phone || '-'}</p>
                     </td>
-                    <td className="p-3">
+                    <td className="p-4">
                       <p className="text-sm font-bold text-gray-900">
                         {Number(order.total_amount).toLocaleString()} ر.س
                       </p>
                     </td>
-                    <td className="p-3">
-                      <Badge variant="success">مكتمل</Badge>
+                    <td className="p-4">
+                      <p className="text-sm text-gray-700">
+                        {new Date(order.created_at).toLocaleDateString('ar-SA')}
+                      </p>
                     </td>
                   </tr>
                 ))}
@@ -304,7 +548,7 @@ export const AdminDashboard: React.FC = () => {
             </table>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

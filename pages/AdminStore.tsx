@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { UserProfile, POSItem, POS_CATEGORIES, StoreOrder } from '../types';
+import { POSItem, POS_CATEGORIES, StoreOrder } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 import {
-  Plus, Trash2, Package, Search, Loader2, Edit3, AlertTriangle,
-  Store, Tag, ShoppingBag, CheckCircle2, XCircle
+  Plus, Trash2, Package, Search, Loader2, Edit3,
+  Tag, ShoppingBag, CheckCircle2, XCircle
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
-export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
+export const AdminStore: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders'>('orders');
   const [items, setItems] = useState<POSItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<POSItem[]>([]);
@@ -30,16 +30,26 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const fetchData = async () => {
     setLoading(true);
-    const { data: pData } = await supabase.from('pos_items').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false });
-    setItems(pData || []);
-    setFilteredItems(pData || []);
+    try {
+      // Fetch all products (admin view)
+      const { data: pData, error: pError } = await supabase.from('pos_items').select('*').order('created_at', { ascending: false });
+      if (pError) throw pError;
+      setItems(pData || []);
+      setFilteredItems(pData || []);
 
-    const { data: oData } = await supabase.from('store_orders').select('*').order('created_at', { ascending: false });
-    setOrders(oData as any[] || []);
-    setLoading(false);
+      // Fetch all orders
+      const { data: oData, error: oError } = await supabase.from('store_orders').select('*').order('created_at', { ascending: false });
+      if (oError) throw oError;
+      setOrders(oData as any[] || []);
+    } catch (error: any) {
+      console.error('Error fetching store data:', error);
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchData(); }, [user.id]);
+  useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
     let res = items;
@@ -53,50 +63,69 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [searchQuery, selectedCategory, items]);
 
   const handleSaveItem = async () => {
-    if (!currentItem.name || !currentItem.price) return;
+    if (!currentItem.name || !currentItem.price) {
+      toast({ title: 'خطأ', description: 'الاسم والسعر مطلوبان', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
 
     const payload = {
       ...currentItem,
-      vendor_id: user.id,
       price: Number(currentItem.price),
       stock: Number(currentItem.stock) || 0
     };
 
-    let error;
-    if (currentItem.id) {
-      const result = await supabase.from('pos_items').update(payload).eq('id', currentItem.id);
-      error = result.error;
-    } else {
-      const result = await supabase.from('pos_items').insert([payload]);
-      error = result.error;
-    }
+    try {
+      let error;
+      if (currentItem.id) {
+        const result = await supabase.from('pos_items').update(payload).eq('id', currentItem.id);
+        error = result.error;
+      } else {
+        const result = await supabase.from('pos_items').insert([payload]);
+        error = result.error;
+      }
 
-    if (error) {
-      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
-    } else {
+      if (error) throw error;
+
       toast({ title: 'تم الحفظ', variant: 'success' });
       setIsItemModalOpen(false);
       fetchData();
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleDeleteItem = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف المنتج؟')) return;
-    await supabase.from('pos_items').delete().eq('id', id);
+    const { error } = await supabase.from('pos_items').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+      return;
+    }
     toast({ title: 'تم الحذف', variant: 'success' });
     fetchData();
   };
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     const { error } = await supabase.from('store_orders').update({ status }).eq('id', orderId);
-    if (!error) {
-      toast({ title: 'تم التحديث', variant: 'success' });
-      setIsOrderModalOpen(false);
-      fetchData();
+    if (error) {
+      toast({ title: 'خطأ', description: error.message, variant: 'destructive' });
+      return;
     }
+    toast({ title: 'تم التحديث', variant: 'success' });
+    setIsOrderModalOpen(false);
+    fetchData();
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -143,11 +172,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Content */}
         <div className="p-4">
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : activeTab === 'orders' ? (
+          {activeTab === 'orders' ? (
             /* Orders Table */
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -176,20 +201,20 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <p className="text-sm font-semibold text-gray-900">#{index + 1000}</p>
                         </td>
                         <td className="p-4">
-                          <p className="text-sm text-gray-700">{selectedOrder.guest_info?.phone || '-'}</p>
+                          <p className="text-sm text-gray-700">{order.guest_info?.phone || order.user_id || '-'}</p>
                         </td>
                         <td className="p-4">
                           <p className="text-sm font-bold text-gray-900">
-                            {Number(selectedOrder.total_amount).toLocaleString()} ر.س
+                            {Number(order.total_amount).toLocaleString()} ر.س
                           </p>
                         </td>
                         <td className="p-4">
                           <Badge variant={
-                            selectedOrder.status === 'completed' ? 'success' :
-                            selectedOrder.status === 'cancelled' ? 'destructive' : 'default'
+                            order.status === 'completed' ? 'success' :
+                            order.status === 'cancelled' ? 'destructive' : 'default'
                           }>
-                            {selectedOrder.status === 'completed' ? 'مكتمل' :
-                             selectedOrder.status === 'cancelled' ? 'ملغي' : 'قيد المعالجة'}
+                            {order.status === 'completed' ? 'مكتمل' :
+                             order.status === 'cancelled' ? 'ملغي' : 'قيد المعالجة'}
                           </Badge>
                         </td>
                         <td className="p-4">
@@ -300,7 +325,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">التصنيف:</span>
-                          <span className="font-semibold text-gray-700">{item.category}</span>
+                          <span className="font-semibold text-gray-700">{item.category || 'عام'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">المخزون:</span>
@@ -329,7 +354,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div>
             <label className="text-xs font-semibold text-gray-500 block mb-1">اسم المنتج *</label>
             <Input
-              value={currentItem.name}
+              value={currentItem.name || ''}
               onChange={e => setCurrentItem({ ...currentItem, name: e.target.value })}
               placeholder="اسم المنتج"
             />
@@ -339,7 +364,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
               <label className="text-xs font-semibold text-gray-500 block mb-1">السعر *</label>
               <Input
                 type="number"
-                value={currentItem.price}
+                value={currentItem.price || ''}
                 onChange={e => setCurrentItem({ ...currentItem, price: Number(e.target.value) })}
                 placeholder="0"
               />
@@ -348,7 +373,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
               <label className="text-xs font-semibold text-gray-500 block mb-1">المخزون</label>
               <Input
                 type="number"
-                value={currentItem.stock}
+                value={currentItem.stock || ''}
                 onChange={e => setCurrentItem({ ...currentItem, stock: Number(e.target.value) })}
                 placeholder="0"
               />
@@ -357,7 +382,7 @@ export const AdminStore: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div>
             <label className="text-xs font-semibold text-gray-500 block mb-1">التصنيف</label>
             <select
-              value={currentItem.category}
+              value={currentItem.category || 'عام'}
               onChange={e => setCurrentItem({ ...currentItem, category: e.target.value })}
               className="w-full p-3 rounded-lg border border-gray-200 focus:border-primary focus:outline-none"
             >
