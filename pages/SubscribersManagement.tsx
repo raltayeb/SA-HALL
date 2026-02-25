@@ -196,26 +196,21 @@ export const SubscribersManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-ruqaa text-primary">إدارة المشتركين</h2>
-              <p className="text-gray-500 font-bold text-sm">تحكم كامل في حسابات المشتركين</p>
-            </div>
-          </div>
-          <div className="text-left">
-            <p className="text-3xl font-black text-primary">{filteredSubscribers.length}</p>
-            <p className="text-xs font-bold text-gray-500">مشترك</p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">إدارة المشتركين</h2>
+          <p className="text-sm text-gray-500 mt-1">تحكم كامل في حسابات المشتركين</p>
         </div>
+        <div className="text-left">
+          <p className="text-3xl font-bold text-primary">{filteredSubscribers.length}</p>
+          <p className="text-xs text-gray-500">مشترك</p>
+        </div>
+      </div>
 
-        {/* Filters */}
+      {/* Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative md:col-span-2">
             <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -229,7 +224,7 @@ export const SubscribersManagement: React.FC = () => {
           <select
             value={roleFilter}
             onChange={e => setRoleFilter(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none"
+            className="px-4 py-2 rounded-lg border border-gray-200 focus:border-primary focus:outline-none"
           >
             <option value="all">جميع الأدوار</option>
             <option value="user">مستخدم</option>
@@ -238,18 +233,18 @@ export const SubscribersManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Subscribers Table */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+      {/* Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">المشترك</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">الدور</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">الحالة</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">التفعيل</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">القاعات</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">إجراءات</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المشترك</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الدور</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">التفعيل</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">القاعات</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -261,8 +256,10 @@ export const SubscribersManagement: React.FC = () => {
                 </tr>
               ) : filteredSubscribers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-20 text-center text-gray-500 font-bold">
-                    لا يوجد مشتركين
+                  <td colSpan={6} className="p-20 text-center text-gray-500">
+                    <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="font-semibold">لا يوجد مشتركين</p>
+                    <p className="text-sm mt-2">المشتركون سيظهرون هنا</p>
                   </td>
                 </tr>
               ) : (
@@ -270,7 +267,7 @@ export const SubscribersManagement: React.FC = () => {
                   <tr
                     key={sub.id}
                     onClick={() => handleOpenDetails(sub)}
-                    className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <td className="p-4">
                       <div className="flex items-center gap-3">

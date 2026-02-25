@@ -17,6 +17,8 @@ import { UsersManagement } from './pages/UsersManagement';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { HallsManagement } from './pages/HallsManagement';
 import { SubscribersManagement } from './pages/SubscribersManagement';
+import { CouponsManagement } from './pages/CouponsManagement';
+import { AdminAccounting } from './pages/AdminAccounting';
 import { ContentCMS } from './pages/ContentCMS';
 import { VendorCoupons } from './pages/VendorCoupons';
 import { CalendarBoard } from './pages/CalendarBoard';
@@ -613,6 +615,8 @@ const App: React.FC = () => {
       case 'admin_dashboard': return <AdminDashboard />;
       case 'admin_halls': return <HallsManagement />;
       case 'admin_subscribers': return <SubscribersManagement />;
+      case 'admin_coupons': return <CouponsManagement />;
+      case 'admin_accounting': return <AdminAccounting />;
       case 'my_halls': return userProfile ? <VendorHalls user={userProfile} /> : null;
       case 'admin_users': return <UsersManagement />;
       case 'subscriptions': return <VendorSubscriptions />;

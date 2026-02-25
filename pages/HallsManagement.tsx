@@ -296,26 +296,21 @@ export const HallsManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-primary/10 text-primary">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-ruqaa text-primary">إدارة القاعات</h2>
-              <p className="text-gray-500 font-bold text-sm">تحكم كامل في جميع القاعات</p>
-            </div>
-          </div>
-          <div className="text-left">
-            <p className="text-3xl font-black text-primary">{filteredHalls.length}</p>
-            <p className="text-xs font-bold text-gray-500">قاعة</p>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">إدارة القاعات</h2>
+          <p className="text-sm text-gray-500 mt-1">تحكم كامل في جميع القاعات</p>
         </div>
+        <div className="text-left">
+          <p className="text-3xl font-bold text-primary">{filteredHalls.length}</p>
+          <p className="text-xs text-gray-500">قاعة</p>
+        </div>
+      </div>
 
-        {/* Filters */}
+      {/* Filters */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative md:col-span-2">
             <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -329,7 +324,7 @@ export const HallsManagement: React.FC = () => {
           <select
             value={selectedCity}
             onChange={e => setSelectedCity(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none"
+            className="px-4 py-2 rounded-lg border border-gray-200 focus:border-primary focus:outline-none"
           >
             {cities.map(city => (
               <option key={city} value={city}>{city}</option>
@@ -338,7 +333,7 @@ export const HallsManagement: React.FC = () => {
           <select
             value={capacityFilter}
             onChange={e => setCapacityFilter(e.target.value)}
-            className="px-4 py-2 rounded-xl border border-gray-200 focus:border-primary focus:outline-none"
+            className="px-4 py-2 rounded-lg border border-gray-200 focus:border-primary focus:outline-none"
           >
             <option value="all">جميع السعات</option>
             <option value="0-100">0-100 شخص</option>
@@ -349,19 +344,19 @@ export const HallsManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Halls Table */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+      {/* Table */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">القاعة</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">المدينة</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">السعة</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">السعر</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">المالك</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">الحالة</th>
-                <th className="text-right p-4 text-xs font-bold text-gray-500 uppercase">إجراءات</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">القاعة</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المدينة</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">السعة</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">السعر</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المالك</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -373,8 +368,10 @@ export const HallsManagement: React.FC = () => {
                 </tr>
               ) : filteredHalls.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-20 text-center text-gray-500 font-bold">
-                    لا توجد قاعات مطابقة
+                  <td colSpan={7} className="p-20 text-center text-gray-500">
+                    <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="font-semibold">لا توجد قاعات</p>
+                    <p className="text-sm mt-2">أضف قاعة جديدة للبدء</p>
                   </td>
                 </tr>
               ) : (
@@ -382,7 +379,7 @@ export const HallsManagement: React.FC = () => {
                   <tr
                     key={hall.id}
                     onClick={() => handleOpenHallDetails(hall)}
-                    className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -420,17 +417,9 @@ export const HallsManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="flex gap-2 items-center">
-                        {isHallFeatured(hall.id) && (
-                          <Badge variant="warning" className="flex items-center gap-1">
-                            <Star className="w-3 h-3" />
-                            مميزة
-                          </Badge>
-                        )}
-                        <Badge variant={hall.is_active ? 'success' : 'default'}>
-                          {hall.is_active ? 'نشط' : 'غير نشط'}
-                        </Badge>
-                      </div>
+                      <Badge variant={hall.is_active ? 'success' : 'default'}>
+                        {hall.is_active ? 'نشط' : 'غير نشط'}
+                      </Badge>
                     </td>
                     <td className="p-4">
                       <div className="flex gap-2">

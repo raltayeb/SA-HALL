@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList,
   CalendarDays, Settings, X, Tag,
   FileText, BarChart3, Layers, Inbox, Bell,
-  Receipt, Store, LogOut, Star, Megaphone, UserCheck
+  Receipt, Store, LogOut, Star, Megaphone, UserCheck, Banknote
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNotifications } from '../../context/NotificationContext';
@@ -41,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         items: [
           { id: 'admin_halls', label: 'إدارة القاعات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'admin_subscribers', label: 'إدارة المشتركين', icon: <UserCheck className="w-5 h-5" /> },
+          { id: 'admin_accounting', label: 'الحسابات', icon: <Banknote className="w-5 h-5" /> },
+          { id: 'admin_coupons', label: 'كوبونات الخصم', icon: <Tag className="w-5 h-5" /> },
           { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> },
         ]
       },
