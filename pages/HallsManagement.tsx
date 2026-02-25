@@ -22,6 +22,7 @@ interface HallWithVendor extends Hall {
 export const HallsManagement: React.FC = () => {
   const [halls, setHalls] = useState<HallWithVendor[]>([]);
   const [filteredHalls, setFilteredHalls] = useState<HallWithVendor[]>([]);
+  const [featuredHalls, setFeaturedHalls] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -35,7 +36,12 @@ export const HallsManagement: React.FC = () => {
   // Modal state
   const [selectedHall, setSelectedHall] = useState<HallWithVendor | null>(null);
   const [isHallModalOpen, setIsHallModalOpen] = useState(false);
+  const [isFeaturedModalOpen, setIsFeaturedModalOpen] = useState(false);
   const [hallData, setHallData] = useState<Partial<Hall>>({});
+  const [featuredDates, setFeaturedDates] = useState({
+    start_date: '',
+    end_date: ''
+  });
 
   const cities = ['الكل', 'الرياض', 'جدة', 'مكة', 'المدينة', 'الدمام', 'الطائف', 'أبها'];
 
@@ -65,6 +71,17 @@ export const HallsManagement: React.FC = () => {
     } else {
       setHalls(data || []);
     }
+    
+    // Fetch featured halls
+    const { data: featuredData } = await supabase
+      .from('featured_halls')
+      .select('hall_id');
+    
+    if (featuredData) {
+      const featuredSet = new Set(featuredData.map(f => f.hall_id));
+      setFeaturedHalls(featuredSet);
+    }
+    
     setLoading(false);
   };
 
@@ -117,8 +134,7 @@ export const HallsManagement: React.FC = () => {
     try {
       const updateData: any = {
         name: hallData.name,
-        city: hallData.city,
-        updated_at: new Date().toISOString()
+        city: hallData.city
       };
 
       // Only include optional fields if they have values
@@ -158,30 +174,93 @@ export const HallsManagement: React.FC = () => {
     }
   };
 
-  const handleToggleFeatured = async (hallId: string, isFeatured: boolean) => {
+  const handleToggleFeatured = async (hallId: string, isCurrentlyFeatured: boolean) => {
+    const hall = halls.find(h => h.id === hallId) || null;
+    setSelectedHall(hall);
+    
+    if (isCurrentlyFeatured) {
+      // Show modal to remove with date range
+      const today = new Date().toISOString().split('T')[0];
+      setFeaturedDates({ start_date: '', end_date: '' });
+    } else {
+      // Show modal to add with date range
+      const today = new Date().toISOString().split('T')[0];
+      setFeaturedDates({ start_date: today, end_date: '' });
+    }
+    
+    setIsFeaturedModalOpen(true);
+  };
+
+  const handleConfirmFeature = async () => {
+    if (!selectedHall) return;
+    
     setSaving(true);
     try {
-      if (isFeatured) {
-        // Add to featured_halls
-        const { error } = await supabase
-          .from('featured_halls')
-          .insert([{ hall_id: hallId }]);
-        if (error && error.code !== '23505') throw error; // Ignore duplicate
-      } else {
-        // Remove from featured_halls
-        const { error } = await supabase
-          .from('featured_halls')
-          .delete()
-          .eq('hall_id', hallId);
-        if (error) throw error;
+      const insertData: any = { hall_id: selectedHall.id };
+      
+      if (featuredDates.start_date) {
+        insertData.start_date = new Date(featuredDates.start_date).toISOString();
       }
-
+      
+      if (featuredDates.end_date) {
+        insertData.end_date = new Date(featuredDates.end_date).toISOString();
+      }
+      
+      const { error } = await supabase
+        .from('featured_halls')
+        .insert([insertData]);
+      
+      if (error && error.code !== '23505') throw error;
+      
+      // Update local state
+      const newFeatured = new Set(featuredHalls);
+      newFeatured.add(selectedHall.id);
+      setFeaturedHalls(newFeatured);
+      
       toast({
         title: 'تم التحديث',
-        description: isFeatured ? 'تمت إضافة القاعة للمميزة' : 'تمت إزالة القاعة من المميزة',
+        description: 'تمت إضافة القاعة للمميزة',
         variant: 'success'
       });
-      fetchHalls();
+      setIsFeaturedModalOpen(false);
+    } catch (err: any) {
+      toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleConfirmUnfeature = async () => {
+    if (!selectedHall) return;
+    
+    setSaving(true);
+    try {
+      let query = supabase
+        .from('featured_halls')
+        .delete()
+        .eq('hall_id', selectedHall.id);
+      
+      // If end_date is specified, only remove until that date
+      if (featuredDates.end_date) {
+        const endDate = new Date(featuredDates.end_date).toISOString();
+        // For now, just delete the featured entry
+        // Future: implement date-based removal logic
+      }
+      
+      const { error } = await query;
+      if (error) throw error;
+      
+      // Update local state
+      const newFeatured = new Set(featuredHalls);
+      newFeatured.delete(selectedHall.id);
+      setFeaturedHalls(newFeatured);
+      
+      toast({
+        title: 'تم التحديث',
+        description: 'تمت إزالة القاعة من المميزة',
+        variant: 'success'
+      });
+      setIsFeaturedModalOpen(false);
     } catch (err: any) {
       toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
     } finally {
@@ -194,7 +273,7 @@ export const HallsManagement: React.FC = () => {
     try {
       const { error } = await supabase
         .from('halls')
-        .update({ is_active: !isActive, updated_at: new Date().toISOString() })
+        .update({ is_active: !isActive })
         .eq('id', hallId);
 
       if (error) throw error;
@@ -213,7 +292,7 @@ export const HallsManagement: React.FC = () => {
   };
 
   const isHallFeatured = (hallId: string) => {
-    return false;
+    return featuredHalls.has(hallId);
   };
 
   return (
@@ -341,9 +420,17 @@ export const HallsManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <Badge variant={hall.is_active ? 'success' : 'default'}>
-                        {hall.is_active ? 'نشط' : 'غير نشط'}
-                      </Badge>
+                      <div className="flex gap-2 items-center">
+                        {isHallFeatured(hall.id) && (
+                          <Badge variant="warning" className="flex items-center gap-1">
+                            <Star className="w-3 h-3" />
+                            مميزة
+                          </Badge>
+                        )}
+                        <Badge variant={hall.is_active ? 'success' : 'default'}>
+                          {hall.is_active ? 'نشط' : 'غير نشط'}
+                        </Badge>
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex gap-2">
@@ -484,6 +571,112 @@ export const HallsManagement: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Featured Hall Modal */}
+      <Modal
+        isOpen={isFeaturedModalOpen}
+        onClose={() => setIsFeaturedModalOpen(false)}
+        title={featuredDates.start_date ? 'إضافة القاعة للمميزة' : 'إزالة القاعة من المميزة'}
+        className="max-w-lg"
+      >
+        <div className="space-y-4">
+          {selectedHall && (
+            <div className="p-3 bg-gray-50 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="font-bold text-gray-900">{selectedHall.name}</p>
+                <p className="text-xs text-gray-500">{selectedHall.city}</p>
+              </div>
+              {isHallFeatured(selectedHall.id) && (
+                <Badge variant="warning" className="flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  مميزة
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {featuredDates.start_date ? (
+            // Adding to featured - show date range
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600">حدد فترة التميز:</p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">من تاريخ</label>
+                  <Input
+                    type="date"
+                    value={featuredDates.start_date}
+                    onChange={e => setFeaturedDates({ ...featuredDates, start_date: e.target.value })}
+                    className="w-full text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">إلى تاريخ</label>
+                  <Input
+                    type="date"
+                    value={featuredDates.end_date}
+                    onChange={e => setFeaturedDates({ ...featuredDates, end_date: e.target.value })}
+                    className="w-full text-sm"
+                    placeholder="اختياري"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400">اترك "إلى تاريخ" فارغاً لإظهار دائم</p>
+
+              <div className="flex gap-2 pt-3 border-t">
+                <Button onClick={handleConfirmFeature} disabled={saving} className="flex-1 text-sm">
+                  {saving ? <Loader2 className="animate-spin w-4 h-4" /> : 'إضافة للمميزة'}
+                </Button>
+                <Button onClick={() => setIsFeaturedModalOpen(false)} variant="outline" className="text-sm">
+                  إلغاء
+                </Button>
+              </div>
+            </div>
+          ) : (
+            // Removing from featured - show date range
+            <div className="space-y-3">
+              <p className="text-xs text-gray-600">حدد فترة الإخفاء:</p>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">من تاريخ</label>
+                  <Input
+                    type="date"
+                    value={featuredDates.start_date}
+                    onChange={e => setFeaturedDates({ ...featuredDates, start_date: new Date().toISOString().split('T')[0] })}
+                    className="w-full text-sm"
+                    placeholder="فوري"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-500 block mb-1">إلى تاريخ</label>
+                  <Input
+                    type="date"
+                    value={featuredDates.end_date}
+                    onChange={e => setFeaturedDates({ ...featuredDates, end_date: e.target.value })}
+                    className="w-full text-sm"
+                    placeholder="اختياري"
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400">اترك التواريخ فارغة للإخفاء الفوري</p>
+
+              <div className="flex gap-2 pt-3 border-t">
+                <Button onClick={handleConfirmUnfeature} disabled={saving} variant="destructive" className="flex-1 text-sm">
+                  {saving ? <Loader2 className="animate-spin w-4 h-4" /> : 'إزالة من المميزة'}
+                </Button>
+                <Button onClick={() => setIsFeaturedModalOpen(false)} variant="outline" className="text-sm">
+                  إلغاء
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

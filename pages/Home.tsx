@@ -77,42 +77,34 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch featured halls
-      const now = new Date().toISOString();
+      // Fetch featured halls using featured_halls table
       const { data: featuredData, error: featuredError } = await supabase
-        .from('halls')
-        .select('*, vendor:vendor_id(*)')
-        .eq('is_active', true)
-        .eq('is_featured', true)
-        .gt('featured_until', now)
-        .limit(3);
+        .from('featured_halls')
+        .select(`
+          hall_id,
+          halls (
+            *,
+            vendor:vendor_id(*)
+          )
+        `)
+        .eq('halls.is_active', true);
 
       if (featuredError) {
         console.error('❌ Featured halls error:', featuredError);
       }
-      
-      console.log('✅ Featured halls query - Date used:', now);
+
       console.log('✅ Featured halls data:', featuredData);
-      console.log('✅ Featured halls count:', featuredData?.length);
       
-      if (featuredData && featuredData.length === 0) {
-        // Check if there are any featured halls at all (without date filter)
-        const { data: allFeatured } = await supabase
-          .from('halls')
-          .select('id, name, is_featured, featured_until, is_active')
-          .eq('is_featured', true);
-        
-        console.log('🔍 All featured halls (no date filter):', allFeatured);
-        
-        if (allFeatured && allFeatured.length > 0) {
-          console.log('⚠️ Featured halls exist but expired or future date issue');
-          allFeatured.forEach(h => {
-            console.log(`Hall: ${h.name}, featured_until: ${h.featured_until}, is_active: ${h.is_active}`);
-          });
-        } else {
-          console.log('⚠️ No featured halls in database at all');
-        }
+      // Extract halls from the join - featuredData is array of {hall_id, halls: Hall}
+      const hallsList: Hall[] = [];
+      if (featuredData) {
+        featuredData.forEach(f => {
+          if (f.halls) {
+            hallsList.push(f.halls as unknown as Hall);
+          }
+        });
       }
+      console.log('✅ Featured halls count:', hallsList.length);
 
       // Fetch regular halls
       const { data: hData } = await supabase
@@ -129,7 +121,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         .eq('is_active', true)
         .limit(4);
 
-      setFeaturedHalls(featuredData || []);
+      setFeaturedHalls(hallsList as Hall[]);
       setHalls(hData || []);
       setServices(sData || []);
     } catch (err) {

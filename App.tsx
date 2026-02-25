@@ -39,7 +39,6 @@ import { VendorMarketplace } from './pages/VendorMarketplace';
 import { VendorClients } from './pages/VendorClients'; 
 import { VendorSubscription } from './pages/VendorSubscription';
 import { VendorChooseType } from './pages/VendorChooseType';
-import { FeaturedHallsManagement } from './pages/FeaturedHallsManagement';
 import { PopupAnnouncements } from './components/PopupAnnouncements';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
@@ -640,7 +639,6 @@ const App: React.FC = () => {
       case 'vendor_clients': return userProfile ? <VendorClients user={userProfile} /> : null;
       case 'vendor_subscription': return userProfile ? <VendorSubscription user={userProfile} onComplete={() => { setRegStep(3); setActiveTab('vendor_register'); }} /> : null;
       case 'vendor_choose_type': return userProfile ? <VendorChooseType user={userProfile} /> : null;
-      case 'featured_halls': return userProfile?.role === 'super_admin' ? <FeaturedHallsManagement user={userProfile} /> : null;
       case 'admin_requests': return <AdminRequests />;
       default: return <Home user={userProfile} onLoginClick={() => setActiveTab('vendor_login')} onRegisterClick={() => setActiveTab('vendor_register')} onBrowseHalls={(f) => { setBrowseFilters(f); setActiveTab('browse_halls'); }} onNavigate={handleNavigate} onLogout={handleLogout} />;
     }

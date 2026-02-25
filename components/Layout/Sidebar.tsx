@@ -42,7 +42,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
           { id: 'admin_halls', label: 'إدارة القاعات', icon: <Building2 className="w-5 h-5" /> },
           { id: 'admin_subscribers', label: 'إدارة المشتركين', icon: <UserCheck className="w-5 h-5" /> },
           { id: 'admin_store', label: 'إدارة المتجر (POS)', icon: <Store className="w-5 h-5" /> },
-          { id: 'featured_halls', label: 'القاعات المميزة', icon: <Star className="w-5 h-5" /> },
         ]
       },
       {
