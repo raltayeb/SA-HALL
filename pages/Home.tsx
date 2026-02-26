@@ -370,15 +370,14 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           </div>
 
           {/* Halls */}
-          <div className="space-y-12">
+          <div className="space-y-8">
             <SectionHeader title="القاعات" icon={Sparkles} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading 
                   ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) 
                   : halls.slice(0, 8).map(h => renderCard(h, 'hall', 'قاعة'))}
             </div>
-
-            <div className="flex justify-start pt-8">
+            <div className="flex justify-start">
                 <Button
                     onClick={() => onNavigate('browse_halls')}
                     className="h-14 px-10 rounded-2xl font-black text-base bg-primary text-white hover:bg-primary/90 gap-2 transition-all hover:scale-105"
@@ -389,9 +388,8 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           </div>
 
           {/* Featured Services */}
-          <div className="space-y-12">
+          <div className="space-y-8">
             <SectionHeader title="خدمات مميزة" icon={Sparkles} />
-
             {featuredServices.length > 0 ? (
               <FeaturedServicesCarousel services={featuredServices} onNavigate={onNavigate} />
             ) : (
@@ -404,15 +402,14 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
           </div>
 
           {/* Services */}
-          <div className="space-y-12">
+          <div className="space-y-8">
             <SectionHeader title="خدمات المناسبات" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {loading 
                   ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) 
                   : services.slice(0, 8).map(s => renderCard(s, 'service', 'خدمة'))}
             </div>
-
-            <div className="flex justify-start pt-8">
+            <div className="flex justify-start">
                 <Button
                     onClick={() => onNavigate('browse_services')}
                     className="h-14 px-10 rounded-2xl font-black text-base bg-primary text-white hover:bg-primary/90 gap-2 transition-all hover:scale-105"

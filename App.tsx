@@ -59,15 +59,26 @@ import { checkPasswordStrength, isValidSaudiPhone, normalizeNumbers } from './ut
 import { VendorAuth } from './pages/VendorAuth';
 
 const App: React.FC = () => {
+  // Initialize activeTab from URL hash immediately
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.slice(1);
+      if (hash) return hash;
+    }
+    return 'home';
+  };
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('home');
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab());
   const [loading, setLoading] = useState(true);
   const [themeConfig, setThemeConfig] = useState<ThemeConfig | null>(null);
 
   // Wrapper to update both state and URL hash
   const updateActiveTab = (tab: string) => {
     setActiveTab(tab);
-    window.location.hash = tab;
+    if (typeof window !== 'undefined') {
+      window.location.hash = tab;
+    }
   };
   
   // Registration State
@@ -150,8 +161,7 @@ const App: React.FC = () => {
     const handleNavigate = (e: any) => {
       const page = e.detail?.page;
       if (page) {
-        setActiveTab(page);
-        window.location.hash = page;
+        updateActiveTab(page);
       }
     };
 
@@ -160,7 +170,9 @@ const App: React.FC = () => {
     // Handle hash changes to preserve page on reload
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1);
-      if (hash) setActiveTab(hash);
+      if (hash && hash !== activeTab) {
+        setActiveTab(hash);
+      }
     };
 
     window.addEventListener('hashchange', handleHashChange);
