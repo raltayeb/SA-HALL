@@ -8,23 +8,6 @@ export interface PaymentConfig {
   currency: string;
 }
 
-const getPaymentConfig = async (): Promise<PaymentConfig | null> => {
-  const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
-  if (!data?.value?.payment_gateways?.hyperpay_enabled) return null;
-
-  const gw = data.value.payment_gateways;
-  const isTest = gw.hyperpay_mode === 'test';
-  
-  const baseUrl = gw.hyperpay_base_url || (isTest ? 'https://eu-test.oppwa.com' : 'https://oppwa.com');
-
-  return {
-    entityId: gw.hyperpay_entity_id,
-    accessToken: gw.hyperpay_access_token,
-    baseUrl: baseUrl,
-    currency: 'SAR'
-  };
-};
-
 export interface CheckoutParams {
   amount: number;
   merchantTransactionId?: string;
@@ -37,14 +20,68 @@ export interface CheckoutParams {
   surname?: string;
 }
 
+/**
+ * Prepare HyperPay checkout using Supabase Edge Function
+ * This avoids CORS issues by making the request from the server side
+ */
 export const prepareCheckout = async (params: CheckoutParams): Promise<{ checkoutId: string, url: string } | null> => {
+  try {
+    // Get Supabase URL from environment variable or construct from client
+    // @ts-ignore - Accessing protected property for Edge Function URL
+    const supabaseUrl = supabase.supabaseUrl || 
+                        import.meta.env.VITE_SUPABASE_URL || 
+                        window.location.origin.replace('5173', '54321'); // For local dev
+    
+    if (!supabaseUrl || typeof supabaseUrl !== 'string' || !supabaseUrl.includes('supabase')) {
+      // Fallback: try to get from localStorage or use default pattern
+      const fallbackUrl = localStorage.getItem('supabaseUrl') || 'https://placeholder.supabase.co';
+      throw new Error(`Invalid Supabase URL. Please configure Edge Function. URL attempted: ${fallbackUrl}`);
+    }
+
+    // Call the Edge Function
+    const response = await fetch(`${supabaseUrl}/functions/v1/hyperpay-checkout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Edge Function Error:', errorData);
+      throw new Error(errorData.error || 'Failed to prepare checkout');
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return { checkoutId: data.checkoutId, url: data.url };
+    } else {
+      throw new Error(data.error || 'Failed to prepare checkout');
+    }
+
+  } catch (error: any) {
+    console.error('Payment Preparation Failed:', error.message || error);
+    
+    // Fallback to direct method if Edge Function fails (for development)
+    console.warn('Falling back to direct method...');
+    return prepareCheckoutDirect(params);
+  }
+};
+
+/**
+ * Legacy method - kept for backward compatibility
+ * Direct API call (may have CORS issues in browser)
+ */
+const prepareCheckoutDirect = async (params: CheckoutParams): Promise<{ checkoutId: string, url: string } | null> => {
   try {
     const config = await getPaymentConfig();
     if (!config) throw new Error('Payment gateway not configured');
 
     const path = '/v1/checkouts';
     const bodyParams = new URLSearchParams();
-    
+
     // Mandatory Parameters
     bodyParams.append('entityId', config.entityId);
     bodyParams.append('amount', params.amount.toFixed(2));
@@ -81,6 +118,23 @@ export const prepareCheckout = async (params: CheckoutParams): Promise<{ checkou
     console.error('Payment Preparation Failed:', error);
     return null;
   }
+};
+
+const getPaymentConfig = async (): Promise<PaymentConfig | null> => {
+  const { data } = await supabase.from('system_settings').select('value').eq('key', 'platform_config').maybeSingle();
+  if (!data?.value?.payment_gateways?.hyperpay_enabled) return null;
+
+  const gw = data.value.payment_gateways;
+  const isTest = gw.hyperpay_mode === 'test';
+
+  const baseUrl = gw.hyperpay_base_url || (isTest ? 'https://eu-test.oppwa.com' : 'https://oppwa.com');
+
+  return {
+    entityId: gw.hyperpay_entity_id,
+    accessToken: gw.hyperpay_access_token,
+    baseUrl: baseUrl,
+    currency: 'SAR'
+  };
 };
 
 export const verifyPaymentStatus = async (resourcePath: string): Promise<{ success: boolean, id?: string }> => {

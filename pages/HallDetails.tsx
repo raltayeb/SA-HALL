@@ -257,7 +257,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
               guest_email: guestData.email,
               user_id: user?.id || null,
               status: 'pending',
-              payment_status: 'pending',
+              payment_status: 'unpaid', // Changed from 'pending' to 'unpaid'
               guests_adults: guestCounts.men,
               guests_children: guestCounts.women,
               items: [
@@ -300,7 +300,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
       if (createdBookingId) {
           await supabase.from('bookings').update({
               status: 'confirmed',
-              payment_status: 'paid'
+              payment_status: 'paid' // Changed to valid value
           }).eq('id', createdBookingId);
       }
       
@@ -315,7 +315,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
       if (createdBookingId) {
           await supabase.from('bookings').update({
               status: 'cancelled',
-              payment_status: 'failed'
+              payment_status: 'unpaid' // Changed from 'failed' to 'unpaid'
           }).eq('id', createdBookingId);
       }
       
