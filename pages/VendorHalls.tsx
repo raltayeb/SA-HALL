@@ -384,10 +384,11 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                  {/* Other tabs remain the same as existing file content... */}
                  {activeTab === 'packages' && (
                      <div className="space-y-6">
-                        {/* Packages & Addons logic (preserved) */}
+                        {/* Packages Section */}
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
-                            <h3 className="text-sm font-black text-primary mb-4">باقات الحجز</h3>
-                            {/* ... (existing package UI) ... */}
+                            <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2">
+                                <Package className="w-4 h-4" /> باقات الحجز
+                            </h3>
                             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <Input placeholder="اسم الباقة" value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="h-11 bg-white" />
@@ -403,16 +404,75 @@ export const VendorHalls: React.FC<VendorHallsProps> = ({ user }) => {
                                     <input type="checkbox" checked={newPackage.is_default} onChange={e => setNewPackage({...newPackage, is_default: e.target.checked})} className="w-4 h-4 accent-primary" />
                                     <span className="text-xs font-bold">باقة افتراضية</span>
                                 </div>
-                                <Button onClick={addPackage} className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2"><Plus className="w-4 h-4" /> إضافة</Button>
+                                <Button onClick={addPackage} className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2"><Plus className="w-4 h-4" /> إضافة باقة</Button>
                             </div>
                             <div className="space-y-2">
                                 {currentHall.packages?.map((pkg, idx) => (
                                     <div key={idx} className="p-4 border rounded-2xl relative bg-white border-gray-200">
                                         <button onClick={() => setCurrentHall(prev => ({...prev, packages: prev.packages?.filter((_, i) => i !== idx)}))} className="absolute top-4 left-4 text-red-500"><Trash2 className="w-4 h-4" /></button>
                                         <h4 className="font-bold text-gray-900">{pkg.name}</h4>
-                                        <PriceTag amount={pkg.price} className="text-primary" />
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <PriceTag amount={pkg.price} className="text-primary" />
+                                            {pkg.is_default && <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-lg font-bold">افتراضية</span>}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 mt-2">
+                                            رجال: {pkg.min_men} - {pkg.max_men} | نساء: {pkg.min_women} - {pkg.max_women}
+                                        </div>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* Services/Addons Section */}
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-black text-primary mb-4 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" /> الخدمات الإضافية
+                            </h3>
+                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Input 
+                                        placeholder="اسم الخدمة" 
+                                        value={newAddon.name} 
+                                        onChange={e => setNewAddon({...newAddon, name: e.target.value})} 
+                                        className="h-11 bg-white" 
+                                    />
+                                    <Input 
+                                        placeholder="السعر" 
+                                        type="number" 
+                                        value={newAddon.price || ''} 
+                                        onChange={e => setNewAddon({...newAddon, price: Number(e.target.value)})} 
+                                        className="h-11 bg-white" 
+                                    />
+                                </div>
+                                <Input 
+                                    placeholder="وصف الخدمة (اختياري)" 
+                                    value={newAddon.description || ''} 
+                                    onChange={e => setNewAddon({...newAddon, description: e.target.value})} 
+                                    className="h-11 bg-white" 
+                                />
+                                <Button onClick={addAddon} className="w-full h-11 rounded-xl font-bold bg-gray-900 text-white gap-2">
+                                    <Plus className="w-4 h-4" /> إضافة خدمة
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {currentHall.addons?.map((addon, idx) => (
+                                    <div key={idx} className="p-4 border rounded-2xl relative bg-white border-gray-200 flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-gray-900">{addon.name}</h4>
+                                            {addon.description && <p className="text-[10px] text-gray-500 mt-1">{addon.description}</p>}
+                                            <PriceTag amount={addon.price} className="text-primary mt-1" />
+                                        </div>
+                                        <button 
+                                            onClick={() => setCurrentHall(prev => ({...prev, addons: prev.addons?.filter((_, i) => i !== idx)}))} 
+                                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                {(!currentHall.addons || currentHall.addons.length === 0) && (
+                                    <p className="text-center text-sm text-gray-400 font-bold py-4">لا توجد خدمات مضافة حالياً</p>
+                                )}
                             </div>
                         </div>
                      </div>

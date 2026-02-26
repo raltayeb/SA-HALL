@@ -6,9 +6,11 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PriceTag } from '../components/ui/PriceTag';
 import { InvoiceModal } from '../components/Invoice/InvoiceModal';
-import { 
+import { HyperPayForm } from '../components/Payment/HyperPayForm';
+import { prepareCheckout } from '../services/paymentService';
+import {
   MapPin, CheckCircle2, Loader2, Share2, Heart, ArrowRight, Star,
-  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus, CreditCard, ShoppingBag, Phone, User, MessageCircle
+  Calendar as CalendarIcon, Package, Info, Sparkles, Check, Users, Clock, Mail, Tag, FileText, Lock, Plus, Minus, CreditCard, ShoppingBag, Phone, User, MessageCircle, X, ShieldCheck
 } from 'lucide-react';
 import { Calendar } from '../components/ui/Calendar';
 import { useToast } from '../context/ToastContext';
@@ -29,6 +31,9 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
   const [bookingConfig, setBookingConfig] = useState<BookingConfig | null>(null);
 
+  // Image Gallery State
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   // Booking Type: 'night' or 'package'
   const [bookingType, setBookingType] = useState<'night' | 'package'>(item.price_per_night && item.price_per_night > 0 ? 'night' : 'package');
 
@@ -40,6 +45,11 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
   const [selectedAddons, setSelectedAddons] = useState<HallAddon[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // HyperPay Payment State
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{ checkoutId: string; url: string } | null>(null);
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null);
 
   // Coupon State
   const [couponCode, setCouponCode] = useState('');
@@ -237,7 +247,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
               booking_date: format(bookingDate, 'yyyy-MM-dd'),
               total_amount: priceDetails.grandTotal, // Saved as Grand Total
               vat_amount: priceDetails.vatAmount,
-              paid_amount: 0, 
+              paid_amount: 0,
               discount_amount: priceDetails.discountAmount,
               applied_coupon: appliedCoupon?.code,
               booking_option: paymentOption,
@@ -247,7 +257,7 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
               guest_email: guestData.email,
               user_id: user?.id || null,
               status: 'pending',
-              payment_status: 'unpaid',
+              payment_status: 'pending',
               guests_adults: guestCounts.men,
               guests_children: guestCounts.women,
               items: [
@@ -258,15 +268,60 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
 
           if (error) throw error;
 
-          // Simulate Success directly for UX flow as requested
-          setShowSuccess(true);
-          toast({ title: 'تم الحجز بنجاح', description: 'تم إرسال الطلب، يرجى التواصل مع القاعة لإكمال الترتيبات.', variant: 'success' });
+          // Store booking ID for later reference
+          setCreatedBookingId(data.id);
+
+          // 2. Prepare HyperPay Checkout
+          const checkout = await prepareCheckout({
+              amount: payAmount,
+              merchantTransactionId: `BOOKING_${data.id}_${Date.now()}`,
+              customerEmail: guestData.email,
+              billingCity: item.city,
+              billingCountry: 'SA',
+              givenName: guestData.name,
+              surname: ''
+          });
+
+          if (checkout) {
+              setCheckoutData(checkout);
+              setShowPaymentForm(true);
+          } else {
+              throw new Error('فشل في إعداد بوابة الدفع');
+          }
 
       } catch (err: any) {
           toast({ title: 'خطأ', description: err.message, variant: 'destructive' });
-      } finally {
           setIsProcessing(false);
       }
+  };
+
+  const handlePaymentComplete = async () => {
+      // Payment completed successfully
+      if (createdBookingId) {
+          await supabase.from('bookings').update({
+              status: 'confirmed',
+              payment_status: 'paid'
+          }).eq('id', createdBookingId);
+      }
+      
+      setShowPaymentForm(false);
+      setShowSuccess(true);
+      toast({ title: 'تم الدفع بنجاح', description: 'تم تأكيد الحجز بنجاح.', variant: 'success' });
+      setIsProcessing(false);
+  };
+
+  const handlePaymentCancel = async () => {
+      // Payment was cancelled
+      if (createdBookingId) {
+          await supabase.from('bookings').update({
+              status: 'cancelled',
+              payment_status: 'failed'
+          }).eq('id', createdBookingId);
+      }
+      
+      setShowPaymentForm(false);
+      toast({ title: 'تم إلغاء الدفع', description: 'تم إلغاء عملية الدفع.', variant: 'destructive' });
+      setIsProcessing(false);
   };
 
   const allImages = useMemo(() => item.images && item.images.length > 0 ? item.images : [item.image_url].filter(Boolean), [item]);
@@ -287,18 +342,48 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
             <div className="lg:col-span-2 space-y-8">
                 {/* Image Gallery */}
                 <div className="h-[400px] rounded-[2.5rem] overflow-hidden relative group">
-                    <img src={allImages[0]} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+                    <img 
+                        src={allImages[currentImageIndex]} 
+                        className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                        alt={item.name}
+                    />
                     <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur px-4 py-2 rounded-2xl font-black text-sm flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-primary" /> {item.city}
                     </div>
                     {allImages.length > 1 && (
-                        <div className="absolute bottom-6 left-6 flex gap-2">
-                            {allImages.slice(1, 4).map((img, i) => (
-                                <div key={i} className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white shadow-lg cursor-pointer">
-                                    <img src={img} className="w-full h-full object-cover" />
-                                </div>
-                            ))}
-                        </div>
+                        <>
+                            {/* Navigation Arrows */}
+                            <button 
+                                onClick={() => setCurrentImageIndex(prev => prev > 0 ? prev - 1 : allImages.length - 1)}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-all shadow-lg"
+                            >
+                                <ArrowRight className="w-5 h-5 text-primary" />
+                            </button>
+                            <button 
+                                onClick={() => setCurrentImageIndex(prev => prev < allImages.length - 1 ? prev + 1 : 0)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-all shadow-lg"
+                            >
+                                <ArrowRight className="w-5 h-5 text-primary rotate-180" />
+                            </button>
+                            
+                            {/* Thumbnail Images */}
+                            <div className="absolute bottom-6 left-6 flex gap-2">
+                                {allImages.slice(1, 4).map((img, i) => (
+                                    <div 
+                                        key={i} 
+                                        className={`w-16 h-16 rounded-xl overflow-hidden border-2 shadow-lg cursor-pointer transition-all ${currentImageIndex === i + 1 ? 'border-primary scale-105' : 'border-white hover:border-primary/50'}`}
+                                        onClick={() => setCurrentImageIndex(i + 1)}
+                                    >
+                                        <img src={img} className="w-full h-full object-cover" alt={`صورة ${i + 2}`} />
+                                    </div>
+                                ))}
+                                {allImages.length > 4 && (
+                                    <div className="w-16 h-16 rounded-xl bg-white/90 backdrop-blur border-2 border-white flex items-center justify-center text-primary font-black text-sm">
+                                        +{allImages.length - 4}
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
 
@@ -704,6 +789,50 @@ export const HallDetails: React.FC<HallDetailsProps> = ({ item, user, onBack, on
                 </div>
             </div>
         </div>
+
+        {/* HyperPay Payment Modal */}
+        {showPaymentForm && checkoutData && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative animate-in zoom-in-95 duration-300">
+                    {/* Header */}
+                    <div className="sticky top-0 bg-white border-b border-gray-100 p-6 flex justify-between items-center rounded-t-3xl z-10">
+                        <div className="text-right">
+                            <h3 className="text-xl font-black text-gray-900">بوابة الدفع الآمن</h3>
+                            <p className="text-xs text-gray-500 font-bold mt-1">HyperPay - دفع آمن ومشفر</p>
+                        </div>
+                        <button 
+                            onClick={handlePaymentCancel}
+                            className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-red-50 transition-colors"
+                        >
+                            <X className="w-5 h-5 text-gray-500 hover:text-red-500" />
+                        </button>
+                    </div>
+
+                    {/* Payment Form */}
+                    <div className="p-6">
+                        <HyperPayForm 
+                            checkoutId={checkoutData.checkoutId}
+                            baseUrl={checkoutData.url}
+                            redirectUrl={window.location.href}
+                        />
+                    </div>
+
+                    {/* Payment Info */}
+                    <div className="border-t border-gray-100 p-6 bg-gray-50 rounded-b-3xl">
+                        <div className="flex items-center gap-3 text-sm font-bold text-gray-500">
+                            <ShieldCheck className="w-5 h-5 text-green-500" />
+                            <span>جميع عمليات الدفع مشفرة وآمنة 100%</span>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                            <img src="https://eu-test.oppwa.com/static/img/payment-icons/visa.png" alt="Visa" className="h-6 rounded" />
+                            <img src="https://eu-test.oppwa.com/static/img/payment-icons/mastercard.png" alt="Mastercard" className="h-6 rounded" />
+                            <img src="https://eu-test.oppwa.com/static/img/payment-icons/mada.png" alt="Mada" className="h-6 rounded" />
+                            <img src="https://eu-test.oppwa.com/static/img/payment-icons/applepay.png" alt="Apple Pay" className="h-6 rounded" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

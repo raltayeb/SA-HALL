@@ -416,16 +416,61 @@ export const SystemSettings: React.FC = () => {
               </div>
               {settings.payment_gateways.hyperpay_enabled && (
                 <div className="space-y-4 pt-4 border-t">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-xs font-bold text-blue-700 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4" />
+                      إعدادات بوابة الدفع HyperPay السعودية
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500">وضع الاختبار</label>
+                      <select
+                        value={settings.payment_gateways.hyperpay_mode as string}
+                        onChange={e => setSettings({ ...settings, payment_gateways: { ...settings.payment_gateways, hyperpay_mode: e.target.value as 'test' | 'live' } })}
+                        className="w-full h-11 border border-gray-200 rounded-xl px-4 bg-white outline-none font-bold text-sm"
+                      >
+                        <option value="test">اختبار (Test)</option>
+                        <option value="live">إنتاج (Live)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500">Base URL</label>
+                      <Input
+                        value={settings.payment_gateways.hyperpay_base_url}
+                        onChange={e => setSettings({ ...settings, payment_gateways: { ...settings.payment_gateways, hyperpay_base_url: e.target.value } })}
+                        className="h-11"
+                        placeholder="https://eu-test.oppwa.com"
+                      />
+                    </div>
+                  </div>
+                  
                   <Input
                     label="Entity ID"
                     value={settings.payment_gateways.hyperpay_entity_id}
                     onChange={e => setSettings({ ...settings, payment_gateways: { ...settings.payment_gateways, hyperpay_entity_id: e.target.value } })}
+                    className="h-11"
+                    placeholder="أدخل Entity ID من HyperPay"
                   />
                   <Input
                     label="Access Token"
                     value={settings.payment_gateways.hyperpay_access_token}
                     onChange={e => setSettings({ ...settings, payment_gateways: { ...settings.payment_gateways, hyperpay_access_token: e.target.value } })}
+                    className="h-11"
+                    placeholder="أدخل Access Token من HyperPay"
+                    type="password"
                   />
+                  
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-2">
+                    <p className="text-xs font-bold text-gray-500">طرق الدفع المدعومة:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="outline" className="bg-white">VISA</Badge>
+                      <Badge variant="outline" className="bg-white">Mastercard</Badge>
+                      <Badge variant="outline" className="bg-white">MADA</Badge>
+                      <Badge variant="outline" className="bg-white">Apple Pay</Badge>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
