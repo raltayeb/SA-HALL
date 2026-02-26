@@ -7,13 +7,13 @@ import { PriceTag } from '../components/ui/PriceTag';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
 import {
-  Plus, Trash2, Package, Search, Loader2, Edit3,
+  Plus, Trash2, Package, Search, Loader2, Edit3, AlertTriangle,
   Tag, ShoppingBag, CheckCircle2, XCircle
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 export const AdminStore: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders'>('orders');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'stock'>('orders');
   const [items, setItems] = useState<POSItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<POSItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
@@ -25,6 +25,7 @@ export const AdminStore: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<StoreOrder | null>(null);
+  const [stockAlertItems, setStockAlertItems] = useState<POSItem[]>([]);
 
   const { toast } = useToast();
 
@@ -32,10 +33,18 @@ export const AdminStore: React.FC = () => {
     setLoading(true);
     try {
       // Fetch all products (admin view)
-      const { data: pData, error: pError } = await supabase.from('pos_items').select('*').order('created_at', { ascending: false });
+      const { data: pData, error: pError } = await supabase.from('pos_items').select('*').order('stock', { ascending: true });
       if (pError) throw pError;
       setItems(pData || []);
       setFilteredItems(pData || []);
+
+      // Calculate stock alerts (items with less than 5% remaining)
+      const alerts = (pData || []).filter(item => {
+        const initialStock = 100; // Assuming initial stock is 100
+        const remainingPercent = (Number(item.stock) / initialStock) * 100;
+        return remainingPercent < 5;
+      }).slice(0, 10);
+      setStockAlertItems(alerts);
 
       // Fetch all orders
       const { data: oData, error: oError } = await supabase.from('store_orders').select('*').order('created_at', { ascending: false });
@@ -167,6 +176,24 @@ export const AdminStore: React.FC = () => {
                 المنتجات
               </div>
             </button>
+            <button
+              onClick={() => setActiveTab('stock')}
+              className={`px-6 py-3 text-sm font-semibold transition-colors ${
+                activeTab === 'stock'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                تنبيهات المخزون
+                {stockAlertItems.length > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                    {stockAlertItems.length}
+                  </span>
+                )}
+              </div>
+            </button>
           </div>
         </div>
 
@@ -240,6 +267,93 @@ export const AdminStore: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          ) : activeTab === 'stock' ? (
+            /* Stock Alerts Section */
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-amber-900">تنبيهات المخزون المنخفض</h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      المنتجات التي يقل مخزونها عن 5% من الكمية الأولية
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المنتج</th>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">التصنيف</th>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المخزون الحالي</th>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">نسبة المتبقي</th>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                      <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">إجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stockAlertItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-20 text-center text-gray-500">
+                          <CheckCircle2 className="w-16 h-16 text-green-300 mx-auto mb-4" />
+                          <p className="font-semibold">لا توجد تنبيهات مخزون</p>
+                          <p className="text-sm mt-2">جميع المنتجات لديها مخزون كافي</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      stockAlertItems.map((item) => {
+                        const remainingPercent = (Number(item.stock) / 100) * 100;
+                        return (
+                          <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="p-4">
+                              <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                            </td>
+                            <td className="p-4">
+                              <p className="text-sm text-gray-700">{item.category || 'عام'}</p>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="destructive">{item.stock} قطعة</Badge>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full ${
+                                      remainingPercent < 5 ? 'bg-red-500' : 'bg-yellow-500'
+                                    }`}
+                                    style={{ width: `${remainingPercent}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs font-bold text-gray-700">{remainingPercent.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="destructive">منخفض جداً</Badge>
+                            </td>
+                            <td className="p-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentItem(item);
+                                  setIsItemModalOpen(true);
+                                }}
+                                className="text-xs"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             /* Products Section */

@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { FeaturedHallsCarousel } from '../components/FeaturedHallsCarousel';
 import {
-  Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Building2, Palmtree
+  Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Building2, Palmtree, Tag
 } from 'lucide-react';
 
 interface HomeProps {
@@ -42,6 +42,7 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
   const [halls, setHalls] = useState<Hall[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [featuredHalls, setFeaturedHalls] = useState<Hall[]>([]);
+  const [featuredServices, setFeaturedServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentHeroImage, setCurrentHeroImage] = useState(0);
   const [searchTab, setSearchTab] = useState<'halls' | 'services'>('halls');
@@ -122,9 +123,36 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
         .eq('is_active', true)
         .limit(4);
 
+      // Fetch featured services
+      const { data: featuredServicesData, error: featuredServicesError } = await supabase
+        .from('featured_services')
+        .select(`
+          service_id,
+          services (
+            *,
+            vendor:vendor_id(*)
+          )
+        `)
+        .eq('services.is_active', true);
+
+      if (featuredServicesError) {
+        console.error('❌ Featured services error:', featuredServicesError);
+      }
+
+      const featuredServicesList: Service[] = [];
+      if (featuredServicesData) {
+        featuredServicesData.forEach(f => {
+          if (f.services) {
+            featuredServicesList.push(f.services as unknown as Service);
+          }
+        });
+      }
+      console.log('✅ Featured services count:', featuredServicesList.length);
+
       setFeaturedHalls(hallsList as Hall[]);
       setHalls(hData || []);
       setServices(sData || []);
+      setFeaturedServices(featuredServicesList);
     } catch (err) {
       console.error('❌ General error:', err);
     } finally {
@@ -336,6 +364,23 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
                 <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500 font-bold text-lg">لا توجد قاعات مميزة حالياً</p>
                 <p className="text-gray-400 text-sm mt-2">القاعات المميزة ستظهر هنا عند إضافتها من قبل الإدارة</p>
+              </div>
+            )}
+          </div>
+
+          {/* Featured Services */}
+          <div className="space-y-12">
+            <SectionHeader title="خدمات مميزة" icon={Sparkles} />
+
+            {featuredServices.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {featuredServices.map(s => renderCard(s, 'service', 'خدمة مميزة'))}
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-gray-50 rounded-[2rem] border border-gray-100">
+                <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 font-bold text-lg">لا توجد خدمات مميزة حالياً</p>
+                <p className="text-gray-400 text-sm mt-2">الخدمات المميزة ستظهر هنا عند إضافتها من قبل الإدارة</p>
               </div>
             )}
           </div>

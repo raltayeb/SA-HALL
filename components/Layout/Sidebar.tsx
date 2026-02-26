@@ -3,7 +3,7 @@ import React from 'react';
 import { UserProfile } from '../../types';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
-  CalendarDays, Settings, X, Tag,
+  CalendarDays, Settings, X, Tag, Tag as TagIcon,
   FileText, BarChart3, Layers, Inbox,
   Receipt, Store, LogOut, Star, Megaphone, UserCheck, Banknote
 } from 'lucide-react';
@@ -37,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, activeTab, setActiveTab,
         title: "إدارة المنصة",
         items: [
           { id: 'admin_halls', label: 'إدارة القاعات', icon: <Building2 className="w-5 h-5" /> },
+          { id: 'admin_services', label: 'إدارة الخدمات', icon: <TagIcon className="w-5 h-5" /> },
           { id: 'admin_subscribers', label: 'إدارة المشتركين', icon: <UserCheck className="w-5 h-5" /> },
           { id: 'admin_accounting', label: 'الحسابات', icon: <Banknote className="w-5 h-5" /> },
           { id: 'admin_coupons', label: 'كوبونات الخصم', icon: <Tag className="w-5 h-5" /> },

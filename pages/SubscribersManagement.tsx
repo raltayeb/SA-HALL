@@ -4,9 +4,10 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import { Badge } from '../components/ui/Badge';
+import { PriceTag } from '../components/ui/PriceTag';
 import {
   Users, Search, Loader2, Star, StarOff, CheckCircle2, XCircle,
-  Building2, Mail, Phone, Edit3, Shield, UserCheck, UserX
+  Building2, Mail, Phone, Edit3, Shield, UserCheck, UserX, Tag
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -32,6 +33,14 @@ interface Hall {
   is_active: boolean;
 }
 
+interface Service {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  is_active: boolean;
+}
+
 export const SubscribersManagement: React.FC = () => {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [filteredSubscribers, setFilteredSubscribers] = useState<Subscriber[]>([]);
@@ -48,7 +57,9 @@ export const SubscribersManagement: React.FC = () => {
   const [selectedSubscriber, setSelectedSubscriber] = useState<Subscriber | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isHallsModalOpen, setIsHallsModalOpen] = useState(false);
+  const [isServicesModalOpen, setIsServicesModalOpen] = useState(false);
   const [subscriberHalls, setSubscriberHalls] = useState<Hall[]>([]);
+  const [subscriberServices, setSubscriberServices] = useState<Service[]>([]);
 
   useEffect(() => {
     fetchSubscribers();
@@ -159,14 +170,30 @@ export const SubscribersManagement: React.FC = () => {
     setIsHallsModalOpen(true);
   };
 
+  const handleOpenServices = async (subscriber: Subscriber) => {
+    setSelectedSubscriber(subscriber);
+    await fetchSubscriberServices(subscriber.id);
+    setIsServicesModalOpen(true);
+  };
+
   const fetchSubscriberHalls = async (userId: string) => {
     const { data } = await supabase
       .from('halls')
       .select('id, name, city, is_active')
       .eq('vendor_id', userId)
       .order('name');
-    
+
     setSubscriberHalls(data || []);
+  };
+
+  const fetchSubscriberServices = async (userId: string) => {
+    const { data } = await supabase
+      .from('services')
+      .select('id, name, category, price, is_active')
+      .eq('vendor_id', userId)
+      .order('name');
+
+    setSubscriberServices(data || []);
   };
 
   const handleToggleHallActive = async (hallId: string, isActive: boolean) => {
@@ -304,16 +331,30 @@ export const SubscribersManagement: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenHalls(sub);
-                        }}
-                        className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
-                      >
-                        <Building2 className="w-4 h-4" />
-                        عرض القاعات
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenHalls(sub);
+                          }}
+                          className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
+                        >
+                          <Building2 className="w-4 h-4" />
+                          عرض القاعات
+                        </button>
+                        {sub.role === 'vendor' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenServices(sub);
+                            }}
+                            className="text-sm font-bold text-purple-600 hover:underline flex items-center gap-1"
+                          >
+                            <Tag className="w-4 h-4" />
+                            عرض الخدمات
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="p-4">
                       <div className="flex gap-2">
@@ -460,46 +501,37 @@ export const SubscribersManagement: React.FC = () => {
         )}
       </Modal>
 
-      {/* Halls Modal */}
+      {/* Services Modal */}
       <Modal
-        isOpen={isHallsModalOpen}
-        onClose={() => setIsHallsModalOpen(false)}
-        title="قاعات المشترك"
+        isOpen={isServicesModalOpen}
+        onClose={() => setIsServicesModalOpen(false)}
+        title="خدمات المشترك"
         className="max-w-2xl"
       >
         <div className="space-y-4">
-          {subscriberHalls.length === 0 ? (
+          {subscriberServices.length === 0 ? (
             <div className="p-8 text-center text-gray-500 font-bold">
-              لا توجد قاعات مضافة
+              لا توجد خدمات مضافة
             </div>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {subscriberHalls.map(hall => {
-                return (
-                  <div
-                    key={hall.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
-                  >
-                    <div className="flex-1">
-                      <p className="font-bold text-sm text-gray-900">{hall.name}</p>
-                      <p className="text-xs text-gray-500">{hall.city}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleToggleHallActive(hall.id, hall.is_active)}
-                        className="p-2 hover:bg-green-50 rounded-lg transition-colors"
-                        title={hall.is_active ? 'تعطيل القاعة' : 'تفعيل القاعة'}
-                      >
-                        {hall.is_active ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                    </div>
+              {subscriberServices.map(service => (
+                <div
+                  key={service.id}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                >
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-gray-900">{service.name}</p>
+                    <p className="text-xs text-gray-500">{service.category}</p>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-3">
+                    <PriceTag amount={service.price} className="text-sm font-bold" />
+                    <Badge variant={service.is_active ? 'success' : 'default'}>
+                      {service.is_active ? 'نشط' : 'غير نشط'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

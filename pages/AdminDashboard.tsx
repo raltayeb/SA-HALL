@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import {
   Building2, CalendarCheck, Banknote, Users, Tag,
-  TrendingUp, Star, Clock, ShoppingBag, UserCheck, Activity, PieChart
+  TrendingUp, Star, Clock, ShoppingBag, UserCheck, Activity, PieChart, AlertTriangle
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPie, Pie, Cell, Legend
@@ -67,6 +67,7 @@ export const AdminDashboard: React.FC = () => {
   const [popularProducts, setPopularProducts] = useState<POSItem[]>([]);
   const [topHalls, setTopHalls] = useState<Hall[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  const [stockAlerts, setStockAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -87,7 +88,8 @@ export const AdminDashboard: React.FC = () => {
         { count: ordersCount },
         { data: hallsData },
         { data: ordersData },
-        { data: productsData }
+        { data: productsData },
+        { data: stockData }
       ] = await Promise.all([
         supabase.from('halls').select('*', { count: 'exact', head: true }),
         supabase.from('halls').select('*', { count: 'exact', head: true }).eq('is_active', true),
@@ -98,7 +100,8 @@ export const AdminDashboard: React.FC = () => {
         supabase.from('store_orders').select('*', { count: 'exact', head: true }),
         supabase.from('halls').select('id, name, is_active'),
         supabase.from('store_orders').select('total_amount, status, created_at, guest_info').order('created_at', { ascending: false }).limit(10),
-        supabase.from('pos_items').select('id, name').limit(5)
+        supabase.from('pos_items').select('id, name').limit(5),
+        supabase.from('pos_items').select('id, name, stock, category').order('stock', { ascending: true }).limit(10)
       ]);
 
       const revenue = ordersData?.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0) || 0;
@@ -128,6 +131,13 @@ export const AdminDashboard: React.FC = () => {
       // Get pending orders
       const pendingOrdersData = (ordersData || []).filter((o: any) => o.status === 'pending').slice(0, 5) || [];
       setPendingOrders(pendingOrdersData);
+
+      // Get stock alerts (items with less than 5% remaining)
+      const stockAlertData = (stockData || []).filter((item: any) => {
+        const remainingPercent = (Number(item.stock) / 100) * 100;
+        return remainingPercent < 5;
+      });
+      setStockAlerts(stockAlertData);
 
       setStats({
         totalHalls: totalHallsCount || 0,
@@ -544,6 +554,66 @@ export const AdminDashboard: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Stock Alerts */}
+      {stockAlerts.length > 0 && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="p-5 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <div>
+                <h4 className="font-bold text-gray-900">تنبيهات المخزون المنخفض</h4>
+                <p className="text-xs text-gray-500 mt-1">منتجات يقل مخزونها عن 5%</p>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المنتج</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">التصنيف</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">المخزون الحالي</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">نسبة المتبقي</th>
+                  <th className="text-right p-4 text-xs font-semibold text-gray-500 uppercase">الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockAlerts.map((item, index) => {
+                  const remainingPercent = (Number(item.stock) / 100) * 100;
+                  return (
+                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="p-4">
+                        <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                      </td>
+                      <td className="p-4">
+                        <p className="text-sm text-gray-700">{item.category || 'عام'}</p>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="destructive">{item.stock} قطعة</Badge>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="h-2 rounded-full bg-red-500"
+                              style={{ width: `${remainingPercent}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-bold text-gray-700">{remainingPercent.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="destructive">منخفض جداً</Badge>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
