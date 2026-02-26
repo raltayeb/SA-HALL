@@ -5,6 +5,7 @@ import { Hall, UserProfile, Service, SAUDI_CITIES } from '../types';
 import { Button } from '../components/ui/Button';
 import { PriceTag } from '../components/ui/PriceTag';
 import { FeaturedHallsCarousel } from '../components/FeaturedHallsCarousel';
+import { FeaturedServicesCarousel } from '../components/FeaturedServicesCarousel';
 import {
   Sparkles, Star, MapPin, Zap, ArrowLeft, ShoppingBag, Store, Search, Users, Calendar, Building2, Palmtree, Tag
 } from 'lucide-react';
@@ -368,14 +369,31 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             )}
           </div>
 
+          {/* Halls */}
+          <div className="space-y-12">
+            <SectionHeader title="القاعات" icon={Sparkles} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {loading 
+                  ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) 
+                  : halls.slice(0, 8).map(h => renderCard(h, 'hall', 'قاعة'))}
+            </div>
+
+            <div className="flex justify-start pt-8">
+                <Button
+                    onClick={() => onNavigate('browse_halls')}
+                    className="h-14 px-10 rounded-2xl font-black text-base bg-primary text-white hover:bg-primary/90 gap-2 transition-all hover:scale-105"
+                >
+                    عرض جميع القاعات <ArrowLeft className="w-5 h-5" />
+                </Button>
+            </div>
+          </div>
+
           {/* Featured Services */}
           <div className="space-y-12">
             <SectionHeader title="خدمات مميزة" icon={Sparkles} />
 
             {featuredServices.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {featuredServices.map(s => renderCard(s, 'service', 'خدمة مميزة'))}
-              </div>
+              <FeaturedServicesCarousel services={featuredServices} onNavigate={onNavigate} />
             ) : (
               <div className="text-center py-16 bg-gray-50 rounded-[2rem] border border-gray-100">
                 <Tag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -385,36 +403,19 @@ export const Home: React.FC<HomeProps> = ({ user, onLoginClick, onRegisterClick,
             )}
           </div>
 
-          {/* Halls */}
-          <div className="space-y-12">
-            <SectionHeader title="القاعات" icon={Sparkles} />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : halls.map(h => renderCard(h, 'hall', 'قاعة'))}
-            </div>
-            
-            <div className="flex justify-center pt-8">
-                <Button 
-                    onClick={() => onNavigate('browse_halls')} 
-                    variant="outline" 
-                    className="h-14 px-10 rounded-2xl font-black text-base border-2 border-gray-100 hover:border-primary hover:text-primary gap-2 transition-all hover:scale-105"
-                >
-                    عرض جميع القاعات <ArrowLeft className="w-5 h-5" />
-                </Button>
-            </div>
-          </div>
-
           {/* Services */}
           <div className="space-y-12">
             <SectionHeader title="خدمات المناسبات" />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {loading ? [1,2,3,4].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) : services.map(s => renderCard(s, 'service', 'خدمة'))}
+                {loading 
+                  ? [1,2,3,4,5,6,7,8].map(i => <div key={i} className="aspect-[4/5] bg-gray-100 rounded-[2.5rem] animate-pulse"></div>) 
+                  : services.slice(0, 8).map(s => renderCard(s, 'service', 'خدمة'))}
             </div>
 
-            <div className="flex justify-center pt-8">
-                <Button 
-                    onClick={() => onNavigate('browse_services')} 
-                    variant="outline" 
-                    className="h-14 px-10 rounded-2xl font-black text-base border-2 border-gray-100 hover:border-orange-500 hover:text-orange-600 gap-2 transition-all hover:scale-105"
+            <div className="flex justify-start pt-8">
+                <Button
+                    onClick={() => onNavigate('browse_services')}
+                    className="h-14 px-10 rounded-2xl font-black text-base bg-primary text-white hover:bg-primary/90 gap-2 transition-all hover:scale-105"
                 >
                     عرض جميع الخدمات <ArrowLeft className="w-5 h-5" />
                 </Button>

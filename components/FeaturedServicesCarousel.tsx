@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { Hall } from '../types';
+import { Service } from '../types';
 import { PriceTag } from './ui/PriceTag';
 import { Sparkles, Star, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface FeaturedHallsCarouselProps {
-  halls: Hall[];
+interface FeaturedServicesCarouselProps {
+  services: Service[];
   onNavigate: (tab: string, item: any) => void;
 }
 
-export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ halls, onNavigate }) => {
+export const FeaturedServicesCarousel: React.FC<FeaturedServicesCarouselProps> = ({ services, onNavigate }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const visibleCount = 3;
-  const totalSlides = Math.max(0, halls.length - visibleCount);
+  const totalSlides = Math.max(0, services.length - visibleCount);
 
   const nextSlide = () => {
     if (isAnimating || currentSlide >= totalSlides) return;
@@ -29,8 +29,6 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
     setTimeout(() => setIsAnimating(false), 300);
   };
 
-  const displayedHalls = halls.slice(0, Math.min(halls.length, visibleCount + (currentSlide > 0 ? 1 : 0)));
-
   return (
     <div className="relative">
       {/* Carousel Container */}
@@ -41,16 +39,16 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
             transform: `translateX(-${currentSlide * (100 / visibleCount)}%)`,
           }}
         >
-          {halls.map((hall) => (
+          {services.map((service) => (
             <div
-              key={hall.id}
-              onClick={() => onNavigate('hall_details', { item: hall, type: 'hall' })}
+              key={service.id}
+              onClick={() => onNavigate('hall_details', { item: service, type: 'service' })}
               className="group relative cursor-pointer overflow-hidden rounded-[2.5rem] h-[450px] bg-white shadow-lg"
             >
               <img
-                src={hall.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'}
+                src={service.image_url || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80&w=800'}
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                alt={hall.name}
+                alt={service.name}
               />
 
               <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent opacity-90 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -61,7 +59,7 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
 
               <div className="absolute inset-x-0 bottom-0 p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-2xl font-black text-white truncate flex-1">{hall.name}</h3>
+                  <h3 className="text-2xl font-black text-white truncate flex-1">{service.name}</h3>
                   <div className="flex items-center gap-1 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-full mr-3 shrink-0">
                     <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     <span className="text-sm font-black text-white">4.9</span>
@@ -71,11 +69,11 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-white/90">
                     <MapPin className="w-4 h-4" />
-                    <span className="text-sm font-bold">{hall.city}</span>
+                    <span className="text-sm font-bold">{service.category}</span>
                   </div>
                   <div className="text-right">
-                    <PriceTag amount={hall.price_per_night} className="text-lg font-black text-white" />
-                    <span className="text-[10px] text-white/70 font-bold">/ لليلة</span>
+                    <PriceTag amount={service.price} className="text-lg font-black text-white" />
+                    <span className="text-[10px] text-white/70 font-bold">/ للخدمة</span>
                   </div>
                 </div>
               </div>
@@ -85,7 +83,7 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
       </div>
 
       {/* Navigation Arrows */}
-      {halls.length > visibleCount && (
+      {services.length > visibleCount && (
         <>
           <button
             onClick={nextSlide}
@@ -108,7 +106,7 @@ export const FeaturedHallsCarousel: React.FC<FeaturedHallsCarouselProps> = ({ ha
       )}
 
       {/* Slide Indicators */}
-      {halls.length > visibleCount && (
+      {services.length > visibleCount && (
         <div className="flex justify-center gap-2 mt-6">
           {Array.from({ length: totalSlides + 1 }).map((_, i) => (
             <button

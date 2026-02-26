@@ -63,6 +63,12 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('home');
   const [loading, setLoading] = useState(true);
   const [themeConfig, setThemeConfig] = useState<ThemeConfig | null>(null);
+
+  // Wrapper to update both state and URL hash
+  const updateActiveTab = (tab: string) => {
+    setActiveTab(tab);
+    window.location.hash = tab;
+  };
   
   // Registration State
   const [regStep, setRegStep] = useState(1);
@@ -137,21 +143,32 @@ const App: React.FC = () => {
       else {
           setUserProfile(null);
           setLoading(false);
-          setActiveTab('home');
       }
     });
 
     // Listen for navigation events from dashboard
     const handleNavigate = (e: any) => {
       const page = e.detail?.page;
-      if (page) setActiveTab(page);
+      if (page) {
+        setActiveTab(page);
+        window.location.hash = page;
+      }
     };
 
     window.addEventListener('navigate', handleNavigate);
 
+    // Handle hash changes to preserve page on reload
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash) setActiveTab(hash);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+
     return () => {
       subscription.unsubscribe();
       window.removeEventListener('navigate', handleNavigate);
+      window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
 
@@ -164,7 +181,7 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUserProfile(null);
-    setActiveTab('home');
+    updateActiveTab('home');
   };
 
   const navigateToDetails = (tab: string, item: any) => {
