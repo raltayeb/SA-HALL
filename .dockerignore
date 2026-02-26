@@ -1,0 +1,45 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist
+build
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Dokploy/Nixpacks (not needed when using Dockerfile)
+.nixpacks
+supabase-edge-functions
+
+# Documentation (not needed in production build)
+*.md
+!README.md
+PAYMENT_AND_SERVICES_FIXES.md
+HYPERPAY_CORS_FIX.md
+HYPERPAY_EDGE_FUNCTION_SETUP.md
+db_*.sql
+
+# TypeScript config (not needed in build)
+tsconfig.json
+
+# Supabase folder (not needed for frontend build)
+supabase/
